@@ -3,6 +3,7 @@ import { useBattle } from '../context/BattleContext';
 import TimerDisplay from './TimerDisplay';
 import FirebaseModal from './FirebaseModal';
 import ParticipantSubmitView from './ParticipantSubmitView';
+import ContenderRosterManager from './ContenderRosterManager';
 import { 
   ShieldCheck, 
   Lock, 
@@ -74,14 +75,25 @@ export default function AdminView() {
     publishQuizLeaderboard,
     resetQuiz,
     addQuizQuestion,
+    updateQuizQuestion,
+    deleteQuizQuestion,
+    updatePoll,
+    deletePoll,
+    tokenBudget,
     resetAllData,
     firebaseStatus
   } = useBattle();
 
-  // Admin Section Tab: 'battle' | 'poll' | 'quiz'
+  // Admin Section Tab: 'battle' | 'roster' | 'poll' | 'quiz'
   const [adminTab, setAdminTab] = useState('battle');
   const [showMobileSimulator, setShowMobileSimulator] = useState(false);
   const [evaluationViewMode, setEvaluationViewMode] = useState('table'); // 'table' | 'cards'
+
+  // Edit Quiz Question Modal State
+  const [editingQuizQ, setEditingQuizQ] = useState(null);
+
+  // Edit Poll Modal State
+  const [editingPollModal, setEditingPollModal] = useState(null);
 
   // Login form state
   const [passwordInput, setPasswordInput] = useState('');
@@ -576,6 +588,18 @@ export default function AdminView() {
             </button>
 
             <button
+              onClick={() => setAdminTab('roster')}
+              className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
+                adminTab === 'roster'
+                  ? 'border-fest-pes text-fest-pes'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Contender Roster & Excel Import</span>
+            </button>
+
+            <button
               onClick={() => setAdminTab('poll')}
               className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
                 adminTab === 'poll'
@@ -762,16 +786,28 @@ export default function AdminView() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {participants.map((p, idx) => (
                   <div key={p.id} className="p-4 sm:p-5 rounded-xl bg-dark-900 border border-white/10 space-y-4 hover:border-fest-cyan/30 transition-all shadow-md">
-                    {/* Card Header: Contender Name & Total Score Badge */}
+                    {/* Card Header: Contender Station ID, Name & Total Score */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded bg-dark-950 border border-white/10 text-fest-cyan font-mono text-xs font-bold flex items-center justify-center shrink-0">
-                            #{idx + 1}
+                          <span className="px-2 py-0.5 rounded bg-fest-cyan/20 border border-fest-cyan/40 text-fest-cyan font-mono text-xs font-bold shrink-0">
+                            {p.participantId || `#${idx + 1}`}
                           </span>
                           <span className="font-sans font-bold text-base text-white truncate">{p.name}</span>
                         </div>
                         <span className="text-xs text-fest-pink font-mono block mt-0.5 truncate">{p.teamName}</span>
+                        
+                        {/* Time & Token Score Badges */}
+                        <div className="flex items-center gap-2 text-[10px] font-mono mt-1">
+                          <span className="text-emerald-400">
+                            Time: <strong>{p.timeScore !== undefined ? p.timeScore : 15}/15</strong>
+                          </span>
+                          <span className="text-white/20">•</span>
+                          <span className="text-fest-pink">
+                            Tokens: <strong>{p.tokenScore !== undefined ? p.tokenScore : 15}/15</strong>
+                          </span>
+                        </div>
+
                         <div className="mt-1 flex items-center gap-2">
                           {p.tabSwitches > 0 ? (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold text-[10px]">
@@ -799,7 +835,10 @@ export default function AdminView() {
                     {/* Inputs Grid */}
                     <div className="grid grid-cols-2 gap-3 font-mono text-xs">
                       <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Finish Time Recorded</label>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-slate-400">Finish Time</span>
+                          <span className="text-emerald-400">{p.timeScore !== undefined ? p.timeScore : 15}/15 pts</span>
+                        </div>
                         <input
                           type="text"
                           value={p.finishTimeFormatted || ''}
@@ -809,7 +848,10 @@ export default function AdminView() {
                       </div>
 
                       <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Tokens Consumed</label>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-slate-400">Tokens</span>
+                          <span className="text-fest-pink">{p.tokenScore !== undefined ? p.tokenScore : 15}/15 pts</span>
+                        </div>
                         <input
                           type="number"
                           min="0"
@@ -822,12 +864,12 @@ export default function AdminView() {
                       <div>
                         <div className="flex justify-between text-[11px] mb-1">
                           <span className="text-fest-cyan font-semibold">Objective</span>
-                          <span className="text-fest-cyan">{p.objectiveScore || 0}/30</span>
+                          <span className="text-fest-cyan">{p.objectiveScore || 0}/25</span>
                         </div>
                         <input
                           type="number"
                           min="0"
-                          max="30"
+                          max="25"
                           value={p.objectiveScore || 0}
                           onChange={(e) => updateParticipantMarks(p.id, { objectiveScore: Number(e.target.value) })}
                           className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-fest-cyan/40 text-fest-cyan text-xs font-bold text-center"
@@ -835,28 +877,28 @@ export default function AdminView() {
                       </div>
 
                       <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Finish Status</label>
+                        <label className="block text-[11px] text-slate-400 mb-1">Finish Status (0-15)</label>
                         <select
                           value={p.finishStatus || 'Partially Fulfilled'}
                           onChange={(e) => updateParticipantMarks(p.id, { finishStatus: e.target.value })}
                           className="w-full px-2 py-1.5 rounded bg-dark-950 border border-white/15 text-slate-200 text-xs"
                         >
-                          <option value="Fully Completed">Fully Completed (20 pts)</option>
-                          <option value="Substantially Completed">Substantially Completed (16 pts)</option>
-                          <option value="Partially Fulfilled">Partially Fulfilled (12 pts)</option>
-                          <option value="Minimal Fulfillment">Minimal Fulfillment (6 pts)</option>
+                          <option value="Fully Completed">Fully Completed (15 pts)</option>
+                          <option value="Substantially Completed">Substantially Completed (12 pts)</option>
+                          <option value="Partially Fulfilled">Partially Fulfilled (8 pts)</option>
+                          <option value="Minimal Fulfillment">Minimal Fulfillment (4 pts)</option>
                         </select>
                       </div>
 
                       <div>
                         <div className="flex justify-between text-[11px] mb-1">
                           <span className="text-slate-300">Presentation</span>
-                          <span className="text-slate-300">{p.presentationScore || 0}/25</span>
+                          <span className="text-slate-300">{p.presentationScore || 0}/15</span>
                         </div>
                         <input
                           type="number"
                           min="0"
-                          max="25"
+                          max="15"
                           value={p.presentationScore || 0}
                           onChange={(e) => updateParticipantMarks(p.id, { presentationScore: Number(e.target.value) })}
                           className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-white/15 text-white text-xs text-center"
@@ -866,12 +908,12 @@ export default function AdminView() {
                       <div>
                         <div className="flex justify-between text-[11px] mb-1">
                           <span className="text-fest-pink font-semibold">Novelty</span>
-                          <span className="text-fest-pink">{p.noveltyScore || 0}/25</span>
+                          <span className="text-fest-pink">{p.noveltyScore || 0}/15</span>
                         </div>
                         <input
                           type="number"
                           min="0"
-                          max="25"
+                          max="15"
                           value={p.noveltyScore || 0}
                           onChange={(e) => updateParticipantMarks(p.id, { noveltyScore: Number(e.target.value) })}
                           className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-fest-pink/40 text-fest-pink text-xs font-bold text-center"
@@ -881,9 +923,22 @@ export default function AdminView() {
 
                     {/* Card Footer */}
                     <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[11px] font-mono">
-                      <span className="text-slate-400 truncate max-w-[200px]" title={p.notes || 'No notes'}>
-                        {p.notes ? `Note: ${p.notes}` : 'No notes recorded'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {p.workUrl && (
+                          <a
+                            href={p.workUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-fest-cyan hover:underline inline-flex items-center gap-1"
+                          >
+                            <span>Inspect Prompt</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                        <span className="text-slate-400 truncate max-w-[150px]" title={p.notes || 'No notes'}>
+                          {p.notes ? `Note: ${p.notes}` : ''}
+                        </span>
+                      </div>
                       <button
                         onClick={() => {
                           if (window.confirm(`Delete ${p.name}?`)) {
@@ -902,16 +957,16 @@ export default function AdminView() {
             ) : (
               /* SPREADSHEET TABLE VIEW (PC OPTIMIZED) */
               <div className="overflow-x-auto border border-white/10 rounded-lg">
-                <table className="w-full min-w-[960px] text-left font-mono text-xs">
+                <table className="w-full min-w-[1020px] text-left font-mono text-xs">
                   <thead className="bg-dark-950 text-slate-400 uppercase tracking-wider text-[11px] border-b border-white/10">
                     <tr>
-                      <th className="py-3 px-3">Contender</th>
-                      <th className="py-3 px-3">Finish Time</th>
-                      <th className="py-3 px-3">Tokens Used</th>
-                      <th className="py-3 px-3">Objective (0-30)</th>
-                      <th className="py-3 px-3">Finish Status</th>
-                      <th className="py-3 px-3">Presentation (0-25)</th>
-                      <th className="py-3 px-3">Novelty (0-25)</th>
+                      <th className="py-3 px-3">Station & Contender</th>
+                      <th className="py-3 px-3">Finish Time (15)</th>
+                      <th className="py-3 px-3">Tokens Used (15)</th>
+                      <th className="py-3 px-3">Objective (0-25)</th>
+                      <th className="py-3 px-3">Finish Status (0-15)</th>
+                      <th className="py-3 px-3">Presentation (0-15)</th>
+                      <th className="py-3 px-3">Novelty (0-15)</th>
                       <th className="py-3 px-3 text-center">Tab Switches</th>
                       <th className="py-3 px-3 text-right">Total Score</th>
                       <th className="py-3 px-3 text-center">Action</th>
@@ -921,8 +976,24 @@ export default function AdminView() {
                     {participants.map((p) => (
                       <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
                         <td className="py-3 px-3 font-sans">
-                          <div className="font-bold text-white text-sm">{p.name}</div>
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="px-1.5 py-0.5 rounded bg-fest-cyan/20 border border-fest-cyan/40 text-fest-cyan font-mono text-[11px] font-bold">
+                              {p.participantId || 'STATION'}
+                            </span>
+                            <span className="font-bold text-white text-sm">{p.name}</span>
+                          </div>
                           <div className="text-xs text-fest-pink font-mono">{p.teamName}</div>
+                          {p.workUrl && (
+                            <a
+                              href={p.workUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-fest-cyan hover:underline text-[10px] font-mono flex items-center gap-1 mt-0.5"
+                            >
+                              <span>Inspect Prompt Link</span>
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          )}
                           {p.notes && (
                             <div className="text-[10px] text-slate-400 font-mono mt-0.5 max-w-xs truncate" title={p.notes}>
                               Note: {p.notes}
@@ -937,6 +1008,9 @@ export default function AdminView() {
                             onChange={(e) => updateParticipantMarks(p.id, { finishTimeFormatted: e.target.value })}
                             className="w-24 px-2 py-1 rounded bg-dark-950 border border-white/10 text-white font-mono text-xs focus:border-fest-cyan"
                           />
+                          <div className="text-[10px] text-emerald-400 font-mono mt-0.5">
+                            Time: <strong>{p.timeScore !== undefined ? p.timeScore : 15}/15</strong>
+                          </div>
                         </td>
 
                         <td className="py-3 px-3">
@@ -947,13 +1021,16 @@ export default function AdminView() {
                             onChange={(e) => updateParticipantMarks(p.id, { tokensUsed: Number(e.target.value) })}
                             className="w-20 px-2 py-1 rounded bg-dark-950 border border-white/10 text-white font-mono text-xs focus:border-fest-cyan"
                           />
+                          <div className="text-[10px] text-fest-pink font-mono mt-0.5">
+                            Tokens: <strong>{p.tokenScore !== undefined ? p.tokenScore : 15}/15</strong>
+                          </div>
                         </td>
 
                         <td className="py-3 px-3">
                           <input
                             type="number"
                             min="0"
-                            max="30"
+                            max="25"
                             value={p.objectiveScore || 0}
                             onChange={(e) => updateParticipantMarks(p.id, { objectiveScore: Number(e.target.value) })}
                             className="w-16 px-2 py-1 rounded bg-dark-950 border border-fest-cyan/40 text-fest-cyan font-mono text-xs font-bold text-center"
@@ -966,10 +1043,10 @@ export default function AdminView() {
                             onChange={(e) => updateParticipantMarks(p.id, { finishStatus: e.target.value })}
                             className="px-2 py-1 rounded bg-dark-950 border border-white/15 text-slate-200 font-mono text-xs focus:border-fest-pink"
                           >
-                            <option value="Fully Completed">Fully Completed (20 pts)</option>
-                            <option value="Substantially Completed">Substantially Completed (16 pts)</option>
-                            <option value="Partially Fulfilled">Partially Fulfilled (12 pts)</option>
-                            <option value="Minimal Fulfillment">Minimal Fulfillment (6 pts)</option>
+                            <option value="Fully Completed">Fully Completed (15 pts)</option>
+                            <option value="Substantially Completed">Substantially Completed (12 pts)</option>
+                            <option value="Partially Fulfilled">Partially Fulfilled (8 pts)</option>
+                            <option value="Minimal Fulfillment">Minimal Fulfillment (4 pts)</option>
                           </select>
                         </td>
 
@@ -977,7 +1054,7 @@ export default function AdminView() {
                           <input
                             type="number"
                             min="0"
-                            max="25"
+                            max="15"
                             value={p.presentationScore || 0}
                             onChange={(e) => updateParticipantMarks(p.id, { presentationScore: Number(e.target.value) })}
                             className="w-16 px-2 py-1 rounded bg-dark-950 border border-white/10 text-white font-mono text-xs text-center"
@@ -988,7 +1065,7 @@ export default function AdminView() {
                           <input
                             type="number"
                             min="0"
-                            max="25"
+                            max="15"
                             value={p.noveltyScore || 0}
                             onChange={(e) => updateParticipantMarks(p.id, { noveltyScore: Number(e.target.value) })}
                             className="w-16 px-2 py-1 rounded bg-dark-950 border border-fest-pink/40 text-fest-pink font-mono text-xs font-bold text-center"
@@ -1039,6 +1116,15 @@ export default function AdminView() {
         </div>
       )}
 
+      {/* TAB: CONTENDER ROSTER & EXCEL IMPORT */}
+      {adminTab === 'roster' && (
+        <ContenderRosterManager 
+          onSelectForEvaluation={(p) => {
+            setAdminTab('battle');
+          }}
+        />
+      )}
+
       {/* TAB 2: LIVE POLL & MCQ MANAGER */}
       {adminTab === 'poll' && (
         <div className="space-y-8">
@@ -1079,6 +1165,31 @@ export default function AdminView() {
                   }`}
                 >
                   {poll?.published ? 'Hide Results from Arena' : 'Publish Results to Arena'}
+                </button>
+
+                <button
+                  onClick={() => setEditingPollModal({
+                    question: poll?.question || '',
+                    type: poll?.type || 'mcq',
+                    options: (poll?.options || []).map(o => ({ ...o }))
+                  })}
+                  className="px-3.5 py-2 rounded bg-dark-950 border border-white/10 text-slate-200 hover:text-white flex items-center gap-1.5 font-mono text-xs"
+                  title="Edit question text and options"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit Poll</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (window.confirm('Delete and reset active poll? Contenders will see a standby screen.')) {
+                      deletePoll();
+                    }
+                  }}
+                  className="px-3 py-2 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20"
+                  title="Delete active poll"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
 
                 <button
@@ -1435,6 +1546,112 @@ export default function AdminView() {
             )}
           </div>
 
+          {/* ALL QUIZ QUESTIONS BANK (EDITABLE & DELETABLE) */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10 font-mono text-xs">
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-fest-amber" />
+                <h3 className="font-sans font-bold text-base text-white uppercase tracking-tight">
+                  Kahoot Question Bank ({quiz?.questions?.length || 0} Questions)
+                </h3>
+              </div>
+              <span className="text-slate-400">
+                Active Question: #{(quiz?.currentQuestionIndex || 0) + 1}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {(quiz?.questions || []).map((q, idx) => (
+                <div 
+                  key={q.id || idx}
+                  className={`p-4 rounded-xl border transition-all ${
+                    idx === (quiz?.currentQuestionIndex || 0)
+                      ? 'bg-dark-900 border-fest-amber/50 shadow-[0_0_20px_rgba(255,183,0,0.15)]'
+                      : 'bg-dark-950/70 border-white/10'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2.5 border-b border-white/10">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`px-2 py-0.5 rounded font-mono font-bold text-xs ${
+                        idx === (quiz?.currentQuestionIndex || 0)
+                          ? 'bg-fest-amber text-dark-950'
+                          : 'bg-dark-900 border border-white/10 text-slate-300'
+                      }`}>
+                        Q{idx + 1}
+                      </span>
+                      <span className="font-sans font-bold text-white text-sm">
+                        {q.question}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-dark-900 text-fest-cyan text-[10px] font-mono border border-fest-cyan/30">
+                        {q.timeLimit || 20}s
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 font-mono text-xs">
+                      <button
+                        onClick={() => launchQuizQuestion(idx)}
+                        className="px-3 py-1 rounded bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-all text-[11px] flex items-center gap-1"
+                        title="Broadcast this question to phones"
+                      >
+                        <Play className="w-3 h-3 fill-current" />
+                        <span>Launch</span>
+                      </button>
+
+                      <button
+                        onClick={() => setEditingQuizQ({ ...q, index: idx, options: [...(q.options || [])] })}
+                        className="p-1.5 rounded bg-dark-900 border border-white/10 text-slate-300 hover:text-white"
+                        title="Edit question text, options, and answer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete question Q${idx + 1}: "${q.question}"?`)) {
+                            deleteQuizQuestion(q.id);
+                          }
+                        }}
+                        className="p-1.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/30"
+                        title="Delete question"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Options List */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2.5 font-mono text-xs">
+                    {(q.options || []).map((opt, optIdx) => {
+                      const isCorrect = q.correctIndex === optIdx;
+                      return (
+                        <div 
+                          key={optIdx}
+                          className={`p-2 rounded flex items-center justify-between border ${
+                            isCorrect 
+                              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' 
+                              : 'bg-dark-900/60 border-white/5 text-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-fest-cyan">
+                              {String.fromCharCode(65 + optIdx)}:
+                            </span>
+                            <span>{opt}</span>
+                          </div>
+                          {isCorrect && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-300">
+                              CORRECT
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <form onSubmit={handleAddQuestion} className="p-6 rounded-xl bg-dark-900/60 border border-white/15 space-y-4">
             <h4 className="font-sans font-bold text-white text-base flex items-center gap-2">
               <Plus className="w-4 h-4 text-fest-amber" />
@@ -1571,6 +1788,237 @@ export default function AdminView() {
                   className="px-4 py-2 rounded bg-fest-cyan text-dark-950 font-bold"
                 >
                   Add Contender
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT QUIZ QUESTION MODAL */}
+      {editingQuizQ && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="w-full max-w-xl bg-dark-900 border border-white/20 rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto scrollbar-thin font-mono text-xs shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <h3 className="font-sans font-bold text-white text-base">
+                Edit Kahoot Question #{editingQuizQ.index + 1}
+              </h3>
+              <button
+                onClick={() => setEditingQuizQ(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                updateQuizQuestion(editingQuizQ.id, {
+                  question: editingQuizQ.question,
+                  options: editingQuizQ.options,
+                  correctIndex: editingQuizQ.correctIndex,
+                  timeLimit: editingQuizQ.timeLimit,
+                });
+                setEditingQuizQ(null);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Question Prompt *</label>
+                <input
+                  type="text"
+                  required
+                  value={editingQuizQ.question}
+                  onChange={(e) => setEditingQuizQ({ ...editingQuizQ, question: e.target.value })}
+                  className="w-full px-3 py-2 rounded bg-dark-950 border border-white/15 text-white font-sans text-sm focus:border-fest-amber"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-slate-300 font-bold">Answer Options (Select radio for correct answer):</label>
+                {(editingQuizQ.options || []).map((opt, oIdx) => (
+                  <div key={oIdx} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="editCorrectIdx"
+                      checked={editingQuizQ.correctIndex === oIdx}
+                      onChange={() => setEditingQuizQ({ ...editingQuizQ, correctIndex: oIdx })}
+                      className="accent-emerald-400 w-4 h-4 cursor-pointer shrink-0"
+                    />
+                    <span className="text-slate-400 w-6 shrink-0">{String.fromCharCode(65 + oIdx)}:</span>
+                    <input
+                      type="text"
+                      required
+                      value={opt}
+                      onChange={(e) => {
+                        const updated = [...editingQuizQ.options];
+                        updated[oIdx] = e.target.value;
+                        setEditingQuizQ({ ...editingQuizQ, options: updated });
+                      }}
+                      className="flex-1 px-3 py-1.5 rounded bg-dark-950 border border-white/10 text-white"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <label className="block text-slate-300 mb-1">Time Limit (Seconds)</label>
+                <input
+                  type="number"
+                  min="5"
+                  max="120"
+                  value={editingQuizQ.timeLimit || 20}
+                  onChange={(e) => setEditingQuizQ({ ...editingQuizQ, timeLimit: Number(e.target.value) })}
+                  className="w-24 px-3 py-1.5 rounded bg-dark-950 border border-white/15 text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setEditingQuizQ(null)}
+                  className="px-4 py-2 rounded text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded bg-fest-amber text-dark-950 font-bold uppercase tracking-wider"
+                >
+                  Save Question
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT POLL MODAL */}
+      {editingPollModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="w-full max-w-xl bg-dark-900 border border-white/20 rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto scrollbar-thin font-mono text-xs shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <h3 className="font-sans font-bold text-white text-base">
+                Edit Active Live Poll
+              </h3>
+              <button
+                onClick={() => setEditingPollModal(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                updatePoll({
+                  question: editingPollModal.question,
+                  type: editingPollModal.type,
+                  options: editingPollModal.options,
+                });
+                setEditingPollModal(null);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Question Prompt *</label>
+                <input
+                  type="text"
+                  required
+                  value={editingPollModal.question}
+                  onChange={(e) => setEditingPollModal({ ...editingPollModal, question: e.target.value })}
+                  className="w-full px-3 py-2 rounded bg-dark-950 border border-white/15 text-white font-sans text-sm focus:border-fest-pink"
+                />
+              </div>
+
+              <div className="flex items-center gap-6">
+                <span className="text-slate-400">Poll Type:</span>
+                <label className="flex items-center gap-2 cursor-pointer text-white">
+                  <input
+                    type="radio"
+                    name="editPollType"
+                    value="mcq"
+                    checked={editingPollModal.type === 'mcq'}
+                    onChange={() => setEditingPollModal({ ...editingPollModal, type: 'mcq' })}
+                    className="accent-fest-pink"
+                  />
+                  <span>MCQ (Has 1 Correct Answer)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-white">
+                  <input
+                    type="radio"
+                    name="editPollType"
+                    value="voting"
+                    checked={editingPollModal.type === 'voting'}
+                    onChange={() => setEditingPollModal({ ...editingPollModal, type: 'voting' })}
+                    className="accent-fest-cyan"
+                  />
+                  <span>Opinion Voting</span>
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-slate-300 font-bold">Options:</label>
+                {(editingPollModal.options || []).map((opt, oIdx) => (
+                  <div key={oIdx} className="flex items-center gap-2">
+                    {editingPollModal.type === 'mcq' && (
+                      <input
+                        type="radio"
+                        name="editPollCorrectOpt"
+                        checked={Boolean(opt.isCorrect)}
+                        onChange={() => {
+                          const updated = editingPollModal.options.map((o, i) => ({ ...o, isCorrect: i === oIdx }));
+                          setEditingPollModal({ ...editingPollModal, options: updated });
+                        }}
+                        className="accent-emerald-400 w-4 h-4 cursor-pointer shrink-0"
+                        title="Mark as correct answer"
+                      />
+                    )}
+                    <span className="text-slate-400 w-6 shrink-0">{String.fromCharCode(65 + oIdx)}:</span>
+                    <input
+                      type="text"
+                      required
+                      value={opt.text}
+                      onChange={(e) => {
+                        const updated = [...editingPollModal.options];
+                        updated[oIdx] = { ...updated[oIdx], text: e.target.value };
+                        setEditingPollModal({ ...editingPollModal, options: updated });
+                      }}
+                      className="flex-1 px-3 py-1.5 rounded bg-dark-950 border border-white/10 text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (editingPollModal.options.length <= 2) {
+                          alert('Poll must have at least 2 options.');
+                          return;
+                        }
+                        const updated = editingPollModal.options.filter((_, i) => i !== oIdx);
+                        setEditingPollModal({ ...editingPollModal, options: updated });
+                      }}
+                      className="p-1 rounded text-slate-400 hover:text-rose-400"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setEditingPollModal(null)}
+                  className="px-4 py-2 rounded text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded bg-fest-pink text-white font-bold uppercase tracking-wider"
+                >
+                  Save Poll
                 </button>
               </div>
             </form>

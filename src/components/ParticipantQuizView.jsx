@@ -17,14 +17,23 @@ import { setupTabSwitchGuard } from '../lib/focusGuard';
 export default function ParticipantQuizView({ isSimulator = false }) {
   const { quiz, submitQuizAnswer, registerPresence, reportTabSwitch } = useBattle();
 
+  const session = (() => {
+    try {
+      const saved = localStorage.getItem('pb_contender_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  })();
+
   const [participantName, setParticipantName] = useState(() => {
-    return localStorage.getItem('pb_quiz_participant_name') || '';
+    return session?.name || localStorage.getItem('pb_quiz_participant_name') || '';
   });
   const [teamName, setTeamName] = useState(() => {
-    return localStorage.getItem('pb_quiz_team_name') || '';
+    return session?.teamName || localStorage.getItem('pb_quiz_team_name') || '';
   });
   const [isRegistered, setIsRegistered] = useState(() => {
-    return Boolean(localStorage.getItem('pb_quiz_participant_name'));
+    return Boolean(session || localStorage.getItem('pb_quiz_participant_name'));
   });
 
   const [selectedIdx, setSelectedIdx] = useState(null);
@@ -37,7 +46,7 @@ export default function ParticipantQuizView({ isSimulator = false }) {
 
   const questionStartTimeRef = useRef(Date.now());
 
-  const participantId = useState(() => {
+  const participantId = session?.participantId || useState(() => {
     let id = localStorage.getItem('pb_quiz_uuid');
     if (!id) {
       id = `qz-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;

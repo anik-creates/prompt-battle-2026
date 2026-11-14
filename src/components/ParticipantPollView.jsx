@@ -18,8 +18,17 @@ export default function ParticipantPollView({ isSimulator = false }) {
   const safePoll = poll || DEFAULT_POLL;
   const optionsList = toSafeArray(safePoll.options, DEFAULT_POLL.options);
 
+  const session = (() => {
+    try {
+      const saved = localStorage.getItem('pb_contender_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  })();
+
   const [voterName, setVoterName] = useState(() => {
-    return localStorage.getItem('pb_voter_name') || '';
+    return session?.name || localStorage.getItem('pb_voter_name') || '';
   });
   const [selectedOptId, setSelectedOptId] = useState(null);
   const [hasVoted, setHasVoted] = useState(false);
@@ -31,7 +40,7 @@ export default function ParticipantPollView({ isSimulator = false }) {
 
   const questionStartTimeRef = useRef(Date.now());
 
-  const participantId = useState(() => {
+  const participantId = session?.participantId || useState(() => {
     let id = localStorage.getItem('pb_participant_uuid');
     if (!id) {
       id = `voter-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
@@ -93,7 +102,7 @@ export default function ParticipantPollView({ isSimulator = false }) {
     const res = submitVote({
       participantId,
       participantName: nameToSave,
-      teamName: 'Solo',
+      teamName: session?.teamName || 'Solo Contender',
       optionId: optId,
       timeTakenSec,
     });

@@ -7,6 +7,13 @@ import {
   saveStoredFirebaseConfig 
 } from '../lib/firebase';
 import { playCountdownTick, playStartHorn, playFinishFanfare, playTimesUpAlert } from '../lib/sound';
+import { 
+  evaluateTotalScore, 
+  DEFAULT_TOKEN_BUDGET, 
+  DEFAULT_BATTLE_DURATION,
+  calculateTokenScore,
+  calculateTimeScore
+} from '../lib/scoringCalculator';
 
 const BattleContext = createContext(null);
 
@@ -105,6 +112,14 @@ export const DEFAULT_POLL = {
   votes: {},
 };
 
+export const DEFAULT_CONTENDERS = [
+  { participantId: 'PB-101', name: 'Tanvir Hossain', teamName: 'DIU Pioneers', deskNumber: 'Desk 01' },
+  { participantId: 'PB-102', name: 'Anik Sarker', teamName: 'PES Titans', deskNumber: 'Desk 02' },
+  { participantId: 'PB-103', name: 'Sumaiya Akter', teamName: 'Cyber Sparks', deskNumber: 'Desk 03' },
+  { participantId: 'PB-104', name: 'Rakib Hasan', teamName: 'Neural Circuit', deskNumber: 'Desk 04' },
+  { participantId: 'PB-105', name: 'Farhan Kabir', teamName: 'Vector Core', deskNumber: 'Desk 05' },
+];
+
 export const DEFAULT_STATE = {
   activeArena: 'battle', // 'battle' | 'poll' | 'quiz'
   timer: {
@@ -117,6 +132,8 @@ export const DEFAULT_STATE = {
   published: false,
   participants: [],
   joinedParticipants: {}, // [participantId]: { id, name, teamName, arena, lastSeen, tabSwitches }
+  registeredContenders: DEFAULT_CONTENDERS,
+  tokenBudget: DEFAULT_TOKEN_BUDGET,
 
   // Live Poll State
   poll: DEFAULT_POLL,
@@ -172,6 +189,8 @@ export function sanitizeState(raw) {
       status: rawQuiz.status || 'idle',
     },
     participants: toSafeArray(raw.participants, []),
+    registeredContenders: toSafeArray(raw.registeredContenders, DEFAULT_CONTENDERS),
+    tokenBudget: Number(raw.tokenBudget) || DEFAULT_TOKEN_BUDGET,
     published: Boolean(raw.published),
     lastUpdated: raw.lastUpdated || Date.now(),
   };
@@ -479,7 +498,7 @@ export function BattleProvider({ children }) {
     });
   }, [battleState, syncState]);
 
-  const submitParticipantWork = useCallback(({ name, teamName, notes = '' }) => {
+  const submitParticipantWork = useCallback(({ participantId = '', name, teamName = '', notes = '', tokensUsed = 0, workUrl = '' }) => {
     const now = Date.now();
     let elapsedSec = 0;
     if (battleState.timer.startedAt) {
@@ -489,28 +508,52 @@ export function BattleProvider({ children }) {
     const seconds = elapsedSec % 60;
     const finishTimeFormatted = `${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
 
+    const budget = Number(battleState.tokenBudget) || DEFAULT_TOKEN_BUDGET;
+    const duration = Number(battleState.timer.duration) || DEFAULT_BATTLE_DURATION;
+    const tokens = Number(tokensUsed) || 0;
+
+    const scoring = evaluateTotalScore({
+      tokensUsed: tokens,
+      tokenBudget: budget,
+      finishSeconds: elapsedSec,
+      totalDurationSec: duration,
+      objectiveScore: 0,
+      finishStatus: 'Partially Fulfilled',
+      presentationScore: 0,
+      noveltyScore: 0,
+    });
+
+    const cleanParticipantId = (participantId || '').trim().toUpperCase() || `PB-${Math.floor(100 + Math.random() * 900)}`;
+
     const newParticipant = {
       id: `p-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      participantId: cleanParticipantId,
       name: name.trim(),
       teamName: teamName.trim() || 'Independent Contender',
       submittedAt: now,
       finishSeconds: elapsedSec,
       finishTimeFormatted,
       notes: notes.trim(),
-      tokensUsed: 0,
+      workUrl: (workUrl || '').trim(),
+      tokensUsed: tokens,
+      tokenScore: scoring.tokenScore,
+      tokenPercentageUsed: scoring.tokenPercentageUsed,
+      timeScore: scoring.timeScore,
+      timePercentageUsed: scoring.timePercentageUsed,
       objectiveScore: 0,
       finishStatus: 'Partially Fulfilled',
       finishStatusNotes: '',
       presentationScore: 0,
       noveltyScore: 0,
-      totalScore: 0,
+      totalScore: scoring.totalScore,
+      tabSwitches: 0,
     };
 
     playFinishFanfare();
     const currentList = toSafeArray(battleState.participants, []);
     syncState({
       ...battleState,
-      participants: [newParticipant, ...currentList],
+      participants: [newParticipant, ...currentList.filter(p => p.participantId?.toUpperCase() !== cleanParticipantId)],
       lastUpdated: now,
     });
     return newParticipant;
@@ -519,20 +562,29 @@ export function BattleProvider({ children }) {
   const updateParticipantMarks = useCallback((id, updates) => {
     const now = Date.now();
     const currentList = toSafeArray(battleState.participants, []);
-    const updated = currentList.map((p) => {
-      if (p.id !== id) return p;
-      const merged = { ...p, ...updates };
-      let statusWeight = 12;
-      if (merged.finishStatus === 'Fully Completed') statusWeight = 20;
-      else if (merged.finishStatus === 'Substantially Completed') statusWeight = 16;
-      else if (merged.finishStatus === 'Partially Fulfilled') statusWeight = 12;
-      else if (merged.finishStatus === 'Minimal Fulfillment') statusWeight = 6;
+    const budget = Number(battleState.tokenBudget) || DEFAULT_TOKEN_BUDGET;
+    const duration = Number(battleState.timer.duration) || DEFAULT_BATTLE_DURATION;
 
-      const obj = Number(merged.objectiveScore) || 0;
-      const pres = Number(merged.presentationScore) || 0;
-      const nov = Number(merged.noveltyScore) || 0;
-      const computedTotal = obj + statusWeight + pres + nov;
-      merged.totalScore = updates.totalScore !== undefined ? Number(updates.totalScore) : computedTotal;
+    const updated = currentList.map((p) => {
+      if (p.id !== id && p.participantId !== id) return p;
+      const merged = { ...p, ...updates };
+
+      const scoring = evaluateTotalScore({
+        tokensUsed: Number(merged.tokensUsed) || 0,
+        tokenBudget: budget,
+        finishSeconds: Number(merged.finishSeconds) || 0,
+        totalDurationSec: duration,
+        objectiveScore: Number(merged.objectiveScore) || 0,
+        finishStatus: merged.finishStatus || 'Partially Fulfilled',
+        presentationScore: Number(merged.presentationScore) || 0,
+        noveltyScore: Number(merged.noveltyScore) || 0,
+      });
+
+      merged.tokenScore = updates.tokenScore !== undefined ? Number(updates.tokenScore) : scoring.tokenScore;
+      merged.tokenPercentageUsed = scoring.tokenPercentageUsed;
+      merged.timeScore = updates.timeScore !== undefined ? Number(updates.timeScore) : scoring.timeScore;
+      merged.timePercentageUsed = scoring.timePercentageUsed;
+      merged.totalScore = updates.totalScore !== undefined ? Number(updates.totalScore) : scoring.totalScore;
       return merged;
     });
 
@@ -545,26 +597,48 @@ export function BattleProvider({ children }) {
 
   const addManualParticipant = useCallback((participantData) => {
     const now = Date.now();
+    const budget = Number(battleState.tokenBudget) || DEFAULT_TOKEN_BUDGET;
+    const duration = Number(battleState.timer.duration) || DEFAULT_BATTLE_DURATION;
+    const cleanId = (participantData.participantId || '').trim().toUpperCase() || `PB-${Math.floor(100 + Math.random() * 900)}`;
+
+    const scoring = evaluateTotalScore({
+      tokensUsed: Number(participantData.tokensUsed) || 0,
+      tokenBudget: budget,
+      finishSeconds: Number(participantData.finishSeconds) || 0,
+      totalDurationSec: duration,
+      objectiveScore: Number(participantData.objectiveScore) || 0,
+      finishStatus: participantData.finishStatus || 'Fully Completed',
+      presentationScore: Number(participantData.presentationScore) || 0,
+      noveltyScore: Number(participantData.noveltyScore) || 0,
+    });
+
     const newParticipant = {
       id: `p-manual-${Date.now()}`,
+      participantId: cleanId,
       name: participantData.name || 'New Participant',
       teamName: participantData.teamName || 'Solo',
       submittedAt: now,
-      finishSeconds: participantData.finishSeconds || 0,
+      finishSeconds: Number(participantData.finishSeconds) || 0,
       finishTimeFormatted: participantData.finishTimeFormatted || 'Manual Entry',
       notes: participantData.notes || '',
+      workUrl: participantData.workUrl || '',
       tokensUsed: Number(participantData.tokensUsed) || 0,
+      tokenScore: scoring.tokenScore,
+      tokenPercentageUsed: scoring.tokenPercentageUsed,
+      timeScore: scoring.timeScore,
+      timePercentageUsed: scoring.timePercentageUsed,
       objectiveScore: Number(participantData.objectiveScore) || 0,
       finishStatus: participantData.finishStatus || 'Fully Completed',
       finishStatusNotes: participantData.finishStatusNotes || '',
       presentationScore: Number(participantData.presentationScore) || 0,
       noveltyScore: Number(participantData.noveltyScore) || 0,
-      totalScore: Number(participantData.totalScore) || 0,
+      totalScore: participantData.totalScore !== undefined ? Number(participantData.totalScore) : scoring.totalScore,
+      tabSwitches: 0,
     };
     const currentList = toSafeArray(battleState.participants, []);
     syncState({
       ...battleState,
-      participants: [newParticipant, ...currentList],
+      participants: [newParticipant, ...currentList.filter(p => p.participantId !== cleanId)],
       lastUpdated: now,
     });
   }, [battleState, syncState]);
@@ -966,6 +1040,175 @@ export function BattleProvider({ children }) {
     });
   }, [battleState, syncState]);
 
+  const updateQuizQuestion = useCallback((questionId, updatedData) => {
+    const now = Date.now();
+    const currentList = toSafeArray(battleState.quiz?.questions, DEFAULT_QUIZ_QUESTIONS);
+    const updated = currentList.map((q) => {
+      if (q.id === questionId) {
+        return {
+          ...q,
+          question: (updatedData.question !== undefined ? updatedData.question : q.question).trim(),
+          options: updatedData.options ? toSafeArray(updatedData.options, q.options) : q.options,
+          correctIndex: updatedData.correctIndex !== undefined ? Number(updatedData.correctIndex) : q.correctIndex,
+          timeLimit: updatedData.timeLimit !== undefined ? Number(updatedData.timeLimit) : q.timeLimit,
+        };
+      }
+      return q;
+    });
+
+    syncState({
+      ...battleState,
+      quiz: {
+        ...battleState.quiz,
+        questions: updated,
+      },
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const deleteQuizQuestion = useCallback((questionId) => {
+    const now = Date.now();
+    const currentList = toSafeArray(battleState.quiz?.questions, DEFAULT_QUIZ_QUESTIONS);
+    const filtered = currentList.filter((q) => q.id !== questionId);
+    const safeIdx = Math.max(0, Math.min(battleState.quiz?.currentQuestionIndex || 0, filtered.length - 1));
+
+    syncState({
+      ...battleState,
+      quiz: {
+        ...battleState.quiz,
+        questions: filtered.length > 0 ? filtered : DEFAULT_QUIZ_QUESTIONS,
+        currentQuestionIndex: safeIdx,
+      },
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const updatePoll = useCallback((updatedData) => {
+    const now = Date.now();
+    const currentPoll = battleState.poll || DEFAULT_POLL;
+    const formattedOptions = (updatedData.options || currentPoll.options || []).map((opt, idx) => ({
+      id: opt.id || `opt-${idx + 1}`,
+      text: (opt.text || '').trim(),
+      isCorrect: Boolean(opt.isCorrect),
+      votes: opt.votes || 0,
+    }));
+
+    syncState({
+      ...battleState,
+      poll: {
+        ...currentPoll,
+        question: (updatedData.question !== undefined ? updatedData.question : currentPoll.question).trim(),
+        type: updatedData.type || currentPoll.type,
+        options: formattedOptions,
+      },
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const deletePoll = useCallback(() => {
+    const now = Date.now();
+    syncState({
+      ...battleState,
+      poll: {
+        ...DEFAULT_POLL,
+        id: `poll-${now}`,
+        question: 'New Live Poll Pending...',
+        type: 'mcq',
+        status: 'closed',
+        published: false,
+        options: [],
+        votes: {},
+      },
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  // Contender Roster Management
+  const addRegisteredContender = useCallback(({ participantId, name, teamName = '', deskNumber = '' }) => {
+    const now = Date.now();
+    const currentList = toSafeArray(battleState.registeredContenders, DEFAULT_CONTENDERS);
+    const cleanId = (participantId || '').trim().toUpperCase();
+    if (!cleanId) return;
+
+    const newEntry = {
+      participantId: cleanId,
+      name: (name || '').trim(),
+      teamName: (teamName || '').trim() || 'Solo Contender',
+      deskNumber: (deskNumber || '').trim() || 'Main Floor',
+    };
+
+    const updated = [newEntry, ...currentList.filter((c) => c.participantId?.toUpperCase() !== cleanId)];
+
+    syncState({
+      ...battleState,
+      registeredContenders: updated,
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const bulkAddRegisteredContenders = useCallback((newList) => {
+    const now = Date.now();
+    const currentList = toSafeArray(battleState.registeredContenders, DEFAULT_CONTENDERS);
+    const map = new Map();
+    currentList.forEach((c) => map.set(c.participantId?.toUpperCase(), c));
+
+    (newList || []).forEach((c) => {
+      const id = (c.participantId || '').trim().toUpperCase();
+      if (id) {
+        map.set(id, {
+          participantId: id,
+          name: (c.name || '').trim() || `Contender ${id}`,
+          teamName: (c.teamName || '').trim() || 'Solo Contender',
+          deskNumber: (c.deskNumber || '').trim() || 'Main Floor',
+        });
+      }
+    });
+
+    syncState({
+      ...battleState,
+      registeredContenders: Array.from(map.values()),
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const updateRegisteredContender = useCallback((participantId, updates) => {
+    const now = Date.now();
+    const cleanId = (participantId || '').trim().toUpperCase();
+    const currentList = toSafeArray(battleState.registeredContenders, DEFAULT_CONTENDERS);
+    const updated = currentList.map((c) => {
+      if (c.participantId?.toUpperCase() === cleanId) {
+        return { ...c, ...updates, participantId: cleanId };
+      }
+      return c;
+    });
+
+    syncState({
+      ...battleState,
+      registeredContenders: updated,
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const deleteRegisteredContender = useCallback((participantId) => {
+    const now = Date.now();
+    const cleanId = (participantId || '').trim().toUpperCase();
+    const currentList = toSafeArray(battleState.registeredContenders, DEFAULT_CONTENDERS);
+    syncState({
+      ...battleState,
+      registeredContenders: currentList.filter((c) => c.participantId?.toUpperCase() !== cleanId),
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const setTokenBudget = useCallback((budget) => {
+    const now = Date.now();
+    syncState({
+      ...battleState,
+      tokenBudget: Math.max(100, Number(budget) || DEFAULT_TOKEN_BUDGET),
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
   // Auth & General
   const authenticateAdmin = useCallback((enteredPassword) => {
     if (enteredPassword === ADMIN_PASSWORD) {
@@ -1012,11 +1255,14 @@ export function BattleProvider({ children }) {
     activeArena: battleState.activeArena || 'battle',
     timer: battleState.timer,
     participants: toSafeArray(battleState.participants, []),
+    registeredContenders: toSafeArray(battleState.registeredContenders, DEFAULT_CONTENDERS),
+    tokenBudget: Number(battleState.tokenBudget) || DEFAULT_TOKEN_BUDGET,
     published: battleState.published,
     joinedParticipants: battleState.joinedParticipants || {},
     totalJoinedCount: Math.max(
       Object.keys(battleState.joinedParticipants || {}).length,
       toSafeArray(battleState.participants, []).length,
+      toSafeArray(battleState.registeredContenders, []).length,
       Object.keys(battleState.poll?.votes || {}).length,
       Object.keys(battleState.quiz?.submissions || {}).length
     ),
@@ -1038,6 +1284,13 @@ export function BattleProvider({ children }) {
     switchView,
     switchArena,
 
+    // Contender Roster & Settings
+    addRegisteredContender,
+    bulkAddRegisteredContenders,
+    updateRegisteredContender,
+    deleteRegisteredContender,
+    setTokenBudget,
+
     // Battle
     startTimer,
     pauseTimer,
@@ -1051,6 +1304,8 @@ export function BattleProvider({ children }) {
 
     // Poll
     createPoll,
+    updatePoll,
+    deletePoll,
     submitVote,
     setPollStatus,
     setPollDisplayMode,
@@ -1068,6 +1323,8 @@ export function BattleProvider({ children }) {
     publishQuizLeaderboard,
     resetQuiz,
     addQuizQuestion,
+    updateQuizQuestion,
+    deleteQuizQuestion,
 
     // Admin & Sync
     authenticateAdmin,

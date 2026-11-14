@@ -167,7 +167,12 @@ export default function PresentationView() {
                   </span>
 
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {p.participantId && (
+                        <span className="px-2 py-0.5 rounded bg-fest-cyan/20 border border-fest-cyan/40 text-fest-cyan font-mono text-xs font-bold shrink-0">
+                          {p.participantId}
+                        </span>
+                      )}
                       <span className="font-bold text-base text-white font-sans tracking-tight">
                         {p.name}
                       </span>

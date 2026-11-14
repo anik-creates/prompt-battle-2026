@@ -127,8 +127,13 @@ export default function LeaderboardView() {
                   </div>
 
                   {/* Participant & Team */}
-                  <h3 className="text-xl font-bold text-white tracking-tight truncate">
-                    {p.name}
+                  <h3 className="text-xl font-bold text-white tracking-tight truncate flex items-center gap-1.5">
+                    {p.participantId && (
+                      <span className="px-1.5 py-0.5 rounded bg-fest-cyan/20 border border-fest-cyan/40 text-fest-cyan font-mono text-[10px] font-bold shrink-0">
+                        {p.participantId}
+                      </span>
+                    )}
+                    <span className="truncate">{p.name}</span>
                   </h3>
                   <p className="text-xs text-fest-cyan font-mono truncate mt-0.5 flex items-center gap-1">
                     <Users className="w-3 h-3" />
@@ -201,7 +206,12 @@ export default function LeaderboardView() {
                       </td>
 
                       <td className="py-4 px-4 font-sans">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {p.participantId && (
+                            <span className="px-1.5 py-0.5 rounded bg-fest-cyan/20 border border-fest-cyan/40 text-fest-cyan font-mono text-[10px] font-bold shrink-0">
+                              {p.participantId}
+                            </span>
+                          )}
                           <span className="font-bold text-white text-sm">{p.name}</span>
                           {p.tabSwitches > 0 && (
                             <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-mono text-[10px] font-bold border border-rose-500/40">
