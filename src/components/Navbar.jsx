@@ -1,32 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useBattle } from '../context/BattleContext';
 import { 
-  Monitor, 
-  Send, 
-  ShieldCheck, 
-  Lock, 
   Maximize, 
   Minimize, 
   Radio, 
-  Flame, 
+  ExternalLink,
+  ShieldCheck, 
+  Sparkles,
+  Flame,
   Vote,
-  HelpCircle,
-  Sparkles
+  HelpCircle
 } from 'lucide-react';
 
 export default function Navbar() {
   const { 
     activeView, 
     switchView, 
-    activeArena,
-    switchArena,
+    activeArena, 
     timer, 
     published, 
-    poll,
-    quiz,
+    poll, 
+    quiz, 
     isAdminAuthenticated, 
     firebaseStatus 
   } = useBattle();
+
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -45,18 +43,29 @@ export default function Navbar() {
     }
   };
 
+  // Determine active arena title for status badge
+  let arenaTitle = 'Battle Arena';
+  let arenaIcon = <Flame className="w-3.5 h-3.5 text-fest-cyan" />;
+  if (activeArena === 'poll') {
+    arenaTitle = 'Live Poll Active';
+    arenaIcon = <Vote className="w-3.5 h-3.5 text-fest-pink" />;
+  } else if (activeArena === 'quiz') {
+    arenaTitle = 'Kahoot Quiz Active';
+    arenaIcon = <HelpCircle className="w-3.5 h-3.5 text-fest-amber" />;
+  }
+
   return (
-    <header className="sticky top-0 z-50 bg-dark-950/90 backdrop-blur-md border-b border-white/10">
+    <header className="sticky top-0 z-50 bg-dark-950/95 backdrop-blur-md border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20 md:h-24">
           
-          {/* Left: PES Logo (BIG) beside EEE Fest Logo */}
+          {/* Left: IEEE PES DIU SBC Logo (BIG) & EEE Fest 2026 Logo */}
           <div className="flex items-center space-x-3 sm:space-x-5">
             <div className="flex items-center">
               <img 
                 src="./assets/ieee-pes-diu-logo.png" 
                 alt="IEEE PES DIU Student Branch Chapter" 
-                className="h-14 sm:h-16 md:h-20 w-auto object-contain transition-transform hover:scale-105 filter drop-shadow-[0_0_12px_rgba(108,179,63,0.3)]"
+                className="h-14 sm:h-16 md:h-20 w-auto object-contain filter drop-shadow-[0_0_15px_rgba(108,179,63,0.35)]"
               />
             </div>
 
@@ -66,10 +75,11 @@ export default function Navbar() {
               <img 
                 src="./assets/eee-fest-logo.png" 
                 alt="EEE Fest 2026" 
-                className="h-9 sm:h-11 md:h-14 w-auto object-contain filter drop-shadow-[0_0_12px_rgba(0,229,255,0.25)]"
+                className="h-9 sm:h-11 md:h-14 w-auto object-contain filter drop-shadow-[0_0_15px_rgba(0,229,255,0.25)]"
               />
             </div>
 
+            {/* Event Brand Title */}
             <div className="hidden lg:flex flex-col ml-2">
               <div className="flex items-center space-x-2">
                 <span className="text-xl font-extrabold tracking-wider text-fest-gradient font-sans">
@@ -86,116 +96,86 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Center: Arena Switcher (Battle / Poll / Quiz) */}
-          <div className="hidden md:flex items-center p-1 rounded-lg bg-dark-900 border border-white/10 font-mono text-xs">
-            <button
-              onClick={() => switchArena('battle')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
-                activeArena === 'battle'
-                  ? 'bg-fest-cyan/20 text-fest-cyan border border-fest-cyan/40 font-bold shadow-[0_0_12px_rgba(0,229,255,0.2)]'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Flame className="w-3.5 h-3.5" />
-              <span>Battle</span>
-            </button>
-
-            <button
-              onClick={() => switchArena('poll')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
-                activeArena === 'poll'
-                  ? 'bg-fest-pink/20 text-fest-pink border border-fest-pink/40 font-bold shadow-[0_0_12px_rgba(255,0,122,0.2)]'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Vote className="w-3.5 h-3.5" />
-              <span>Poll</span>
-            </button>
-
-            <button
-              onClick={() => switchArena('quiz')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
-                activeArena === 'quiz'
-                  ? 'bg-fest-amber/20 text-fest-amber border border-fest-amber/40 font-bold shadow-[0_0_12px_rgba(255,183,0,0.2)]'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <HelpCircle className="w-3.5 h-3.5" />
-              <span>Kahoot Quiz</span>
-            </button>
-          </div>
-
-          {/* Right: Navigation Portals */}
-          <div className="flex items-center space-x-1 sm:space-x-3">
+          {/* Right Section: Varies cleanly by View */}
+          <div className="flex items-center space-x-3 sm:space-x-4">
             
-            <nav className="flex items-center p-1 rounded-lg bg-dark-900 border border-white/10">
-              <button
-                onClick={() => switchView('presentation')}
-                className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium transition-all ${
-                  activeView === 'presentation'
-                    ? 'bg-gradient-to-r from-fest-cyan/20 to-fest-blue/20 text-fest-cyan border border-fest-cyan/40 shadow-[0_0_15px_rgba(0,229,255,0.2)]'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                }`}
-                title="Presentation View for Projector"
-              >
-                <Monitor className="w-4 h-4" />
-                <span className="hidden sm:inline">Presentation</span>
-              </button>
+            {/* 1. PRESENTATION VIEW (AUDITORIUM BROADCAST): Clean, Distraction-Free */}
+            {activeView === 'presentation' && (
+              <div className="flex items-center space-x-3">
+                {/* Live Arena Stage Status Badge */}
+                <div className="flex items-center px-3.5 py-1.5 rounded-full bg-dark-900 border border-white/10 text-xs font-mono">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-2.5"></span>
+                  <span className="flex items-center gap-1.5 text-slate-200 uppercase tracking-wider font-semibold">
+                    {arenaIcon}
+                    <span>{arenaTitle}</span>
+                  </span>
+                </div>
 
-              <button
-                onClick={() => switchView('submit')}
-                className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium transition-all ${
-                  activeView === 'submit'
-                    ? 'bg-gradient-to-r from-fest-pink/20 to-purple-600/20 text-fest-pink border border-fest-pink/40 shadow-[0_0_15px_rgba(255,0,122,0.2)]'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                }`}
-                title="Participant Portal"
-              >
-                <Send className="w-4 h-4" />
-                <span className="hidden sm:inline">Participant</span>
-              </button>
+                {/* Cloud Sync Status */}
+                <div 
+                  className="hidden md:flex items-center px-2.5 py-1.5 rounded bg-dark-900 border border-white/10 text-xs font-mono text-slate-400"
+                  title="Real-Time Cloud Synced"
+                >
+                  <Radio className="w-3.5 h-3.5 mr-1.5 text-fest-cyan animate-pulse" />
+                  <span className="text-[11px]">Live Broadcast</span>
+                </div>
 
-              <button
-                onClick={() => switchView('admin')}
-                className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium transition-all ${
-                  activeView === 'admin'
-                    ? 'bg-gradient-to-r from-fest-pes/20 to-emerald-600/20 text-fest-pes border border-fest-pes/40 shadow-[0_0_15px_rgba(108,179,63,0.2)]'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                }`}
-                title="Admin Control Center"
-              >
-                {isAdminAuthenticated ? (
-                  <ShieldCheck className="w-4 h-4 text-fest-pes" />
-                ) : (
-                  <Lock className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">Admin</span>
-              </button>
-            </nav>
+                {/* Fullscreen Button for Projector Operator */}
+                <button
+                  onClick={toggleFullscreen}
+                  className="p-2.5 rounded-lg bg-dark-900 border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen (Auditorium Projector Mode)'}
+                >
+                  {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                </button>
+              </div>
+            )}
 
-            {/* Cloud Sync Status */}
-            <div 
-              className="hidden md:flex items-center px-2.5 py-1.5 rounded bg-dark-900 border border-white/10 text-xs font-mono text-slate-400"
-              title={firebaseStatus === 'connected' ? 'Firebase Realtime Connected' : 'Connecting to Cloud...'}
-            >
-              <Radio className={`w-3.5 h-3.5 mr-1.5 ${
-                firebaseStatus === 'connected' ? 'text-fest-cyan animate-pulse' : 'text-slate-500'
-              }`} />
-              <span className="text-[11px]">
-                {firebaseStatus === 'connected' ? 'Cloud Live' : 'Syncing'}
-              </span>
-            </div>
+            {/* 2. PARTICIPANT VIEW: Minimalist Contender Header */}
+            {activeView === 'submit' && (
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center px-3 py-1.5 rounded-full bg-dark-900 border border-white/10 text-xs font-mono text-slate-300">
+                  <span className="w-2 h-2 rounded-full bg-fest-cyan animate-pulse mr-2"></span>
+                  <span>Contender Live Arena</span>
+                </div>
+              </div>
+            )}
 
-            {/* Fullscreen Button */}
-            <button
-              onClick={toggleFullscreen}
-              className="p-2 rounded bg-dark-900 border border-white/10 text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-colors"
-              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen (Auditorium Mode)'}
-            >
-              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-            </button>
+            {/* 3. ADMIN VIEW: Admin Tools & Quick Links */}
+            {activeView === 'admin' && (
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center px-3 py-1.5 rounded bg-fest-pes/10 border border-fest-pes/30 text-xs font-mono text-fest-pes">
+                  <ShieldCheck className="w-4 h-4 mr-1.5" />
+                  <span>Admin Mode</span>
+                </div>
+
+                {/* Quick Link to open the Presentation Screen in new window (for projector) */}
+                <a
+                  href="./#presentation"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-900 border border-white/15 text-fest-cyan hover:text-white font-mono text-xs transition-colors"
+                  title="Open Presentation Screen on a separate monitor/projector"
+                >
+                  <span>Projector View</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
+                {/* Quick Link to preview Participant View */}
+                <a
+                  href="./#submit"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-900 border border-white/15 text-slate-400 hover:text-white font-mono text-xs transition-colors"
+                >
+                  <span>Phone View</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            )}
 
           </div>
+
         </div>
       </div>
     </header>

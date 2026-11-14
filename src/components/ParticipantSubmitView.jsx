@@ -11,31 +11,19 @@ import {
   FileText, 
   Sparkles, 
   RotateCcw, 
-  Monitor, 
-  Flame, 
-  Vote, 
-  HelpCircle, 
   AlertCircle,
-  Radio
+  Radio,
+  Flame,
+  Vote,
+  HelpCircle
 } from 'lucide-react';
 
 export default function ParticipantSubmitView() {
   const { 
     activeArena, 
     timer, 
-    submitParticipantWork, 
-    switchView 
+    submitParticipantWork 
   } = useBattle();
-
-  // Driven dynamically by activeArena from the Admin!
-  const [currentTab, setCurrentTab] = useState(activeArena || 'battle');
-
-  // When Admin changes active arena, automatically shift participant screen in real time!
-  useEffect(() => {
-    if (activeArena) {
-      setCurrentTab(activeArena);
-    }
-  }, [activeArena]);
 
   const [name, setName] = useState('');
   const [teamName, setTeamName] = useState('');
@@ -67,64 +55,39 @@ export default function ParticipantSubmitView() {
     setNotes('');
   };
 
+  // Determine stage title for status banner
+  let stageLabel = 'Prompt Battle Submission Active';
+  let stageIcon = <Flame className="w-3.5 h-3.5 text-fest-cyan" />;
+  if (activeArena === 'poll') {
+    stageLabel = 'Live Poll Active';
+    stageIcon = <Vote className="w-3.5 h-3.5 text-fest-pink" />;
+  } else if (activeArena === 'quiz') {
+    stageLabel = 'Kahoot Quiz Active';
+    stageIcon = <HelpCircle className="w-3.5 h-3.5 text-fest-amber" />;
+  }
+
   return (
-    <div className="w-full max-w-2xl mx-auto py-6 sm:py-10 px-4 space-y-6">
+    <div className="w-full max-w-2xl mx-auto py-6 sm:py-8 px-4 space-y-6">
       
-      {/* Live Director Broadcast Banner */}
+      {/* Live Stage Status Indicator (Synchronized with Admin) */}
       <div className="p-2.5 rounded-xl bg-dark-900 border border-white/10 flex items-center justify-between text-xs font-mono max-w-md mx-auto">
         <div className="flex items-center gap-2">
           <Radio className="w-3.5 h-3.5 text-fest-cyan animate-pulse" />
-          <span className="text-slate-400">Moderator Broadcast:</span>
-          <span className="font-bold text-white uppercase">
-            {activeArena === 'poll' ? 'Live Poll' : activeArena === 'quiz' ? 'Kahoot Quiz' : 'Battle Submit'}
+          <span className="text-slate-400">Live Stage:</span>
+          <span className="font-bold text-white uppercase flex items-center gap-1.5">
+            {stageIcon}
+            <span>{stageLabel}</span>
           </span>
         </div>
-
-        {/* Optional quick switcher */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setCurrentTab('battle')}
-            className={`p-1.5 rounded transition-all ${
-              currentTab === 'battle'
-                ? 'bg-fest-cyan/20 text-fest-cyan border border-fest-cyan/40'
-                : 'text-slate-500 hover:text-white'
-            }`}
-            title="Battle Submission Form"
-          >
-            <Flame className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('poll')}
-            className={`p-1.5 rounded transition-all ${
-              currentTab === 'poll'
-                ? 'bg-fest-pink/20 text-fest-pink border border-fest-pink/40'
-                : 'text-slate-500 hover:text-white'
-            }`}
-            title="Live Poll Screen"
-          >
-            <Vote className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('quiz')}
-            className={`p-1.5 rounded transition-all ${
-              currentTab === 'quiz'
-                ? 'bg-fest-amber/20 text-fest-amber border border-fest-amber/40'
-                : 'text-slate-500 hover:text-white'
-            }`}
-            title="Kahoot Quiz Screen"
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
       </div>
 
-      {/* RENDER CURRENT VIEW ACCORDING TO ADMIN BROADCAST */}
-      {currentTab === 'poll' && <ParticipantPollView />}
-      {currentTab === 'quiz' && <ParticipantQuizView />}
+      {/* DYNAMIC VIEW DRIVEN BY ADMIN PORTAL */}
+      {activeArena === 'poll' && <ParticipantPollView />}
+      
+      {activeArena === 'quiz' && <ParticipantQuizView />}
 
-      {currentTab === 'battle' && (
+      {activeArena === 'battle' && (
         <div className="space-y-6">
           <div className="text-center">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fest-pink/10 border border-fest-pink/30 text-fest-pink text-xs font-mono uppercase tracking-wider mb-3">
@@ -179,20 +142,13 @@ export default function ParticipantSubmitView() {
                 </div>
               </div>
 
-              <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <button
-                  onClick={() => switchView('presentation')}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded bg-fest-cyan/15 hover:bg-fest-cyan/25 border border-fest-cyan/40 text-fest-cyan font-mono text-xs font-bold transition-all"
-                >
-                  <Monitor className="w-4 h-4" />
-                  View Arena Screen
-                </button>
+              <div className="pt-4 flex items-center justify-center">
                 <button
                   onClick={handleReset}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded bg-dark-850 hover:bg-dark-800 border border-white/10 text-slate-300 font-mono text-xs transition-all"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded bg-dark-850 hover:bg-dark-800 border border-white/10 text-slate-300 font-mono text-xs transition-all"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  Submit Another
+                  <span>Submit Another Contender</span>
                 </button>
               </div>
             </div>

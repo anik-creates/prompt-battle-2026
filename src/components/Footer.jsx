@@ -6,7 +6,8 @@ import {
   ExternalLink,
   Shield,
   Layers,
-  Sparkles
+  Sparkles,
+  Lock
 } from 'lucide-react';
 
 export default function Footer() {
@@ -88,9 +89,17 @@ export default function Footer() {
         {/* Bottom copyright line */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 font-mono">
           <p>© 2026 IEEE PES DIU SBC • EEE FEST 2026. All rights reserved.</p>
-          <p className="mt-2 sm:mt-0 flex items-center gap-1.5 text-slate-400">
+          <p className="mt-2 sm:mt-0 flex items-center gap-2 text-slate-400">
             <span>Powered by</span>
             <span className="text-fest-pink font-semibold">AI Prompt Battle Engine</span>
+            <span>•</span>
+            <a 
+              href="#admin" 
+              className="text-slate-600 hover:text-slate-400 transition-colors inline-flex items-center gap-1"
+              title="Admin Portal"
+            >
+              <Lock className="w-3 h-3" />
+            </a>
           </p>
         </div>
 
