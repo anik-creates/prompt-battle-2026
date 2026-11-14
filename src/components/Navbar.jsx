@@ -3,26 +3,16 @@ import { useBattle } from '../context/BattleContext';
 import { 
   Maximize, 
   Minimize, 
-  Radio, 
   ExternalLink,
   ShieldCheck, 
   Sparkles,
-  Flame,
-  Vote,
-  HelpCircle
+  Smartphone
 } from 'lucide-react';
 
 export default function Navbar() {
   const { 
     activeView, 
-    switchView, 
-    activeArena, 
-    timer, 
-    published, 
-    poll, 
-    quiz, 
-    isAdminAuthenticated, 
-    firebaseStatus 
+    isAdminAuthenticated 
   } = useBattle();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -42,17 +32,6 @@ export default function Navbar() {
       document.exitFullscreen().catch((err) => console.warn(err));
     }
   };
-
-  // Determine active arena title for status badge
-  let arenaTitle = 'Battle Arena';
-  let arenaIcon = <Flame className="w-3.5 h-3.5 text-fest-cyan" />;
-  if (activeArena === 'poll') {
-    arenaTitle = 'Live Poll Active';
-    arenaIcon = <Vote className="w-3.5 h-3.5 text-fest-pink" />;
-  } else if (activeArena === 'quiz') {
-    arenaTitle = 'Kahoot Quiz Active';
-    arenaIcon = <HelpCircle className="w-3.5 h-3.5 text-fest-amber" />;
-  }
 
   return (
     <header className="sticky top-0 z-50 bg-dark-950/95 backdrop-blur-md border-b border-white/10">
@@ -75,7 +54,7 @@ export default function Navbar() {
               <img 
                 src="./assets/eee-fest-logo.png" 
                 alt="EEE Fest 2026" 
-                className="h-9 sm:h-11 md:h-14 w-auto object-contain filter drop-shadow-[0_0_15px_rgba(0,229,255,0.25)]"
+                className="h-9 sm:h-11 md:h-14 w-auto object-contain filter drop-shadow-[0_0_12px_rgba(0,229,255,0.25)]"
               />
             </div>
 
@@ -96,31 +75,12 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Right Section: Varies cleanly by View */}
-          <div className="flex items-center space-x-3 sm:space-x-4">
+          {/* Right Section: Clean, Minimalist Display per View */}
+          <div className="flex items-center space-x-3">
             
-            {/* 1. PRESENTATION VIEW (AUDITORIUM BROADCAST): Clean, Distraction-Free */}
+            {/* 1. PRESENTATION VIEW: 100% Clean Projector Display (NO switching panels or badges) */}
             {activeView === 'presentation' && (
-              <div className="flex items-center space-x-3">
-                {/* Live Arena Stage Status Badge */}
-                <div className="flex items-center px-3.5 py-1.5 rounded-full bg-dark-900 border border-white/10 text-xs font-mono">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-2.5"></span>
-                  <span className="flex items-center gap-1.5 text-slate-200 uppercase tracking-wider font-semibold">
-                    {arenaIcon}
-                    <span>{arenaTitle}</span>
-                  </span>
-                </div>
-
-                {/* Cloud Sync Status */}
-                <div 
-                  className="hidden md:flex items-center px-2.5 py-1.5 rounded bg-dark-900 border border-white/10 text-xs font-mono text-slate-400"
-                  title="Real-Time Cloud Synced"
-                >
-                  <Radio className="w-3.5 h-3.5 mr-1.5 text-fest-cyan animate-pulse" />
-                  <span className="text-[11px]">Live Broadcast</span>
-                </div>
-
-                {/* Fullscreen Button for Projector Operator */}
+              <div className="flex items-center space-x-2">
                 <button
                   onClick={toggleFullscreen}
                   className="p-2.5 rounded-lg bg-dark-900 border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
@@ -131,25 +91,22 @@ export default function Navbar() {
               </div>
             )}
 
-            {/* 2. PARTICIPANT VIEW: Minimalist Contender Header */}
+            {/* 2. PARTICIPANT VIEW */}
             {activeView === 'submit' && (
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center px-3 py-1.5 rounded-full bg-dark-900 border border-white/10 text-xs font-mono text-slate-300">
-                  <span className="w-2 h-2 rounded-full bg-fest-cyan animate-pulse mr-2"></span>
-                  <span>Contender Live Arena</span>
-                </div>
+              <div className="flex items-center px-3 py-1.5 rounded-full bg-dark-900 border border-white/10 text-xs font-mono text-slate-300">
+                <span className="w-2 h-2 rounded-full bg-fest-cyan animate-pulse mr-2"></span>
+                <span>Contender Portal</span>
               </div>
             )}
 
-            {/* 3. ADMIN VIEW: Admin Tools & Quick Links */}
+            {/* 3. ADMIN VIEW */}
             {activeView === 'admin' && (
               <div className="flex items-center space-x-3">
                 <div className="flex items-center px-3 py-1.5 rounded bg-fest-pes/10 border border-fest-pes/30 text-xs font-mono text-fest-pes">
                   <ShieldCheck className="w-4 h-4 mr-1.5" />
-                  <span>Admin Mode</span>
+                  <span>Admin Command</span>
                 </div>
 
-                {/* Quick Link to open the Presentation Screen in new window (for projector) */}
                 <a
                   href="./#presentation"
                   target="_blank"
@@ -157,19 +114,19 @@ export default function Navbar() {
                   className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-900 border border-white/15 text-fest-cyan hover:text-white font-mono text-xs transition-colors"
                   title="Open Presentation Screen on a separate monitor/projector"
                 >
-                  <span>Projector View</span>
+                  <span>Open Projector</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
 
-                {/* Quick Link to preview Participant View */}
                 <a
                   href="./#submit"
                   target="_blank"
                   rel="noreferrer"
-                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-900 border border-white/15 text-slate-400 hover:text-white font-mono text-xs transition-colors"
+                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-900 border border-white/15 text-slate-300 hover:text-white font-mono text-xs transition-colors"
+                  title="Open Participant Screen in new tab"
                 >
+                  <Smartphone className="w-3.5 h-3.5" />
                   <span>Phone View</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>
             )}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useBattle } from '../context/BattleContext';
 import TimerDisplay from './TimerDisplay';
 import FirebaseModal from './FirebaseModal';
+import ParticipantSubmitView from './ParticipantSubmitView';
 import { 
   ShieldCheck, 
   Lock, 
@@ -31,7 +32,9 @@ import {
   Zap,
   ArrowRight,
   Radio,
-  Check
+  Check,
+  Smartphone,
+  ExternalLink
 } from 'lucide-react';
 
 export default function AdminView() {
@@ -67,7 +70,7 @@ export default function AdminView() {
     firebaseStatus
   } = useBattle();
 
-  // Admin Section Tab: 'battle' | 'poll' | 'quiz'
+  // Admin Section Tab: 'battle' | 'poll' | 'quiz' | 'preview'
   const [adminTab, setAdminTab] = useState('battle');
 
   // Login form state
@@ -89,7 +92,7 @@ export default function AdminView() {
 
   // Poll Form State
   const [newPollQuestion, setNewPollQuestion] = useState('');
-  const [newPollType, setNewPollType] = useState('mcq'); // 'mcq' | 'voting'
+  const [newPollType, setNewPollType] = useState('mcq');
   const [newPollOptions, setNewPollOptions] = useState([
     { text: '', isCorrect: true },
     { text: '', isCorrect: false },
@@ -147,7 +150,6 @@ export default function AdminView() {
     setShowAddModal(false);
   };
 
-  // Poll Creation Submit
   const handleCreatePoll = (e) => {
     e.preventDefault();
     if (!newPollQuestion.trim()) return;
@@ -166,7 +168,6 @@ export default function AdminView() {
     setNewPollQuestion('');
   };
 
-  // Quiz Question Creation Submit
   const handleAddQuestion = (e) => {
     e.preventDefault();
     if (!newQText.trim()) return;
@@ -180,7 +181,6 @@ export default function AdminView() {
     setNewQOpts(['', '', '', '']);
   };
 
-  // Export CSV
   const exportToCSV = () => {
     if (participants.length === 0) {
       alert('No participant records to export.');
@@ -304,6 +304,19 @@ export default function AdminView() {
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-mono">
           <button
+            onClick={() => setAdminTab('preview')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded border transition-all ${
+              adminTab === 'preview'
+                ? 'bg-fest-cyan/20 border-fest-cyan text-fest-cyan font-bold shadow-[0_0_12px_rgba(0,229,255,0.3)]'
+                : 'bg-dark-900 border-white/10 text-slate-300 hover:text-white'
+            }`}
+            title="View Live Participant Mobile Simulator"
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+            <span>Live Phone Preview</span>
+          </button>
+
+          <button
             onClick={() => setIsFirebaseOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded bg-fest-cyan/10 border border-fest-cyan/40 text-fest-cyan"
           >
@@ -346,9 +359,9 @@ export default function AdminView() {
         <div className="flex items-center gap-2">
           <Radio className="w-4 h-4 text-fest-cyan animate-pulse" />
           <span className="text-slate-300 uppercase tracking-wider font-bold">
-            Auditorium Projector Screen Mode:
+            Auditorium Projector & Phones Live Broadcast Mode:
           </span>
-          <span className="text-fest-cyan font-bold uppercase px-2 py-0.5 rounded bg-dark-950 border border-fest-cyan/40">
+          <span className="text-fest-cyan font-bold uppercase px-2.5 py-0.5 rounded bg-dark-950 border border-fest-cyan/40">
             {activeArena === 'battle' ? 'Prompt Battle Arena' : activeArena === 'poll' ? 'Live Poll Display' : 'Kahoot Quiz Screen'}
           </span>
         </div>
@@ -356,47 +369,47 @@ export default function AdminView() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => switchArena('battle')}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all ${
               activeArena === 'battle'
                 ? 'bg-fest-cyan text-dark-950 font-bold shadow-[0_0_15px_rgba(0,229,255,0.4)]'
                 : 'bg-dark-950 border border-white/10 text-slate-300 hover:text-white'
             }`}
           >
-            <Flame className="w-3 h-3" />
+            <Flame className="w-3.5 h-3.5" />
             <span>Battle Screen</span>
           </button>
 
           <button
             onClick={() => switchArena('poll')}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all ${
               activeArena === 'poll'
                 ? 'bg-fest-pink text-white font-bold shadow-[0_0_15px_rgba(255,0,122,0.4)]'
                 : 'bg-dark-950 border border-white/10 text-slate-300 hover:text-white'
             }`}
           >
-            <Vote className="w-3 h-3" />
+            <Vote className="w-3.5 h-3.5" />
             <span>Poll Screen</span>
           </button>
 
           <button
             onClick={() => switchArena('quiz')}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all ${
               activeArena === 'quiz'
                 ? 'bg-fest-amber text-dark-950 font-bold shadow-[0_0_15px_rgba(255,183,0,0.4)]'
                 : 'bg-dark-950 border border-white/10 text-slate-300 hover:text-white'
             }`}
           >
-            <HelpCircle className="w-3 h-3" />
+            <HelpCircle className="w-3.5 h-3.5" />
             <span>Kahoot Quiz Screen</span>
           </button>
         </div>
       </div>
 
       {/* ADMIN CONTROL SECTION TABS */}
-      <div className="flex border-b border-white/10 font-mono text-sm space-x-6">
+      <div className="flex border-b border-white/10 font-mono text-sm space-x-6 overflow-x-auto pb-0.5">
         <button
           onClick={() => setAdminTab('battle')}
-          className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 ${
+          className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
             adminTab === 'battle'
               ? 'border-fest-cyan text-fest-cyan'
               : 'border-transparent text-slate-400 hover:text-white'
@@ -408,7 +421,7 @@ export default function AdminView() {
 
         <button
           onClick={() => setAdminTab('poll')}
-          className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 ${
+          className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
             adminTab === 'poll'
               ? 'border-fest-pink text-fest-pink'
               : 'border-transparent text-slate-400 hover:text-white'
@@ -420,7 +433,7 @@ export default function AdminView() {
 
         <button
           onClick={() => setAdminTab('quiz')}
-          className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 ${
+          className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
             adminTab === 'quiz'
               ? 'border-fest-amber text-fest-amber'
               : 'border-transparent text-slate-400 hover:text-white'
@@ -428,6 +441,19 @@ export default function AdminView() {
         >
           <HelpCircle className="w-4 h-4" />
           <span>Kahoot Quiz Manager</span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('preview')}
+          className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
+            adminTab === 'preview'
+              ? 'border-fest-cyan text-fest-cyan'
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          <Smartphone className="w-4 h-4" />
+          <span>Participant Live Preview</span>
+          <span className="w-2 h-2 rounded-full bg-fest-cyan animate-pulse"></span>
         </button>
       </div>
 
@@ -732,7 +758,6 @@ export default function AdminView() {
               </div>
             </div>
 
-            {/* Current Options Distribution Preview */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               {poll?.options?.map((opt, idx) => (
                 <div key={opt.id} className="p-3 rounded bg-dark-950 border border-white/10 flex items-center justify-between font-mono text-xs">
@@ -797,7 +822,6 @@ export default function AdminView() {
               </label>
             </div>
 
-            {/* Options */}
             <div className="space-y-2 pt-2">
               <label className="block text-xs font-mono text-slate-300">
                 Options {newPollType === 'mcq' && '(Select radio to mark correct answer):'}
@@ -851,7 +875,6 @@ export default function AdminView() {
       {adminTab === 'quiz' && (
         <div className="space-y-8">
           
-          {/* Active Quiz Question Controller */}
           <div className="p-6 rounded-xl bg-dark-900 border border-white/15 space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
@@ -871,7 +894,6 @@ export default function AdminView() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => launchQuizQuestion(quiz?.currentQuestionIndex || 0)}
@@ -921,7 +943,6 @@ export default function AdminView() {
             </div>
           </div>
 
-          {/* Add Custom Question Form */}
           <form onSubmit={handleAddQuestion} className="p-6 rounded-xl bg-dark-900/60 border border-white/15 space-y-4">
             <h4 className="font-sans font-bold text-white text-base flex items-center gap-2">
               <Plus className="w-4 h-4 text-fest-amber" />
@@ -995,6 +1016,140 @@ export default function AdminView() {
               Add Question to Quiz
             </button>
           </form>
+
+        </div>
+      )}
+
+      {/* TAB 4: PARTICIPANT LIVE PREVIEW (SMARTPHONE SIMULATOR) */}
+      {adminTab === 'preview' && (
+        <div className="space-y-6">
+          
+          <div className="p-6 rounded-xl bg-dark-900 border border-white/15 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-fest-cyan" />
+                <h3 className="font-sans font-bold text-white text-lg">
+                  Participant Live Mobile Simulator
+                </h3>
+              </div>
+              <p className="text-xs font-mono text-slate-400 mt-1">
+                Real-time interactive mobile screen mirror demonstrating what contenders see on their smartphones
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 font-mono text-xs">
+              <span className="text-slate-400">Broadcast Stage:</span>
+              <button
+                onClick={() => switchArena('battle')}
+                className={`px-3 py-1.5 rounded transition-all ${
+                  activeArena === 'battle'
+                    ? 'bg-fest-cyan text-dark-950 font-bold shadow-[0_0_12px_rgba(0,229,255,0.3)]'
+                    : 'bg-dark-950 border border-white/10 text-slate-300 hover:text-white'
+                }`}
+              >
+                Battle
+              </button>
+              <button
+                onClick={() => switchArena('poll')}
+                className={`px-3 py-1.5 rounded transition-all ${
+                  activeArena === 'poll'
+                    ? 'bg-fest-pink text-white font-bold shadow-[0_0_12px_rgba(255,0,122,0.3)]'
+                    : 'bg-dark-950 border border-white/10 text-slate-300 hover:text-white'
+                }`}
+              >
+                Poll
+              </button>
+              <button
+                onClick={() => switchArena('quiz')}
+                className={`px-3 py-1.5 rounded transition-all ${
+                  activeArena === 'quiz'
+                    ? 'bg-fest-amber text-dark-950 font-bold shadow-[0_0_12px_rgba(255,183,0,0.3)]'
+                    : 'bg-dark-950 border border-white/10 text-slate-300 hover:text-white'
+                }`}
+              >
+                Kahoot Quiz
+              </button>
+            </div>
+          </div>
+
+          {/* Smartphone Simulator Frame */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* Phone Mockup Frame (Col 7) */}
+            <div className="lg:col-span-7 flex justify-center py-2">
+              <div className="w-full max-w-sm rounded-[50px] p-4 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 shadow-[0_0_60px_rgba(0,0,0,0.95)] border-4 border-slate-600">
+                <div className="rounded-[40px] bg-dark-950 overflow-hidden border border-white/15 relative h-[700px] flex flex-col shadow-inner">
+                  
+                  {/* Smartphone Top Notch / Speaker */}
+                  <div className="pt-3 pb-1 bg-dark-950 flex items-center justify-between px-6 border-b border-white/5 select-none">
+                    <span className="text-[10px] font-mono text-slate-400">9:41</span>
+                    <div className="w-20 h-4 rounded-full bg-black border border-white/15 flex items-center justify-center">
+                      <div className="w-2 h-2 rounded-full bg-slate-900 border border-white/10 mr-1.5"></div>
+                    </div>
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold">5G</span>
+                  </div>
+
+                  {/* Mobile Screen Content (Live View) */}
+                  <div className="flex-1 overflow-y-auto p-2">
+                    <ParticipantSubmitView />
+                  </div>
+
+                  {/* Smartphone Home Indicator Bar */}
+                  <div className="py-2.5 bg-dark-950 flex justify-center border-t border-white/5">
+                    <div className="w-28 h-1 rounded-full bg-white/30"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Control & Live Inspection Sidecard (Col 5) */}
+            <div className="lg:col-span-5 space-y-4 font-mono text-xs">
+              <div className="p-5 rounded-xl bg-dark-900 border border-white/15 space-y-3">
+                <div className="flex items-center gap-2 text-fest-cyan font-bold">
+                  <Radio className="w-4 h-4 animate-pulse" />
+                  <span>Real-Time Device Synchronization</span>
+                </div>
+                <p className="text-slate-300 leading-relaxed">
+                  Whatever mode is active on this simulator is <strong>identical to what every participant sees on their smartphone</strong> when scanning the venue QR code.
+                </p>
+                <div className="p-3 rounded bg-dark-950 border border-white/10 space-y-1.5 text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Current Broadcast Stage:</span>
+                    <strong className="text-fest-cyan uppercase">{activeArena}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Firebase Realtime Sync:</span>
+                    <strong className="text-emerald-400">Active</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Anti-Cheat Lock:</span>
+                    <strong className="text-amber-400">Enabled</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5 rounded-xl bg-dark-900 border border-white/15 space-y-3">
+                <span className="text-white font-bold block">Testing Tips:</span>
+                <ul className="space-y-2 text-slate-300 text-[11px] leading-relaxed">
+                  <li>• You can interact with the smartphone on the left directly — tap buttons, vote, or submit to test the flow.</li>
+                  <li>• To see what happens on an actual phone, scan the QR code projected on the presentation screen or open <code className="text-fest-cyan">#submit</code> on your mobile browser.</li>
+                  <li>• Switching the stage here immediately updates all active participant phones and the venue projector simultaneously.</li>
+                </ul>
+                <div className="pt-2">
+                  <a
+                    href="./#submit"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded bg-fest-cyan/15 hover:bg-fest-cyan/25 border border-fest-cyan/40 text-fest-cyan font-bold transition-all"
+                  >
+                    <span>Open Phone View in Separate Window</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+          </div>
 
         </div>
       )}
