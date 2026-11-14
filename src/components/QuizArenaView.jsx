@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { useBattle } from '../context/BattleContext';
+import { useBattle, toSafeArray, DEFAULT_QUIZ_QUESTIONS } from '../context/BattleContext';
 import { 
   HelpCircle, 
   Clock, 
@@ -18,15 +18,16 @@ import {
 export default function QuizArenaView() {
   const { quiz } = useBattle();
 
-  const currentIdx = quiz?.currentQuestionIndex || 0;
-  const questions = quiz?.questions || [];
-  const currentQ = questions[currentIdx] || questions[0];
-  const isFinished = quiz?.status === 'finished' || quiz?.published;
-  const isQuestionEnded = quiz?.status === 'question_ended';
-  const isInProgress = quiz?.status === 'in_progress';
+  const safeQuiz = quiz || {};
+  const currentIdx = safeQuiz.currentQuestionIndex || 0;
+  const questions = toSafeArray(safeQuiz.questions, DEFAULT_QUIZ_QUESTIONS);
+  const currentQ = questions[currentIdx] || questions[0] || DEFAULT_QUIZ_QUESTIONS[0];
+  const isFinished = safeQuiz.status === 'finished' || safeQuiz.published;
+  const isQuestionEnded = safeQuiz.status === 'question_ended';
+  const isInProgress = safeQuiz.status === 'in_progress';
 
   // Calculate live responses for current question
-  const submissions = Object.values(quiz?.submissions || {});
+  const submissions = Object.values(safeQuiz.submissions || {});
   const answeredForCurrent = submissions.filter((s) => s.answers && s.answers[currentIdx] !== undefined);
 
   // Compute leaderboard sorted by totalScore descending
@@ -86,7 +87,7 @@ export default function QuizArenaView() {
                   : 'border-amber-700/50 bg-gradient-to-b from-amber-700/10 via-dark-900 to-dark-950 shadow-[0_0_20px_rgba(180,83,9,0.1)]';
 
                 return (
-                  <div key={p.participantId} className={`p-6 rounded-xl border relative transition-all ${styling}`}>
+                  <div key={p.participantId || idx} className={`p-6 rounded-xl border relative transition-all ${styling}`}>
                     <div className="flex items-center justify-between mb-4">
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider ${
                         isChampion ? 'bg-fest-amber/20 text-fest-amber border border-fest-amber/40' : 'bg-white/10 text-slate-200'
@@ -125,7 +126,7 @@ export default function QuizArenaView() {
                 </thead>
                 <tbody className="divide-y divide-white/5 bg-dark-900/40">
                   {sortedContenders.map((p, idx) => (
-                    <tr key={p.participantId} className="hover:bg-white/[0.02]">
+                    <tr key={p.participantId || idx} className="hover:bg-white/[0.02]">
                       <td className="py-3 px-4 font-bold text-fest-cyan">#{idx + 1}</td>
                       <td className="py-3 px-4 font-sans font-semibold text-white">
                         {p.name} <span className="text-xs text-slate-400 font-mono">({p.teamName})</span>
@@ -150,6 +151,8 @@ export default function QuizArenaView() {
       </div>
     );
   }
+
+  const qOptions = toSafeArray(currentQ?.options, ['Option A', 'Option B', 'Option C', 'Option D']);
 
   // Active Question Screen (During Live Kahoot Battle)
   return (
@@ -188,49 +191,23 @@ export default function QuizArenaView() {
         </h2>
       </div>
 
-      {/* Kahoot 4-Quadrant Massive Option Grid */}
+      {/* Kahoot 4-Quadrant Option Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-        {currentQ?.options?.map((text, optIdx) => {
+        {qOptions.map((text, optIdx) => {
           const isCorrect = optIdx === currentQ.correctIndex;
           const showAnswer = isQuestionEnded;
 
-          // Distinctive Kahoot Palette adapted to EEE Fest Cyber Dark Theme
           const optionThemes = [
-            {
-              border: 'border-rose-500/40',
-              bg: 'bg-rose-950/30 hover:bg-rose-950/50',
-              badge: 'bg-rose-500 text-white',
-              shape: '▲', // Triangle
-              letter: 'A'
-            },
-            {
-              border: 'border-fest-cyan/40',
-              bg: 'bg-cyan-950/30 hover:bg-cyan-950/50',
-              badge: 'bg-fest-cyan text-dark-950',
-              shape: '◆', // Diamond
-              letter: 'B'
-            },
-            {
-              border: 'border-amber-500/40',
-              bg: 'bg-amber-950/30 hover:bg-amber-950/50',
-              badge: 'bg-amber-500 text-dark-950',
-              shape: '●', // Circle
-              letter: 'C'
-            },
-            {
-              border: 'border-emerald-500/40',
-              bg: 'bg-emerald-950/30 hover:bg-emerald-950/50',
-              badge: 'bg-emerald-500 text-dark-950',
-              shape: '■', // Square
-              letter: 'D'
-            }
+            { border: 'border-rose-500/40', bg: 'bg-rose-950/30 hover:bg-rose-950/50', badge: 'bg-rose-500 text-white', shape: '▲' },
+            { border: 'border-fest-cyan/40', bg: 'bg-cyan-950/30 hover:bg-cyan-950/50', badge: 'bg-fest-cyan text-dark-950', shape: '◆' },
+            { border: 'border-amber-500/40', bg: 'bg-amber-950/30 hover:bg-amber-950/50', badge: 'bg-amber-500 text-dark-950', shape: '●' },
+            { border: 'border-emerald-500/40', bg: 'bg-emerald-950/30 hover:bg-emerald-950/50', badge: 'bg-emerald-500 text-dark-950', shape: '■' }
           ];
 
           const t = optionThemes[optIdx % 4];
 
-          // Compute how many participants chose this option
           const choseThisCount = answeredForCurrent.filter(
-            (s) => s.answers[currentIdx]?.selectedIndex === optIdx
+            (s) => s.answers && s.answers[currentIdx]?.selectedIndex === optIdx
           ).length;
 
           return (
@@ -253,7 +230,6 @@ export default function QuizArenaView() {
                 </span>
               </div>
 
-              {/* Show checkmark or choice counter when question concludes */}
               <div className="flex items-center gap-2">
                 {showAnswer && isCorrect && (
                   <CheckCircle2 className="w-6 h-6 text-emerald-400" />

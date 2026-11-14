@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useBattle } from '../context/BattleContext';
+import { useBattle, toSafeArray, DEFAULT_POLL } from '../context/BattleContext';
 import { 
   Vote, 
   CheckCircle2, 
@@ -13,6 +13,9 @@ import {
 
 export default function ParticipantPollView() {
   const { poll, submitVote } = useBattle();
+
+  const safePoll = poll || DEFAULT_POLL;
+  const optionsList = toSafeArray(safePoll.options, DEFAULT_POLL.options);
 
   const [voterName, setVoterName] = useState(() => {
     return localStorage.getItem('pb_voter_name') || '';
@@ -36,11 +39,11 @@ export default function ParticipantPollView() {
 
   // Detect whether already voted in this poll
   useEffect(() => {
-    if (poll?.votes && poll.votes[participantId]) {
+    if (safePoll?.votes && safePoll.votes[participantId]) {
       setHasVoted(true);
-      setSelectedOptId(poll.votes[participantId].optionId);
+      setSelectedOptId(safePoll.votes[participantId].optionId);
     }
-  }, [poll, participantId]);
+  }, [safePoll, participantId]);
 
   // Anti-Switching Focus Protection
   useEffect(() => {
@@ -69,7 +72,7 @@ export default function ParticipantPollView() {
 
   const handleCastVote = (optId) => {
     if (hasVoted) return;
-    if (poll?.status === 'closed') {
+    if (safePoll?.status === 'closed') {
       setErrorMsg('This poll has been concluded by the moderator.');
       return;
     }
@@ -128,7 +131,7 @@ export default function ParticipantPollView() {
           Live Participant Voting
         </div>
         <h2 className="text-xl sm:text-2xl font-bold font-sans text-white">
-          {poll?.question}
+          {safePoll.question || 'Awaiting Question...'}
         </h2>
       </div>
 
@@ -158,14 +161,14 @@ export default function ParticipantPollView() {
 
       {/* Options List */}
       <div className="space-y-3">
-        {poll?.options?.map((opt, idx) => {
+        {optionsList.map((opt, idx) => {
           const isSelected = selectedOptId === opt.id;
           const letter = String.fromCharCode(65 + idx);
 
           return (
             <button
-              key={opt.id}
-              disabled={hasVoted || poll?.status === 'closed'}
+              key={opt.id || idx}
+              disabled={hasVoted || safePoll.status === 'closed'}
               onClick={() => handleCastVote(opt.id)}
               className={`w-full p-4 rounded-xl border text-left transition-all duration-200 flex items-center justify-between group ${
                 isSelected

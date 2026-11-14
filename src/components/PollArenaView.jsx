@@ -1,6 +1,6 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { useBattle } from '../context/BattleContext';
+import { useBattle, toSafeArray, DEFAULT_POLL } from '../context/BattleContext';
 import { 
   BarChart3, 
   Vote, 
@@ -17,9 +17,11 @@ import {
 export default function PollArenaView() {
   const { poll } = useBattle();
 
-  const totalVotes = Object.keys(poll?.votes || {}).length;
-  const isMcq = poll?.type === 'mcq';
-  const isPublished = poll?.published;
+  const safePoll = poll || DEFAULT_POLL;
+  const optionsList = toSafeArray(safePoll.options, DEFAULT_POLL.options);
+  const totalVotes = Object.keys(safePoll.votes || {}).length;
+  const isMcq = safePoll.type === 'mcq';
+  const isPublished = safePoll.published;
 
   const submissionUrl = typeof window !== 'undefined'
     ? `${window.location.origin}${window.location.pathname}#poll`
@@ -36,7 +38,7 @@ export default function PollArenaView() {
         </div>
 
         <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white font-sans tracking-tight max-w-4xl mx-auto leading-snug">
-          {poll?.question || 'Awaiting Question from Admin...'}
+          {safePoll.question || 'Awaiting Question from Moderator...'}
         </h1>
 
         <div className="flex items-center justify-center gap-4 mt-4 text-xs font-mono text-slate-400">
@@ -46,11 +48,11 @@ export default function PollArenaView() {
           </span>
           <span>•</span>
           <span className={`px-2.5 py-0.5 rounded-full uppercase tracking-wider text-[11px] font-bold ${
-            poll?.status === 'active'
+            safePoll.status === 'active'
               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse'
               : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
           }`}>
-            {poll?.status === 'active' ? 'Voting Live' : 'Voting Concluded'}
+            {safePoll.status === 'active' ? 'Voting Live' : 'Voting Concluded'}
           </span>
         </div>
       </div>
@@ -60,14 +62,13 @@ export default function PollArenaView() {
         
         {/* Left: Options & Animated Progress Bars (Col 8) */}
         <div className="lg:col-span-8 space-y-4">
-          {poll?.options?.map((opt, idx) => {
+          {optionsList.map((opt, idx) => {
             const count = opt.votes || 0;
             const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
             const isCorrect = opt.isCorrect;
-            const revealCorrect = isMcq && (isPublished || poll?.status === 'closed');
+            const revealCorrect = isMcq && (isPublished || safePoll.status === 'closed');
 
-            // Kahoot/EEE Fest distinctive option borders & badges
-            const letter = String.fromCharCode(65 + idx); // A, B, C, D
+            const letter = String.fromCharCode(65 + idx);
             const colorAccents = [
               'border-fest-pink/40 text-fest-pink bg-fest-pink/10',
               'border-fest-cyan/40 text-fest-cyan bg-fest-cyan/10',
@@ -77,7 +78,7 @@ export default function PollArenaView() {
 
             return (
               <div 
-                key={opt.id}
+                key={opt.id || idx}
                 className={`relative p-4 sm:p-5 rounded-lg border transition-all duration-500 overflow-hidden ${
                   revealCorrect && isCorrect
                     ? 'border-emerald-400 bg-emerald-950/40 shadow-[0_0_25px_rgba(16,185,129,0.3)]'

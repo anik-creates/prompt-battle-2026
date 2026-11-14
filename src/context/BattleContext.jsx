@@ -10,11 +10,20 @@ import { playCountdownTick, playStartHorn, playFinishFanfare, playTimesUpAlert }
 
 const BattleContext = createContext(null);
 
-const STORAGE_KEY = 'pb_local_state_v2';
-const BROADCAST_CHANNEL_NAME = 'prompt_battle_broadcast_v2';
+const STORAGE_KEY = 'pb_local_state_v3';
+const BROADCAST_CHANNEL_NAME = 'prompt_battle_broadcast_v3';
 const ADMIN_PASSWORD = 'eeefestadmin';
 
 const INITIAL_DURATION = 1200; // 20 minutes default
+
+// Safe array helper to prevent Firebase Realtime Database object-conversion crashes
+export function toSafeArray(val, fallback = []) {
+  if (Array.isArray(val)) return val;
+  if (val && typeof val === 'object') {
+    return Object.values(val);
+  }
+  return fallback;
+}
 
 // Pre-built AI Prompt Engineering questions for the Kahoot-Style Quiz
 export const DEFAULT_QUIZ_QUESTIONS = [
@@ -28,7 +37,7 @@ export const DEFAULT_QUIZ_QUESTIONS = [
       'Temperature Scaling Prompting'
     ],
     correctIndex: 0,
-    timeLimit: 20, // seconds
+    timeLimit: 20,
   },
   {
     id: 'q-2',
@@ -83,8 +92,8 @@ export const DEFAULT_QUIZ_QUESTIONS = [
 export const DEFAULT_POLL = {
   id: 'poll-1',
   question: 'Which AI Model Architecture excels the most at complex logical prompt decomposition?',
-  type: 'mcq', // 'voting' (opinion) or 'mcq' (has correct answer)
-  status: 'active', // 'idle' | 'active' | 'closed'
+  type: 'mcq', // 'voting' or 'mcq'
+  status: 'active', // 'active' | 'closed'
   published: false,
   options: [
     { id: 'opt-1', text: 'Mixture of Experts (MoE) with CoT', isCorrect: true, votes: 0 },
@@ -92,10 +101,10 @@ export const DEFAULT_POLL = {
     { id: 'opt-3', text: 'Unquantized Recurrent Baseline', isCorrect: false, votes: 0 },
     { id: 'opt-4', text: 'Standard Zero-Shot Feedforward', isCorrect: false, votes: 0 }
   ],
-  votes: {}, // participantId -> { optionId, name, timestamp }
+  votes: {},
 };
 
-const DEFAULT_STATE = {
+export const DEFAULT_STATE = {
   activeArena: 'battle', // 'battle' | 'poll' | 'quiz'
   timer: {
     duration: INITIAL_DURATION,
@@ -107,10 +116,10 @@ const DEFAULT_STATE = {
   published: false,
   participants: [],
 
-  // Live Polling State
+  // Live Poll State
   poll: DEFAULT_POLL,
 
-  // Kahoot-Style Live Quiz State
+  // Kahoot Live Quiz State
   quiz: {
     id: 'quiz-main',
     title: 'Prompt Battle 2026 Kahoot Arena',
@@ -119,18 +128,57 @@ const DEFAULT_STATE = {
     questionEndsAt: null,
     published: false,
     questions: DEFAULT_QUIZ_QUESTIONS,
-    submissions: {}, // participantId -> { name, teamName, answers: { [qIdx]: { selectedIndex, isCorrect, points, timeTakenSec } }, totalScore: 0 }
+    submissions: {},
   },
 
   lastUpdated: Date.now(),
 };
+
+// Deep state merger ensuring zero undefined properties from cloud/storage
+export function sanitizeState(raw) {
+  if (!raw || typeof raw !== 'object') return DEFAULT_STATE;
+
+  const rawPoll = raw.poll || {};
+  const pollOptions = toSafeArray(rawPoll.options, DEFAULT_POLL.options);
+
+  const rawQuiz = raw.quiz || {};
+  const quizQuestions = toSafeArray(rawQuiz.questions, DEFAULT_QUIZ_QUESTIONS);
+
+  return {
+    ...DEFAULT_STATE,
+    ...raw,
+    activeArena: raw.activeArena || 'battle',
+    timer: {
+      ...DEFAULT_STATE.timer,
+      ...(raw.timer || {}),
+    },
+    poll: {
+      ...DEFAULT_POLL,
+      ...rawPoll,
+      options: pollOptions.length > 0 ? pollOptions : DEFAULT_POLL.options,
+      votes: rawPoll.votes || {},
+      status: rawPoll.status || 'active',
+      type: rawPoll.type || 'mcq',
+    },
+    quiz: {
+      ...DEFAULT_STATE.quiz,
+      ...rawQuiz,
+      questions: quizQuestions.length > 0 ? quizQuestions : DEFAULT_QUIZ_QUESTIONS,
+      submissions: rawQuiz.submissions || {},
+      status: rawQuiz.status || 'idle',
+    },
+    participants: toSafeArray(raw.participants, []),
+    published: Boolean(raw.published),
+    lastUpdated: raw.lastUpdated || Date.now(),
+  };
+}
 
 export function BattleProvider({ children }) {
   const [battleState, setBattleState] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        return { ...DEFAULT_STATE, ...JSON.parse(saved) };
+        return sanitizeState(JSON.parse(saved));
       }
     } catch (e) {
       console.warn('Failed to load local state:', e);
@@ -162,23 +210,24 @@ export function BattleProvider({ children }) {
 
   // Sync state to local storage and broadcast to other tabs & cloud
   const syncState = useCallback((newState, shouldPushCloud = true) => {
-    setBattleState(newState);
+    const cleanState = sanitizeState(newState);
+    setBattleState(cleanState);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanState));
     } catch (e) {
       console.warn(e);
     }
 
     if (broadcastRef.current) {
       try {
-        broadcastRef.current.postMessage({ type: 'STATE_UPDATE', payload: newState });
+        broadcastRef.current.postMessage({ type: 'STATE_UPDATE', payload: cleanState });
       } catch (err) {
         console.warn('Broadcast error:', err);
       }
     }
 
     if (shouldPushCloud) {
-      pushStateToCloud(newState).catch((err) => console.warn('Cloud sync error:', err));
+      pushStateToCloud(cleanState).catch((err) => console.warn('Cloud sync error:', err));
     }
   }, []);
 
@@ -190,9 +239,10 @@ export function BattleProvider({ children }) {
 
       channel.onmessage = (event) => {
         if (event.data?.type === 'STATE_UPDATE' && event.data.payload) {
-          setBattleState(event.data.payload);
+          const sanitized = sanitizeState(event.data.payload);
+          setBattleState(sanitized);
           try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(event.data.payload));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
           } catch (e) {
             console.warn(e);
           }
@@ -204,7 +254,7 @@ export function BattleProvider({ children }) {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
-          setBattleState(parsed);
+          setBattleState(sanitizeState(parsed));
         } catch (err) {
           console.warn(err);
         }
@@ -235,12 +285,13 @@ export function BattleProvider({ children }) {
         if (cloudData && cloudData.lastUpdated) {
           setBattleState((prev) => {
             if (!prev.lastUpdated || cloudData.lastUpdated > prev.lastUpdated) {
+              const sanitized = sanitizeState(cloudData);
               try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
               } catch (e) {
                 console.warn(e);
               }
-              return cloudData;
+              return sanitized;
             }
             return prev;
           });
@@ -315,7 +366,6 @@ export function BattleProvider({ children }) {
         if (diffMs <= 0) {
           clearInterval(quizInterval);
           playTimesUpAlert();
-          // Automatically transition to question_ended
           syncState({
             ...battleState,
             quiz: {
@@ -341,6 +391,8 @@ export function BattleProvider({ children }) {
     window.location.hash = `#${newView}`;
   }, []);
 
+  // ADMIN CONTROL: Master Arena Switcher
+  // When Admin switches arena, it broadcasts to all phones & presentation screens
   const switchArena = useCallback((arena) => {
     const now = Date.now();
     const newState = {
@@ -359,6 +411,7 @@ export function BattleProvider({ children }) {
     playStartHorn();
     syncState({
       ...battleState,
+      activeArena: 'battle',
       timer: {
         duration,
         remaining: duration,
@@ -450,9 +503,10 @@ export function BattleProvider({ children }) {
     };
 
     playFinishFanfare();
+    const currentList = toSafeArray(battleState.participants, []);
     syncState({
       ...battleState,
-      participants: [newParticipant, ...battleState.participants],
+      participants: [newParticipant, ...currentList],
       lastUpdated: now,
     });
     return newParticipant;
@@ -460,7 +514,8 @@ export function BattleProvider({ children }) {
 
   const updateParticipantMarks = useCallback((id, updates) => {
     const now = Date.now();
-    const updated = battleState.participants.map((p) => {
+    const currentList = toSafeArray(battleState.participants, []);
+    const updated = currentList.map((p) => {
       if (p.id !== id) return p;
       const merged = { ...p, ...updates };
       let statusWeight = 12;
@@ -502,18 +557,20 @@ export function BattleProvider({ children }) {
       noveltyScore: Number(participantData.noveltyScore) || 0,
       totalScore: Number(participantData.totalScore) || 0,
     };
+    const currentList = toSafeArray(battleState.participants, []);
     syncState({
       ...battleState,
-      participants: [newParticipant, ...battleState.participants],
+      participants: [newParticipant, ...currentList],
       lastUpdated: now,
     });
   }, [battleState, syncState]);
 
   const removeParticipant = useCallback((id) => {
     const now = Date.now();
+    const currentList = toSafeArray(battleState.participants, []);
     syncState({
       ...battleState,
-      participants: battleState.participants.filter((p) => p.id !== id),
+      participants: currentList.filter((p) => p.id !== id),
       lastUpdated: now,
     });
   }, [battleState, syncState]);
@@ -528,18 +585,19 @@ export function BattleProvider({ children }) {
   }, [battleState, syncState]);
 
   // --- LIVE POLL ACTIONS ---
+  // When Admin creates a poll, it automatically switches ALL screens to Poll view!
   const createPoll = useCallback(({ question, type, options }) => {
     const now = Date.now();
     const formattedOptions = options.map((opt, idx) => ({
       id: `opt-${idx + 1}`,
-      text: opt.text.trim(),
+      text: (opt.text || '').trim(),
       isCorrect: Boolean(opt.isCorrect),
       votes: 0,
     }));
 
     const newPoll = {
       id: `poll-${now}`,
-      question: question.trim(),
+      question: (question || '').trim(),
       type: type || 'mcq',
       status: 'active',
       published: false,
@@ -547,10 +605,12 @@ export function BattleProvider({ children }) {
       votes: {},
     };
 
+    playStartHorn();
+
     syncState({
       ...battleState,
+      activeArena: 'poll', // Automatically switch auditorium and participant screens!
       poll: newPoll,
-      activeArena: 'poll',
       lastUpdated: now,
     });
   }, [battleState, syncState]);
@@ -569,8 +629,8 @@ export function BattleProvider({ children }) {
       timestamp: now,
     };
 
-    // Recalculate option vote counts
-    const updatedOptions = currentPoll.options.map((opt) => {
+    const optionsList = toSafeArray(currentPoll.options, DEFAULT_POLL.options);
+    const updatedOptions = optionsList.map((opt) => {
       const voteCount = Object.values(currentVotes).filter((v) => v.optionId === opt.id).length;
       return { ...opt, votes: voteCount };
     });
@@ -624,10 +684,12 @@ export function BattleProvider({ children }) {
   }, [battleState, syncState]);
 
   // --- KAHOOT-STYLE LIVE QUIZ ACTIONS ---
+  // When Admin launches a quiz question, it automatically switches ALL screens to Quiz view!
   const launchQuizQuestion = useCallback((questionIdx = 0) => {
     const now = Date.now();
     const quiz = battleState.quiz || { questions: DEFAULT_QUIZ_QUESTIONS };
-    const q = quiz.questions[questionIdx] || quiz.questions[0];
+    const questionsList = toSafeArray(quiz.questions, DEFAULT_QUIZ_QUESTIONS);
+    const q = questionsList[questionIdx] || questionsList[0];
     const duration = q.timeLimit || 20;
     const questionEndsAt = now + duration * 1000;
 
@@ -635,7 +697,7 @@ export function BattleProvider({ children }) {
 
     syncState({
       ...battleState,
-      activeArena: 'quiz',
+      activeArena: 'quiz', // Automatically switch auditorium and participant screens!
       quiz: {
         ...quiz,
         status: 'in_progress',
@@ -661,16 +723,15 @@ export function BattleProvider({ children }) {
 
   const submitQuizAnswer = useCallback(({ participantId, participantName, teamName, questionIndex, selectedIndex, timeTakenSec }) => {
     const now = Date.now();
-    const quiz = battleState.quiz;
-    const currentQ = quiz.questions[questionIndex];
+    const quiz = battleState.quiz || {};
+    const questionsList = toSafeArray(quiz.questions, DEFAULT_QUIZ_QUESTIONS);
+    const currentQ = questionsList[questionIndex];
     if (!currentQ) return { success: false };
 
     const isCorrect = selectedIndex === currentQ.correctIndex;
     let points = 0;
 
     if (isCorrect) {
-      // Kahoot speed + accuracy formula:
-      // Base 1000 points, linearly scaled by time taken
       const maxTime = currentQ.timeLimit || 20;
       const ratio = Math.max(0, Math.min(1, timeTakenSec / maxTime));
       points = Math.round((1 - ratio / 2) * 1000);
@@ -686,7 +747,6 @@ export function BattleProvider({ children }) {
       correctCount: 0,
     };
 
-    // Record answer
     userSubmission.answers[questionIndex] = {
       selectedIndex,
       isCorrect,
@@ -695,7 +755,6 @@ export function BattleProvider({ children }) {
       answeredAt: now,
     };
 
-    // Recompute total score & accuracy
     const allAnswers = Object.values(userSubmission.answers);
     userSubmission.totalScore = allAnswers.reduce((sum, a) => sum + (a.points || 0), 0);
     userSubmission.correctCount = allAnswers.filter((a) => a.isCorrect).length;
@@ -727,7 +786,7 @@ export function BattleProvider({ children }) {
       quiz: {
         ...battleState.quiz,
         published: shouldPublish,
-        status: shouldPublish ? 'finished' : battleState.quiz.status,
+        status: shouldPublish ? 'finished' : battleState.quiz?.status,
       },
       lastUpdated: now,
     });
@@ -751,10 +810,11 @@ export function BattleProvider({ children }) {
 
   const addQuizQuestion = useCallback((newQ) => {
     const now = Date.now();
-    const updatedQuestions = [...(battleState.quiz.questions || []), {
+    const currentList = toSafeArray(battleState.quiz?.questions, DEFAULT_QUIZ_QUESTIONS);
+    const updatedQuestions = [...currentList, {
       id: `q-${Date.now()}`,
       question: newQ.question,
-      options: newQ.options,
+      options: toSafeArray(newQ.options, ['Option A', 'Option B', 'Option C', 'Option D']),
       correctIndex: Number(newQ.correctIndex) || 0,
       timeLimit: Number(newQ.timeLimit) || 20,
     }];
@@ -807,14 +867,25 @@ export function BattleProvider({ children }) {
     });
   }, [syncState]);
 
+  const safePoll = battleState.poll || DEFAULT_POLL;
+  const safeQuiz = battleState.quiz || DEFAULT_STATE.quiz;
+
   const value = {
     battleState,
     activeArena: battleState.activeArena || 'battle',
     timer: battleState.timer,
-    participants: battleState.participants,
+    participants: toSafeArray(battleState.participants, []),
     published: battleState.published,
-    poll: battleState.poll || DEFAULT_POLL,
-    quiz: battleState.quiz,
+    poll: {
+      ...safePoll,
+      options: toSafeArray(safePoll.options, DEFAULT_POLL.options),
+      votes: safePoll.votes || {},
+    },
+    quiz: {
+      ...safeQuiz,
+      questions: toSafeArray(safeQuiz.questions, DEFAULT_QUIZ_QUESTIONS),
+      submissions: safeQuiz.submissions || {},
+    },
     isAdminAuthenticated,
     activeView,
     firebaseStatus,

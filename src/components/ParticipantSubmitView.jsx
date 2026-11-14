@@ -10,36 +10,30 @@ import {
   Users, 
   FileText, 
   Sparkles, 
-  RotateCcw,
-  Monitor,
-  Flame,
-  Vote,
-  HelpCircle,
-  AlertCircle
+  RotateCcw, 
+  Monitor, 
+  Flame, 
+  Vote, 
+  HelpCircle, 
+  AlertCircle,
+  Radio
 } from 'lucide-react';
 
 export default function ParticipantSubmitView() {
   const { 
-    activeArena,
+    activeArena, 
     timer, 
     submitParticipantWork, 
     switchView 
   } = useBattle();
 
-  // Selected sub-tab: 'battle' | 'poll' | 'quiz'
-  const [subTab, setSubTab] = useState(() => {
-    const hash = window.location.hash.replace('#', '');
-    if (['poll', 'quiz'].includes(hash)) return hash;
-    return activeArena || 'battle';
-  });
+  // Driven dynamically by activeArena from the Admin!
+  const [currentTab, setCurrentTab] = useState(activeArena || 'battle');
 
-  // Keep in sync with hash or admin active arena if changed
+  // When Admin changes active arena, automatically shift participant screen in real time!
   useEffect(() => {
-    const hash = window.location.hash.replace('#', '');
-    if (['poll', 'quiz'].includes(hash)) {
-      setSubTab(hash);
-    } else if (activeArena) {
-      setSubTab(activeArena);
+    if (activeArena) {
+      setCurrentTab(activeArena);
     }
   }, [activeArena]);
 
@@ -76,60 +70,61 @@ export default function ParticipantSubmitView() {
   return (
     <div className="w-full max-w-2xl mx-auto py-6 sm:py-10 px-4 space-y-6">
       
-      {/* Participant Sub-Navigation Tabs */}
-      <div className="flex items-center justify-center p-1.5 rounded-xl bg-dark-900 border border-white/10 font-mono text-xs max-w-md mx-auto">
-        <button
-          onClick={() => {
-            setSubTab('battle');
-            window.location.hash = '#submit';
-          }}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg font-bold transition-all ${
-            subTab === 'battle'
-              ? 'bg-fest-cyan/20 text-fest-cyan border border-fest-cyan/40 shadow-[0_0_12px_rgba(0,229,255,0.2)]'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Flame className="w-3.5 h-3.5" />
-          <span>Battle Submit</span>
-        </button>
+      {/* Live Director Broadcast Banner */}
+      <div className="p-2.5 rounded-xl bg-dark-900 border border-white/10 flex items-center justify-between text-xs font-mono max-w-md mx-auto">
+        <div className="flex items-center gap-2">
+          <Radio className="w-3.5 h-3.5 text-fest-cyan animate-pulse" />
+          <span className="text-slate-400">Moderator Broadcast:</span>
+          <span className="font-bold text-white uppercase">
+            {activeArena === 'poll' ? 'Live Poll' : activeArena === 'quiz' ? 'Kahoot Quiz' : 'Battle Submit'}
+          </span>
+        </div>
 
-        <button
-          onClick={() => {
-            setSubTab('poll');
-            window.location.hash = '#poll';
-          }}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg font-bold transition-all ${
-            subTab === 'poll'
-              ? 'bg-fest-pink/20 text-fest-pink border border-fest-pink/40 shadow-[0_0_12px_rgba(255,0,122,0.2)]'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Vote className="w-3.5 h-3.5" />
-          <span>Live Poll</span>
-        </button>
+        {/* Optional quick switcher */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setCurrentTab('battle')}
+            className={`p-1.5 rounded transition-all ${
+              currentTab === 'battle'
+                ? 'bg-fest-cyan/20 text-fest-cyan border border-fest-cyan/40'
+                : 'text-slate-500 hover:text-white'
+            }`}
+            title="Battle Submission Form"
+          >
+            <Flame className="w-3.5 h-3.5" />
+          </button>
 
-        <button
-          onClick={() => {
-            setSubTab('quiz');
-            window.location.hash = '#quiz';
-          }}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg font-bold transition-all ${
-            subTab === 'quiz'
-              ? 'bg-fest-amber/20 text-fest-amber border border-fest-amber/40 shadow-[0_0_12px_rgba(255,183,0,0.2)]'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <HelpCircle className="w-3.5 h-3.5" />
-          <span>Kahoot Quiz</span>
-        </button>
+          <button
+            onClick={() => setCurrentTab('poll')}
+            className={`p-1.5 rounded transition-all ${
+              currentTab === 'poll'
+                ? 'bg-fest-pink/20 text-fest-pink border border-fest-pink/40'
+                : 'text-slate-500 hover:text-white'
+            }`}
+            title="Live Poll Screen"
+          >
+            <Vote className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            onClick={() => setCurrentTab('quiz')}
+            className={`p-1.5 rounded transition-all ${
+              currentTab === 'quiz'
+                ? 'bg-fest-amber/20 text-fest-amber border border-fest-amber/40'
+                : 'text-slate-500 hover:text-white'
+            }`}
+            title="Kahoot Quiz Screen"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
-      {/* Render Poll or Quiz View */}
-      {subTab === 'poll' && <ParticipantPollView />}
-      {subTab === 'quiz' && <ParticipantQuizView />}
+      {/* RENDER CURRENT VIEW ACCORDING TO ADMIN BROADCAST */}
+      {currentTab === 'poll' && <ParticipantPollView />}
+      {currentTab === 'quiz' && <ParticipantQuizView />}
 
-      {/* Render Battle Submission View */}
-      {subTab === 'battle' && (
+      {currentTab === 'battle' && (
         <div className="space-y-6">
           <div className="text-center">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fest-pink/10 border border-fest-pink/30 text-fest-pink text-xs font-mono uppercase tracking-wider mb-3">

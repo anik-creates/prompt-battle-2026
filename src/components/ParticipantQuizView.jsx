@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useBattle } from '../context/BattleContext';
+import { useBattle, toSafeArray, DEFAULT_QUIZ_QUESTIONS } from '../context/BattleContext';
 import { 
   HelpCircle, 
   Clock, 
@@ -28,7 +28,7 @@ export default function ParticipantQuizView() {
 
   const [selectedIdx, setSelectedIdx] = useState(null);
   const [hasAnsweredCurrent, setHasAnsweredCurrent] = useState(false);
-  const [answerResult, setAnswerResult] = useState(null); // { isCorrect, points }
+  const [answerResult, setAnswerResult] = useState(null);
 
   // Anti-Cheat / App-Switching Lock State
   const [focusViolated, setFocusViolated] = useState(false);
@@ -45,18 +45,17 @@ export default function ParticipantQuizView() {
     return id;
   })[0];
 
-  const currentIdx = quiz?.currentQuestionIndex || 0;
-  const questions = quiz?.questions || [];
-  const currentQ = questions[currentIdx];
-  const isQuestionRunning = quiz?.status === 'in_progress';
-  const isQuestionEnded = quiz?.status === 'question_ended';
-  const isQuizFinished = quiz?.status === 'finished' || quiz?.published;
+  const safeQuiz = quiz || {};
+  const currentIdx = safeQuiz.currentQuestionIndex || 0;
+  const questions = toSafeArray(safeQuiz.questions, DEFAULT_QUIZ_QUESTIONS);
+  const currentQ = questions[currentIdx] || questions[0] || DEFAULT_QUIZ_QUESTIONS[0];
+  const isQuestionRunning = safeQuiz.status === 'in_progress';
+  const isQuestionEnded = safeQuiz.status === 'question_ended';
+  const isQuizFinished = safeQuiz.status === 'finished' || safeQuiz.published;
 
-  // Track user submissions
-  const mySubmission = quiz?.submissions?.[participantId] || null;
+  const mySubmission = safeQuiz.submissions?.[participantId] || null;
   const myTotalScore = mySubmission?.totalScore || 0;
 
-  // Reset answer state when a new question arrives
   useEffect(() => {
     questionStartTimeRef.current = Date.now();
     const prevAnswer = mySubmission?.answers?.[currentIdx];
@@ -125,7 +124,6 @@ export default function ParticipantQuizView() {
     }
   };
 
-  // Screen 1: Registration before quiz starts
   if (!isRegistered) {
     return (
       <div className="w-full max-w-md mx-auto py-8 px-4">
@@ -176,13 +174,14 @@ export default function ParticipantQuizView() {
     );
   }
 
-  // Kahoot Buttons Palette
   const kahootButtons = [
-    { bg: 'bg-rose-600 hover:bg-rose-500 active:bg-rose-700', shape: '▲', label: 'A' },
-    { bg: 'bg-fest-cyan hover:bg-cyan-400 active:bg-cyan-500 text-dark-950', shape: '◆', label: 'B' },
-    { bg: 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-dark-950', shape: '●', label: 'C' },
-    { bg: 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700', shape: '■', label: 'D' }
+    { bg: 'bg-rose-600 hover:bg-rose-500 active:bg-rose-700', shape: '▲' },
+    { bg: 'bg-fest-cyan hover:bg-cyan-400 active:bg-cyan-500 text-dark-950', shape: '◆' },
+    { bg: 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-dark-950', shape: '●' },
+    { bg: 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700', shape: '■' }
   ];
+
+  const qOptions = toSafeArray(currentQ?.options, ['Option A', 'Option B', 'Option C', 'Option D']);
 
   return (
     <div className="w-full max-w-lg mx-auto py-4 px-4 space-y-4">
@@ -213,7 +212,7 @@ export default function ParticipantQuizView() {
         </div>
       )}
 
-      {/* Top Participant Status & Score Bar */}
+      {/* Top Status & Score Bar */}
       <div className="flex items-center justify-between p-3 rounded-xl bg-dark-900 border border-white/10 font-mono text-xs">
         <div>
           <span className="text-white font-bold block">{participantName}</span>
@@ -227,7 +226,7 @@ export default function ParticipantQuizView() {
       </div>
 
       {/* Waiting or Active Question Display */}
-      {quiz?.status === 'idle' ? (
+      {safeQuiz.status === 'idle' ? (
         <div className="p-10 rounded-xl bg-dark-900/60 border border-white/10 text-center space-y-3 font-mono">
           <Zap className="w-8 h-8 text-fest-amber mx-auto animate-bounce" />
           <h3 className="text-lg font-bold text-white font-sans">Lobby Ready</h3>
@@ -250,12 +249,10 @@ export default function ParticipantQuizView() {
         /* Active Question Tap Screen */
         <div className="space-y-4">
           
-          {/* Question Text Preview */}
           <div className="p-4 rounded-xl bg-dark-950 border border-white/10 text-center font-sans font-bold text-white text-sm sm:text-base">
             {currentQ?.question}
           </div>
 
-          {/* Feedback Banner if user answered */}
           {hasAnsweredCurrent && (
             <div className={`p-3 rounded-lg text-center font-mono text-xs border ${
               answerResult?.isCorrect
@@ -278,7 +275,7 @@ export default function ParticipantQuizView() {
 
           {/* 4 Massive Kahoot Touch Quadrants */}
           <div className="grid grid-cols-2 gap-3 pt-1">
-            {currentQ?.options?.map((optText, optIdx) => {
+            {qOptions.map((optText, optIdx) => {
               const b = kahootButtons[optIdx % 4];
               const isSelected = selectedIdx === optIdx;
 
