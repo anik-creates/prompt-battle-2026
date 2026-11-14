@@ -49,20 +49,30 @@ export default function ParticipantPollView({ isSimulator = false }) {
     return id;
   })[0];
 
-  // Register presence & detect whether already voted in this poll
+  // Detect whether already voted in this poll
   useEffect(() => {
-    registerPresence({
-      participantId,
-      name: voterName || 'Contender',
-      teamName: 'Solo',
-      arena: 'poll',
-    });
-
     if (safePoll?.votes && safePoll.votes[participantId]) {
       setHasVoted(true);
       setSelectedOptId(safePoll.votes[participantId].optionId);
     }
-  }, [safePoll, participantId, registerPresence, voterName]);
+  }, [safePoll, participantId]);
+
+  // Maintain live presence heartbeat (every 20s)
+  useEffect(() => {
+    if (isSimulator) return;
+
+    const ping = () => {
+      registerPresence({
+        participantId,
+        name: voterName || 'Contender',
+        teamName: 'Solo',
+        arena: 'poll',
+      });
+    };
+    ping();
+    const interval = setInterval(ping, 20000);
+    return () => clearInterval(interval);
+  }, [isSimulator, participantId, registerPresence, voterName]);
 
   // Anti-Switching Focus Protection (with Smart Screen Lock bypass on phones)
   useEffect(() => {

@@ -112,13 +112,7 @@ export const DEFAULT_POLL = {
   votes: {},
 };
 
-export const DEFAULT_CONTENDERS = [
-  { participantId: 'PB-101', name: 'Tanvir Hossain', teamName: 'DIU Pioneers', deskNumber: 'Desk 01' },
-  { participantId: 'PB-102', name: 'Anik Sarker', teamName: 'PES Titans', deskNumber: 'Desk 02' },
-  { participantId: 'PB-103', name: 'Sumaiya Akter', teamName: 'Cyber Sparks', deskNumber: 'Desk 03' },
-  { participantId: 'PB-104', name: 'Rakib Hasan', teamName: 'Neural Circuit', deskNumber: 'Desk 04' },
-  { participantId: 'PB-105', name: 'Farhan Kabir', teamName: 'Vector Core', deskNumber: 'Desk 05' },
-];
+export const DEFAULT_CONTENDERS = [];
 
 export const DEFAULT_STATE = {
   activeArena: 'battle', // 'battle' | 'poll' | 'quiz'
@@ -132,7 +126,7 @@ export const DEFAULT_STATE = {
   published: false,
   participants: [],
   joinedParticipants: {}, // [participantId]: { id, name, teamName, arena, lastSeen, tabSwitches }
-  registeredContenders: DEFAULT_CONTENDERS,
+  registeredContenders: [],
   tokenBudget: DEFAULT_TOKEN_BUDGET,
 
   // Live Poll State
@@ -163,6 +157,16 @@ export function sanitizeState(raw) {
   const rawQuiz = raw.quiz || {};
   const quizQuestions = toSafeArray(rawQuiz.questions, DEFAULT_QUIZ_QUESTIONS);
 
+  const now = Date.now();
+  const rawJoined = (raw.joinedParticipants && typeof raw.joinedParticipants === 'object') ? raw.joinedParticipants : {};
+  const cleanJoined = {};
+  Object.entries(rawJoined).forEach(([id, p]) => {
+    // Only retain active presence within the last 2 minutes
+    if (p && p.lastSeen && (now - p.lastSeen < 120000)) {
+      cleanJoined[id] = p;
+    }
+  });
+
   return {
     ...DEFAULT_STATE,
     ...raw,
@@ -171,7 +175,7 @@ export function sanitizeState(raw) {
       ...DEFAULT_STATE.timer,
       ...(raw.timer || {}),
     },
-    joinedParticipants: (raw.joinedParticipants && typeof raw.joinedParticipants === 'object') ? raw.joinedParticipants : {},
+    joinedParticipants: cleanJoined,
     poll: {
       ...DEFAULT_POLL,
       ...rawPoll,
@@ -189,7 +193,7 @@ export function sanitizeState(raw) {
       status: rawQuiz.status || 'idle',
     },
     participants: toSafeArray(raw.participants, []),
-    registeredContenders: toSafeArray(raw.registeredContenders, DEFAULT_CONTENDERS),
+    registeredContenders: toSafeArray(raw.registeredContenders, []),
     tokenBudget: Number(raw.tokenBudget) || DEFAULT_TOKEN_BUDGET,
     published: Boolean(raw.published),
     lastUpdated: raw.lastUpdated || Date.now(),
@@ -1247,6 +1251,14 @@ export function BattleProvider({ children }) {
     });
   }, [syncState]);
 
+  const clearAllPresence = useCallback(() => {
+    syncState({
+      ...battleState,
+      joinedParticipants: {},
+      lastUpdated: Date.now(),
+    });
+  }, [battleState, syncState]);
+
   const safePoll = battleState.poll || DEFAULT_POLL;
   const safeQuiz = battleState.quiz || DEFAULT_STATE.quiz;
 
@@ -1255,17 +1267,14 @@ export function BattleProvider({ children }) {
     activeArena: battleState.activeArena || 'battle',
     timer: battleState.timer,
     participants: toSafeArray(battleState.participants, []),
-    registeredContenders: toSafeArray(battleState.registeredContenders, DEFAULT_CONTENDERS),
+    registeredContenders: toSafeArray(battleState.registeredContenders, []),
     tokenBudget: Number(battleState.tokenBudget) || DEFAULT_TOKEN_BUDGET,
     published: battleState.published,
     joinedParticipants: battleState.joinedParticipants || {},
-    totalJoinedCount: Math.max(
-      Object.keys(battleState.joinedParticipants || {}).length,
-      toSafeArray(battleState.participants, []).length,
-      toSafeArray(battleState.registeredContenders, []).length,
-      Object.keys(battleState.poll?.votes || {}).length,
-      Object.keys(battleState.quiz?.submissions || {}).length
-    ),
+    // Real-time Active Connected Participants (Heartbeat within last 60 seconds)
+    totalJoinedCount: Object.values(battleState.joinedParticipants || {}).filter(
+      (p) => p && p.lastSeen && (Date.now() - p.lastSeen < 60000)
+    ).length,
     poll: {
       ...safePoll,
       displayMode: safePoll.displayMode || 'percentage',
@@ -1284,7 +1293,10 @@ export function BattleProvider({ children }) {
     switchView,
     switchArena,
 
-    // Contender Roster & Settings
+    // Presence & Anti-Cheat
+    registerPresence,
+    reportTabSwitch,
+    clearAllPresence,
     addRegisteredContender,
     bulkAddRegisteredContenders,
     updateRegisteredContender,
@@ -1311,10 +1323,6 @@ export function BattleProvider({ children }) {
     setPollDisplayMode,
     publishPollResults,
     resetPoll,
-
-    // Presence & Anti-Cheat
-    registerPresence,
-    reportTabSwitch,
 
     // Quiz
     launchQuizQuestion,

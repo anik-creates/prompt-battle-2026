@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useBattle } from '../context/BattleContext';
 import { parseContenderFile, downloadContenderTemplate } from '../lib/excelParser';
+import { parseContenderJSON, downloadSampleContenderJSON } from '../lib/jsonParser';
 import { 
   Users, 
   Upload, 
@@ -14,8 +15,11 @@ import {
   Zap, 
   Check, 
   FileSpreadsheet, 
+  FileCode,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  ClipboardList,
+  RotateCcw
 } from 'lucide-react';
 
 export default function ContenderRosterManager({ onSelectForEvaluation }) {
@@ -30,9 +34,12 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
     participants = [],
     poll,
     quiz,
-    joinedParticipants = {}
+    joinedParticipants = {},
+    clearAllPresence
   } = useBattle();
 
+  const [importMethod, setImportMethod] = useState('json'); // 'json' | 'excel'
+  const [jsonInputText, setJsonInputText] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [importStatus, setImportStatus] = useState('');
   const [importError, setImportError] = useState('');
@@ -51,7 +58,7 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
   // Edit Contender Modal State
   const [editingContender, setEditingContender] = useState(null);
 
-  // Handle File Upload (Excel / CSV)
+  // Handle JSON File or Excel File Upload
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -61,19 +68,49 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
     setImportError('');
 
     try {
-      const parsed = await parseContenderFile(file);
+      let parsed = [];
+      if (file.name.endsWith('.json')) {
+        const text = await file.text();
+        parsed = parseContenderJSON(text);
+      } else {
+        parsed = await parseContenderFile(file);
+      }
+
       if (parsed.length === 0) {
-        setImportError('No valid contender rows found. Please ensure the file contains columns for Participant ID, Name, and Team.');
+        setImportError('No valid contender rows found. Ensure the file contains "participantId" (or "id") and "name".');
       } else {
         bulkAddRegisteredContenders(parsed);
         setImportStatus(`Successfully registered ${parsed.length} contenders from ${file.name}!`);
       }
     } catch (err) {
       console.error(err);
-      setImportError('Failed to parse file. Please upload a valid .xlsx, .xls, or .csv document.');
+      setImportError(err.message || 'Failed to parse file. Please verify syntax.');
     } finally {
       setIsProcessingFile(false);
       e.target.value = '';
+    }
+  };
+
+  // Handle Direct JSON Paste
+  const handlePasteJSONImport = (e) => {
+    e.preventDefault();
+    if (!jsonInputText.trim()) return;
+
+    setImportStatus('');
+    setImportError('');
+
+    try {
+      const parsed = parseContenderJSON(jsonInputText);
+      if (parsed.length === 0) {
+        setImportError('No valid contenders found in the pasted JSON. Please check field names ("id" and "name").');
+        return;
+      }
+
+      bulkAddRegisteredContenders(parsed);
+      setImportStatus(`Successfully registered ${parsed.length} contenders from pasted JSON!`);
+      setJsonInputText('');
+    } catch (err) {
+      setImportError(err.message || 'Invalid JSON syntax. Please verify commas and braces.');
     }
   };
 
@@ -132,88 +169,194 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
   return (
     <div className="space-y-8 font-mono text-xs">
       
-      {/* TOP SECTION: EXCEL UPLOAD & TOKEN BUDGET CONFIGURATION */}
+      {/* TOP SECTION: JSON & EXCEL UPLOADER */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Card 1 & 2: Excel / CSV Importer */}
-        <div className="lg:col-span-2 p-6 rounded-xl bg-dark-900 border border-white/15 space-y-4">
+        {/* Card 1 & 2: JSON / Excel Importer */}
+        <div className="lg:col-span-2 p-6 rounded-2xl bg-dark-900 border border-white/15 space-y-4 shadow-xl">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
             <div>
               <div className="flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-fest-cyan" />
+                <FileCode className="w-5 h-5 text-fest-cyan" />
                 <h3 className="font-sans font-bold text-base text-white uppercase tracking-tight">
-                  Bulk Contender Registration (Excel / CSV)
+                  Upload Contenders via JSON / Excel
                 </h3>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Upload student registration roster from organizer spreadsheet.
+                Upload student Name & Participant ID provided by the IEEE PES DIU SBC organizers.
               </p>
             </div>
 
-            <button
-              onClick={downloadContenderTemplate}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-950 border border-white/10 text-slate-300 hover:text-white transition-colors text-[11px]"
-              title="Download pre-formatted Excel template"
-            >
-              <Download className="w-3.5 h-3.5 text-fest-cyan" />
-              <span>Download Excel Template</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setImportMethod('json')}
+                className={`px-3 py-1.5 rounded transition-all flex items-center gap-1.5 ${
+                  importMethod === 'json'
+                    ? 'bg-fest-cyan text-dark-950 font-bold shadow-[0_0_12px_rgba(0,229,255,0.4)]'
+                    : 'bg-dark-950 border border-white/10 text-slate-300 hover:text-white'
+                }`}
+              >
+                <FileCode className="w-3.5 h-3.5" />
+                <span>JSON Upload</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setImportMethod('excel')}
+                className={`px-3 py-1.5 rounded transition-all flex items-center gap-1.5 ${
+                  importMethod === 'excel'
+                    ? 'bg-fest-pes text-white font-bold shadow-[0_0_12px_rgba(108,179,63,0.4)]'
+                    : 'bg-dark-950 border border-white/10 text-slate-300 hover:text-white'
+                }`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Excel (.xlsx)</span>
+              </button>
+            </div>
           </div>
 
-          {/* Upload Drop Area */}
-          <div className="border-2 border-dashed border-white/15 hover:border-fest-cyan/40 rounded-xl p-6 text-center transition-colors bg-dark-950/60">
-            <input
-              type="file"
-              id="excel-contender-upload"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <label
-              htmlFor="excel-contender-upload"
-              className="cursor-pointer flex flex-col items-center justify-center space-y-2 select-none"
-            >
-              <div className="w-12 h-12 rounded-full bg-fest-cyan/10 border border-fest-cyan/30 text-fest-cyan flex items-center justify-center">
-                <Upload className="w-6 h-6" />
-              </div>
-              <div>
-                <span className="font-bold text-white text-sm hover:text-fest-cyan transition-colors">
-                  {isProcessingFile ? 'Analyzing spreadsheet...' : 'Click to Upload Excel (.xlsx) or CSV Roster'}
+          {/* JSON MODE */}
+          {importMethod === 'json' ? (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <span className="text-slate-300 font-bold">
+                  Upload .json File or Paste Array:
                 </span>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Supports columns: <strong>Participant ID, Name, Team Name, Desk Number</strong>
-                </p>
+                <button
+                  type="button"
+                  onClick={downloadSampleContenderJSON}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded bg-dark-950 border border-white/15 text-fest-cyan hover:text-white text-[11px]"
+                  title="Download ready-to-fill JSON template"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Sample JSON Template</span>
+                </button>
               </div>
-            </label>
-          </div>
 
-          {/* Import Status Alert */}
+              {/* JSON File Picker Dropzone */}
+              <div className="border-2 border-dashed border-white/15 hover:border-fest-cyan/40 rounded-xl p-5 text-center transition-colors bg-dark-950/60">
+                <input
+                  type="file"
+                  id="json-contender-upload"
+                  accept=".json"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="json-contender-upload"
+                  className="cursor-pointer flex flex-col items-center justify-center space-y-2 select-none"
+                >
+                  <div className="w-10 h-10 rounded-full bg-fest-cyan/15 border border-fest-cyan/30 text-fest-cyan flex items-center justify-center">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-white text-xs hover:text-fest-cyan transition-colors">
+                      {isProcessingFile ? 'Parsing JSON...' : 'Click to Upload .JSON Roster File'}
+                    </span>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Accepts <code>[&#123; "id": "PB-101", "name": "..." &#125;]</code>
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Direct Paste JSON Textarea */}
+              <form onSubmit={handlePasteJSONImport} className="space-y-2 pt-1">
+                <label className="block text-[11px] text-slate-400">
+                  Or Paste JSON Text Directly:
+                </label>
+                <textarea
+                  rows={4}
+                  value={jsonInputText}
+                  onChange={(e) => setJsonInputText(e.target.value)}
+                  placeholder={`[\n  { "id": "PB-101", "name": "Shakib Ahmed", "team": "DIU Sparks" },\n  { "id": "PB-102", "name": "Tamim Iqbal", "team": "PES Titans" }\n]`}
+                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white font-mono text-xs focus:border-fest-cyan resize-none"
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={!jsonInputText.trim()}
+                    className="px-5 py-2 rounded-lg bg-fest-cyan text-dark-950 font-bold uppercase tracking-wider disabled:opacity-40 hover:opacity-90 transition-all flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Import Pasted JSON</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            /* EXCEL MODE */
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <span className="text-slate-300 font-bold">
+                  Upload Excel (.xlsx, .xls) or CSV Spreadsheet:
+                </span>
+                <button
+                  type="button"
+                  onClick={downloadContenderTemplate}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded bg-dark-950 border border-white/15 text-fest-pes hover:text-white text-[11px]"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Excel Template</span>
+                </button>
+              </div>
+
+              <div className="border-2 border-dashed border-white/15 hover:border-fest-pes/40 rounded-xl p-6 text-center transition-colors bg-dark-950/60">
+                <input
+                  type="file"
+                  id="excel-contender-upload"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="excel-contender-upload"
+                  className="cursor-pointer flex flex-col items-center justify-center space-y-2 select-none"
+                >
+                  <div className="w-12 h-12 rounded-full bg-fest-pes/15 border border-fest-pes/30 text-fest-pes flex items-center justify-center">
+                    <Upload className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-white text-xs hover:text-fest-pes transition-colors">
+                      {isProcessingFile ? 'Analyzing spreadsheet...' : 'Click to Upload Excel (.xlsx) File'}
+                    </span>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Columns: <strong>Participant ID, Name, Team Name, Desk Number</strong>
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Feedback Alerts */}
           {importStatus && (
-            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 flex items-center gap-2">
+            <div className="p-3 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>{importStatus}</span>
             </div>
           )}
 
           {importError && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 flex items-center gap-2">
+            <div className="p-3 rounded-lg bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{importError}</span>
             </div>
           )}
         </div>
 
-        {/* Card 3: Benchmark Token Budget & Penalty Rule */}
-        <div className="p-6 rounded-xl bg-dark-900 border border-white/15 space-y-4 flex flex-col justify-between">
+        {/* Card 3: Benchmark Token Budget & Scoring Rule */}
+        <div className="p-6 rounded-2xl bg-dark-900 border border-white/15 space-y-4 flex flex-col justify-between shadow-xl">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Zap className="w-5 h-5 text-fest-pink" />
               <h3 className="font-sans font-bold text-base text-white uppercase tracking-tight">
-                Token Budget & Scoring Formula
+                Token Budget & Penalty Formula
               </h3>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Tokens are penalized proportionally. The more tokens used, the lower the contender's score.
+              Tokens are penalized proportionally. The more tokens used by the contender, the lower their score.
             </p>
           </div>
 
@@ -241,22 +384,22 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
               </div>
               {budgetSavedMsg && (
                 <span className="text-[10px] text-emerald-400 mt-1 block">
-                  ✓ Token budget updated to {budgetInput} tokens.
+                  ✓ Token budget set to {budgetInput} tokens.
                 </span>
               )}
             </div>
 
             <div className="p-2.5 rounded bg-dark-950 border border-white/10 text-[10px] text-slate-400 space-y-1">
               <div className="flex justify-between">
-                <span>0 Tokens Used:</span>
+                <span>0 Tokens Consumed:</span>
                 <span className="text-emerald-400 font-bold">15 / 15 pts (100%)</span>
               </div>
               <div className="flex justify-between">
-                <span>50% Budget Used:</span>
+                <span>50% Budget Consumed:</span>
                 <span className="text-amber-400 font-bold">8 / 15 pts (50%)</span>
               </div>
               <div className="flex justify-between">
-                <span>≥ 100% Budget Used:</span>
+                <span>≥ 100% Budget Consumed:</span>
                 <span className="text-rose-400 font-bold">0 / 15 pts (0%)</span>
               </div>
             </div>
@@ -266,11 +409,16 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
       </div>
 
       {/* QUICK INLINE ADD FORM FOR MANUAL CONTENDER */}
-      <form onSubmit={handleManualAdd} className="p-4 sm:p-5 rounded-xl bg-dark-900 border border-white/15 space-y-3">
-        <div className="flex items-center gap-2">
-          <Plus className="w-4 h-4 text-fest-cyan" />
-          <span className="font-sans font-bold text-white uppercase text-xs">
-            Add Individual Contender Manually
+      <form onSubmit={handleManualAdd} className="p-5 rounded-2xl bg-dark-900 border border-white/15 space-y-3 shadow-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Plus className="w-4 h-4 text-fest-cyan" />
+            <span className="font-sans font-bold text-white uppercase text-xs">
+              Add Individual Contender (Name & Participant ID)
+            </span>
+          </div>
+          <span className="text-[10px] text-slate-400">
+            Added immediately to official database
           </span>
         </div>
 
@@ -282,20 +430,20 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
               required
               value={newId}
               onChange={(e) => setNewId(e.target.value)}
-              placeholder="e.g. PB-106"
-              className="w-full px-3 py-1.5 rounded bg-dark-950 border border-white/15 text-fest-cyan font-bold uppercase"
+              placeholder="e.g. PB-101"
+              className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-fest-cyan font-bold uppercase"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] text-slate-400 mb-1">Full Name *</label>
+            <label className="block text-[11px] text-slate-400 mb-1">Contender Full Name *</label>
             <input
               type="text"
               required
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="e.g. Shakib Ahmed"
-              className="w-full px-3 py-1.5 rounded bg-dark-950 border border-white/15 text-white"
+              placeholder="e.g. Tanvir Hossain"
+              className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white"
             />
           </div>
 
@@ -305,8 +453,8 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
               type="text"
               value={newTeam}
               onChange={(e) => setNewTeam(e.target.value)}
-              placeholder="e.g. DIU Sparks"
-              className="w-full px-3 py-1.5 rounded bg-dark-950 border border-white/15 text-white"
+              placeholder="e.g. DIU Pioneers"
+              className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white"
             />
           </div>
 
@@ -317,14 +465,14 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                 type="text"
                 value={newDesk}
                 onChange={(e) => setNewDesk(e.target.value)}
-                placeholder="e.g. Desk 06"
-                className="w-full px-3 py-1.5 rounded bg-dark-950 border border-white/15 text-white"
+                placeholder="e.g. Desk 01"
+                className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white"
               />
               <button
                 type="submit"
-                className="px-4 py-1.5 rounded bg-fest-cyan text-dark-950 font-bold uppercase shrink-0 hover:opacity-90"
+                className="px-4 py-2 rounded-lg bg-fest-cyan text-dark-950 font-bold uppercase shrink-0 hover:opacity-90 shadow-[0_0_12px_rgba(0,229,255,0.3)]"
               >
-                Add
+                Add ID
               </button>
             </div>
           </div>
@@ -338,23 +486,54 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-fest-cyan" />
               <h3 className="font-sans font-bold text-lg text-white uppercase tracking-tight">
-                Official Registered Contender Directory ({registeredContenders.length})
+                Contender Roster Directory ({registeredContenders.length} Registered)
               </h3>
             </div>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Judges can use this station directory to locate contenders and grade desks live.
+              Contenders log in with their Participant ID & Name. Judges can locate stations and grade desk prompts directly.
             </p>
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search ID, name, or desk..."
-              className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-dark-950 border border-white/15 text-white text-xs placeholder-slate-400"
-            />
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search ID, name, or desk..."
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-dark-950 border border-white/15 text-white text-xs placeholder-slate-400"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Reset all active live connections? Any active participant phone will reconnect automatically.')) {
+                  clearAllPresence();
+                }
+              }}
+              className="px-2.5 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-[11px] shrink-0 flex items-center gap-1.5"
+              title="Purge ghost connections & refresh live active counter"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span className="hidden sm:inline">Reset Presence</span>
+            </button>
+
+            {registeredContenders.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Clear all registered contenders from roster?')) {
+                    bulkAddRegisteredContenders([]);
+                  }
+                }}
+                className="px-2.5 py-1.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-[11px] shrink-0"
+                title="Clear all registered contenders"
+              >
+                Clear Roster
+              </button>
+            )}
           </div>
         </div>
 
@@ -377,8 +556,11 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
             <tbody className="divide-y divide-white/5 bg-dark-900/50">
               {filteredContenders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
-                    No contenders found matching your query.
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                    <p className="font-bold text-white text-sm">No contenders registered yet.</p>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Upload a JSON file, Excel file, or add Participant ID & Name above to register contestants.
+                    </p>
                   </td>
                 </tr>
               ) : (
@@ -394,11 +576,9 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                   // Find poll vote
                   const pollVote = poll?.votes?.[c.participantId] || poll?.votes?.[c.name];
 
-                  // Check presence
-                  const isOnline = Boolean(
-                    joinedParticipants[c.participantId] ||
-                    joinedParticipants[c.name]
-                  );
+                  // Check presence (ping in last 60s)
+                  const presence = joinedParticipants[c.participantId] || joinedParticipants[c.name];
+                  const isOnline = Boolean(presence && presence.lastSeen && (Date.now() - presence.lastSeen < 60000));
 
                   // Tab switches
                   const switches = battleSub?.tabSwitches || quizSub?.tabSwitches || pollVote?.tabSwitches || 0;
@@ -417,7 +597,7 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                         <div className="font-bold text-white text-sm flex items-center gap-1.5">
                           <span>{c.name}</span>
                           {isOnline && (
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Online Live"></span>
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Active on site now"></span>
                           )}
                         </div>
                       </td>

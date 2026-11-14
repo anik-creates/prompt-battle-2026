@@ -80,15 +80,22 @@ export default function ParticipantQuizView({ isSimulator = false }) {
     }
   }, [currentIdx, mySubmission]);
 
-  // Register presence
+  // Maintain live presence heartbeat (every 20s)
   useEffect(() => {
-    registerPresence({
-      participantId,
-      name: participantName || 'Contender',
-      teamName: teamName || 'Solo',
-      arena: 'quiz',
-    });
-  }, [participantId, participantName, teamName, registerPresence]);
+    if (isSimulator) return;
+
+    const ping = () => {
+      registerPresence({
+        participantId,
+        name: participantName || 'Contender',
+        teamName: teamName || 'Solo',
+        arena: 'quiz',
+      });
+    };
+    ping();
+    const interval = setInterval(ping, 20000);
+    return () => clearInterval(interval);
+  }, [isSimulator, participantId, participantName, teamName, registerPresence]);
 
   // Anti-Switching Focus Protection (with Smart Screen Lock bypass on phones)
   useEffect(() => {

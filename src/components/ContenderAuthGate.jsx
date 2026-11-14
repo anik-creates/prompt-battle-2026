@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useBattle } from '../context/BattleContext';
 import { ShieldCheck, User, Users, Key, AlertCircle, ArrowRight, LogOut, CheckCircle2 } from 'lucide-react';
 
-export default function ContenderAuthGate({ children, onAuthenticated }) {
+export default function ContenderAuthGate({ children, onAuthenticated, isSimulator = false }) {
   const { registeredContenders = [], registerPresence, activeArena } = useBattle();
 
   const [session, setSession] = useState(() => {
@@ -42,18 +42,25 @@ export default function ContenderAuthGate({ children, onAuthenticated }) {
     }
   }, [idInput, registeredContenders]);
 
-  // When session is active, notify parent and register presence
+  // When session is active, notify parent and maintain live presence heartbeat (every 20s)
   useEffect(() => {
+    if (isSimulator) return; // Do not count admin simulator as a live mobile participant
+
     if (session) {
       if (onAuthenticated) onAuthenticated(session);
-      registerPresence({
-        participantId: session.participantId,
-        name: session.name,
-        teamName: session.teamName,
-        arena: activeArena,
-      });
+      const ping = () => {
+        registerPresence({
+          participantId: session.participantId,
+          name: session.name,
+          teamName: session.teamName,
+          arena: activeArena,
+        });
+      };
+      ping();
+      const interval = setInterval(ping, 20000);
+      return () => clearInterval(interval);
     }
-  }, [session, onAuthenticated, registerPresence, activeArena]);
+  }, [session, isSimulator, onAuthenticated, registerPresence, activeArena]);
 
   const handleLogin = (e) => {
     e.preventDefault();

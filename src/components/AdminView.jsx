@@ -40,7 +40,8 @@ import {
   ChevronUp,
   LayoutGrid,
   List,
-  BarChart3
+  BarChart3,
+  FileCode
 } from 'lucide-react';
 
 export default function AdminView() {
@@ -55,6 +56,7 @@ export default function AdminView() {
     totalJoinedCount,
     setPollDisplayMode,
     joinedParticipants,
+    clearAllPresence,
     isAdminAuthenticated, 
     authenticateAdmin, 
     logoutAdmin,
@@ -366,11 +368,37 @@ export default function AdminView() {
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               <span><strong>{totalJoinedCount}</strong> Joined</span>
             </span>
+            <button
+              onClick={() => {
+                if (window.confirm('Reset live presence connections? This clears inactive ghost devices; active contender phones will re-announce within seconds.')) {
+                  clearAllPresence();
+                }
+              }}
+              title="Reset active presence count & flush stale connections"
+              className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-emerald-400 transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+            </button>
             <span className="text-white/20">|</span>
             <span className="text-fest-cyan">
               <strong>{participants.length}</strong> Submitted
             </span>
           </div>
+
+          {/* Direct Quick Jump to Contenders JSON / Excel Uploader */}
+          <button
+            onClick={() => setAdminTab('roster')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded border font-bold transition-all ${
+              adminTab === 'roster'
+                ? 'bg-fest-cyan/20 border-fest-cyan text-fest-cyan shadow-[0_0_15px_rgba(0,229,255,0.3)]'
+                : 'bg-dark-900 border-white/15 text-slate-300 hover:text-white hover:border-fest-cyan/40'
+            }`}
+            title="Upload Contenders JSON or Excel"
+          >
+            <FileCode className="w-3.5 h-3.5 text-fest-cyan" />
+            <span className="hidden sm:inline">Upload Contenders (JSON/Excel)</span>
+            <span className="sm:hidden">Upload JSON</span>
+          </button>
 
           {/* Mobile phone toggle button for screens < xl */}
           <button
@@ -596,7 +624,7 @@ export default function AdminView() {
               }`}
             >
               <Users className="w-4 h-4" />
-              <span>Contender Roster & Excel Import</span>
+              <span>Contender Roster (JSON / Excel Upload)</span>
             </button>
 
             <button

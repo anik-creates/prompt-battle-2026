@@ -48,17 +48,24 @@ export default function ParticipantSubmitView({ isSimulator = false }) {
   const [submittedData, setSubmittedData] = useState(null);
   const [error, setError] = useState('');
 
-  // Register presence whenever session or arena changes
+  // Register presence whenever session or arena changes with recurring 20s heartbeat
   useEffect(() => {
+    if (isSimulator) return; // Do not count admin simulator as a live mobile participant
+
     if (session) {
-      registerPresence({
-        participantId: session.participantId,
-        name: session.name,
-        teamName: session.teamName,
-        arena: activeArena,
-      });
+      const ping = () => {
+        registerPresence({
+          participantId: session.participantId,
+          name: session.name,
+          teamName: session.teamName,
+          arena: activeArena,
+        });
+      };
+      ping();
+      const interval = setInterval(ping, 20000);
+      return () => clearInterval(interval);
     }
-  }, [session, activeArena, registerPresence]);
+  }, [isSimulator, session, activeArena, registerPresence]);
 
   // Anti-Cheat Tab Switch Protection
   useEffect(() => {
@@ -137,19 +144,19 @@ export default function ParticipantSubmitView({ isSimulator = false }) {
 
       {/* DYNAMIC VIEW DRIVEN BY ADMIN PORTAL */}
       {activeArena === 'poll' && (
-        <ContenderAuthGate onAuthenticated={setSession}>
+        <ContenderAuthGate onAuthenticated={setSession} isSimulator={isSimulator}>
           <ParticipantPollView isSimulator={isSimulator} />
         </ContenderAuthGate>
       )}
       
       {activeArena === 'quiz' && (
-        <ContenderAuthGate onAuthenticated={setSession}>
+        <ContenderAuthGate onAuthenticated={setSession} isSimulator={isSimulator}>
           <ParticipantQuizView isSimulator={isSimulator} />
         </ContenderAuthGate>
       )}
 
       {activeArena === 'battle' && (
-        <ContenderAuthGate onAuthenticated={setSession}>
+        <ContenderAuthGate onAuthenticated={setSession} isSimulator={isSimulator}>
           {(activeSession) => (
             <div className="space-y-6">
               <div className="text-center">
