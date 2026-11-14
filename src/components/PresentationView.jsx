@@ -29,7 +29,7 @@ export default function PresentationView() {
   // Compute submission portal URL
   const submissionUrl = typeof window !== 'undefined'
     ? `${window.location.origin}${window.location.pathname}#submit`
-    : 'https://tanvir508.github.io/prompt-battle-2026/#submit';
+    : 'https://anik-creates.github.io/prompt-battle-2026/#submit';
 
   // If Admin has published the Leaderboard, show Leaderboard View!
   if (published) {

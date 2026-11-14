@@ -2,17 +2,17 @@
 > **AI Prompt Engineering Competition Portal**  
 > Organized by **IEEE Power & Energy Society (PES) DIU Student Branch Chapter** for **EEE FEST 2026**
 
-[![Deploy to GitHub Pages](https://github.com/tanvir508/prompt-battle-2026/actions/workflows/deploy.yml/badge.svg)](https://github.com/tanvir508/prompt-battle-2026/actions/workflows/deploy.yml)
+[![Deploy to GitHub Pages](https://github.com/anik-creates/prompt-battle-2026/actions/workflows/deploy.yml/badge.svg)](https://github.com/anik-creates/prompt-battle-2026/actions/workflows/deploy.yml)
 [![IEEE PES DIU SBC](https://img.shields.io/badge/Organizer-IEEE%20PES%20DIU%20SBC-6cb33f?style=flat-square)](https://daffodilvarsity.edu.bd/)
 [![EEE FEST 2026](https://img.shields.io/badge/Event-EEE%20FEST%202026-00e5ff?style=flat-square)](https://daffodilvarsity.edu.bd/)
 
 ---
 
 ## ⚡ Live Links
-- **GitHub Repository**: [https://github.com/tanvir508/prompt-battle-2026](https://github.com/tanvir508/prompt-battle-2026)
-- **Live Website (GitHub Pages)**: [https://tanvir508.github.io/prompt-battle-2026/](https://tanvir508.github.io/prompt-battle-2026/)
-- **Participant Submission View**: [https://tanvir508.github.io/prompt-battle-2026/#submit](https://tanvir508.github.io/prompt-battle-2026/#submit)
-- **Admin Control Portal**: [https://tanvir508.github.io/prompt-battle-2026/#admin](https://tanvir508.github.io/prompt-battle-2026/#admin)
+- **GitHub Repository**: [https://github.com/anik-creates/prompt-battle-2026](https://github.com/anik-creates/prompt-battle-2026)
+- **Live Website (GitHub Pages)**: [https://anik-creates.github.io/prompt-battle-2026/](https://anik-creates.github.io/prompt-battle-2026/)
+- **Participant Submission View**: [https://anik-creates.github.io/prompt-battle-2026/#submit](https://anik-creates.github.io/prompt-battle-2026/#submit)
+- **Admin Control Portal**: [https://anik-creates.github.io/prompt-battle-2026/#admin](https://anik-creates.github.io/prompt-battle-2026/#admin)
 
 ---
 
@@ -86,7 +86,7 @@ The platform features a **hybrid dual-sync engine**:
 
 ```bash
 # Clone repository
-git clone https://github.com/tanvir508/prompt-battle-2026.git
+git clone https://github.com/anik-creates/prompt-battle-2026.git
 cd prompt-battle-2026
 
 # Install dependencies
@@ -105,7 +105,7 @@ npm run build
 
 To host on your Vercel account:
 1. Go to [vercel.com/new](https://vercel.com/new).
-2. Connect your GitHub account and import `tanvir508/prompt-battle-2026`.
+2. Connect your GitHub account and import `anik-creates/prompt-battle-2026`.
 3. Framework Preset: **Vite**.
 4. Click **Deploy**. Vercel will deploy it in under 30 seconds.
 
