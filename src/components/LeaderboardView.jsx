@@ -12,7 +12,8 @@ import {
   AlertCircle,
   FileText,
   Star,
-  Users
+  Users,
+  MapPin
 } from 'lucide-react';
 
 export default function LeaderboardView() {
@@ -127,10 +128,16 @@ export default function LeaderboardView() {
                   </div>
 
                   {/* Participant & Team */}
-                  <h3 className="text-xl font-bold text-white tracking-tight truncate flex items-center gap-1.5">
+                  <h3 className="text-xl font-bold text-white tracking-tight truncate flex items-center gap-1.5 flex-wrap">
                     {p.participantId && (
                       <span className="px-1.5 py-0.5 rounded bg-fest-cyan/20 border border-fest-cyan/40 text-fest-cyan font-mono text-[10px] font-bold shrink-0">
                         {p.participantId}
+                      </span>
+                    )}
+                    {p.deskNumber && (
+                      <span className="px-1.5 py-0.5 rounded bg-fest-amber/15 border border-fest-amber/40 text-fest-amber font-mono text-[10px] font-bold shrink-0 flex items-center gap-1">
+                        <MapPin className="w-2.5 h-2.5 text-fest-amber" />
+                        <span>{p.deskNumber}</span>
                       </span>
                     )}
                     <span className="truncate">{p.name}</span>
@@ -210,6 +217,12 @@ export default function LeaderboardView() {
                           {p.participantId && (
                             <span className="px-1.5 py-0.5 rounded bg-fest-cyan/20 border border-fest-cyan/40 text-fest-cyan font-mono text-[10px] font-bold shrink-0">
                               {p.participantId}
+                            </span>
+                          )}
+                          {p.deskNumber && (
+                            <span className="px-1.5 py-0.5 rounded bg-fest-amber/15 border border-fest-amber/40 text-fest-amber font-mono text-[10px] font-bold shrink-0 flex items-center gap-1">
+                              <MapPin className="w-2.5 h-2.5 text-fest-amber" />
+                              <span>{p.deskNumber}</span>
                             </span>
                           )}
                           <span className="font-bold text-white text-sm">{p.name}</span>

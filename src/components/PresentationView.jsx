@@ -16,7 +16,8 @@ import {
   Activity,
   Flame,
   Vote,
-  HelpCircle
+  HelpCircle,
+  MapPin
 } from 'lucide-react';
 
 export default function PresentationView() {
@@ -171,6 +172,12 @@ export default function PresentationView() {
                       {p.participantId && (
                         <span className="px-2 py-0.5 rounded bg-fest-cyan/20 border border-fest-cyan/40 text-fest-cyan font-mono text-xs font-bold shrink-0">
                           {p.participantId}
+                        </span>
+                      )}
+                      {p.deskNumber && (
+                        <span className="px-2 py-0.5 rounded bg-fest-amber/20 border border-fest-amber/40 text-fest-amber font-mono text-xs font-bold shrink-0 flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-fest-amber" />
+                          <span>{p.deskNumber}</span>
                         </span>
                       )}
                       <span className="font-bold text-base text-white font-sans tracking-tight">

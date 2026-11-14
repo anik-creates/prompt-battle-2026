@@ -41,7 +41,8 @@ import {
   LayoutGrid,
   List,
   BarChart3,
-  FileCode
+  FileCode,
+  MapPin
 } from 'lucide-react';
 
 export default function AdminView() {
@@ -817,9 +818,13 @@ export default function AdminView() {
                     {/* Card Header: Contender Station ID, Name & Total Score */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="px-2 py-0.5 rounded bg-fest-cyan/20 border border-fest-cyan/40 text-fest-cyan font-mono text-xs font-bold shrink-0">
                             {p.participantId || `#${idx + 1}`}
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-fest-amber/15 border border-fest-amber/40 text-fest-amber font-mono text-xs font-bold shrink-0 flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-fest-amber" />
+                            <span>{p.deskNumber || 'Desk Station'}</span>
                           </span>
                           <span className="font-sans font-bold text-base text-white truncate">{p.name}</span>
                         </div>
@@ -1004,9 +1009,13 @@ export default function AdminView() {
                     {participants.map((p) => (
                       <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
                         <td className="py-3 px-3 font-sans">
-                          <div className="flex items-center gap-1.5 mb-0.5">
+                          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                             <span className="px-1.5 py-0.5 rounded bg-fest-cyan/20 border border-fest-cyan/40 text-fest-cyan font-mono text-[11px] font-bold">
                               {p.participantId || 'STATION'}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded bg-fest-amber/15 border border-fest-amber/40 text-fest-amber font-mono text-[10px] font-bold flex items-center gap-1">
+                              <MapPin className="w-2.5 h-2.5 text-fest-amber" />
+                              <span>{p.deskNumber || 'Desk Station'}</span>
                             </span>
                             <span className="font-bold text-white text-sm">{p.name}</span>
                           </div>

@@ -502,7 +502,7 @@ export function BattleProvider({ children }) {
     });
   }, [battleState, syncState]);
 
-  const submitParticipantWork = useCallback(({ participantId = '', name, teamName = '', notes = '', tokensUsed = 0, workUrl = '' }) => {
+  const submitParticipantWork = useCallback(({ participantId = '', name, teamName = '', deskNumber = '', notes = '', tokensUsed = 0, workUrl = '' }) => {
     const now = Date.now();
     let elapsedSec = 0;
     if (battleState.timer.startedAt) {
@@ -528,12 +528,17 @@ export function BattleProvider({ children }) {
     });
 
     const cleanParticipantId = (participantId || '').trim().toUpperCase() || `PB-${Math.floor(100 + Math.random() * 900)}`;
+    const matchedRoster = (battleState.registeredContenders || []).find(
+      (c) => c.participantId?.toUpperCase() === cleanParticipantId
+    );
+    const resolvedDesk = (deskNumber || matchedRoster?.deskNumber || 'Main Floor').trim();
 
     const newParticipant = {
       id: `p-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       participantId: cleanParticipantId,
       name: name.trim(),
-      teamName: teamName.trim() || 'Independent Contender',
+      teamName: teamName.trim() || matchedRoster?.teamName || 'Independent Contender',
+      deskNumber: resolvedDesk,
       submittedAt: now,
       finishSeconds: elapsedSec,
       finishTimeFormatted,

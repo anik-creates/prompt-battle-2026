@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBattle } from '../context/BattleContext';
-import { ShieldCheck, User, Users, Key, AlertCircle, ArrowRight, LogOut, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, User, Users, Key, AlertCircle, ArrowRight, LogOut, CheckCircle2, MapPin } from 'lucide-react';
 
 export default function ContenderAuthGate({ children, onAuthenticated, isSimulator = false }) {
   const { registeredContenders = [], registerPresence, activeArena } = useBattle();
@@ -14,9 +14,11 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
     }
   });
 
+  const [showDeskScreen, setShowDeskScreen] = useState(false);
   const [idInput, setIdInput] = useState('');
   const [nameInput, setNameInput] = useState('');
   const [teamInput, setTeamInput] = useState('');
+  const [deskInput, setDeskInput] = useState('');
   const [error, setError] = useState('');
   const [matchedContender, setMatchedContender] = useState(null);
 
@@ -36,6 +38,7 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
       setMatchedContender(match);
       setNameInput(match.name || '');
       setTeamInput(match.teamName || '');
+      setDeskInput(match.deskNumber || '');
       setError('');
     } else {
       setMatchedContender(null);
@@ -53,6 +56,7 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
           participantId: session.participantId,
           name: session.name,
           teamName: session.teamName,
+          deskNumber: session.deskNumber,
           arena: activeArena,
         });
       };
@@ -77,11 +81,13 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
       return;
     }
 
+    const assignedDesk = deskInput.trim() || matchedContender?.deskNumber || 'Desk 01';
+
     const contenderData = {
       participantId: cleanId,
       name: cleanName,
       teamName: teamInput.trim() || matchedContender?.teamName || 'Solo Contender',
-      deskNumber: matchedContender?.deskNumber || 'Main Floor',
+      deskNumber: assignedDesk,
       loggedInAt: Date.now(),
     };
 
@@ -92,6 +98,7 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
     }
 
     setSession(contenderData);
+    setShowDeskScreen(true);
     setError('');
   };
 
@@ -99,9 +106,11 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
     if (window.confirm('Switch Contender ID? Any in-progress answers on this device will reset.')) {
       localStorage.removeItem('pb_contender_session');
       setSession(null);
+      setShowDeskScreen(false);
       setIdInput('');
       setNameInput('');
       setTeamInput('');
+      setDeskInput('');
       setMatchedContender(null);
     }
   };
@@ -223,6 +232,68 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
     );
   }
 
+  // If user just logged in or clicked their desk button, show the Designated Desk Card
+  if (session && showDeskScreen) {
+    return (
+      <div className="w-full max-w-md mx-auto py-6 px-3 sm:px-4 font-mono text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
+        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-dark-900 via-dark-950 to-dark-950 border-2 border-fest-amber/50 shadow-[0_0_60px_rgba(255,183,0,0.3)] space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-fest-amber/20 border-2 border-fest-amber/40 text-fest-amber flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(255,183,0,0.5)]">
+            <MapPin className="w-8 h-8 text-fest-amber" />
+          </div>
+
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold text-fest-cyan uppercase tracking-widest px-3 py-1 rounded-full bg-fest-cyan/15 border border-fest-cyan/30 inline-block">
+              Official Contender Verified
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold font-sans text-white mt-2">
+              Welcome, {session.name}!
+            </h2>
+            <p className="text-xs text-slate-400">
+              IEEE PES DIU SBC • Prompt Battle 2026
+            </p>
+          </div>
+
+          {/* Large Glowing Designated Desk Station Card */}
+          <div className="p-6 rounded-2xl bg-dark-950/90 border-2 border-fest-amber/40 shadow-inner space-y-2 relative overflow-hidden">
+            <div className="absolute top-0 right-0 transform translate-x-2 -translate-y-2 w-16 h-16 bg-fest-amber/10 rounded-full blur-xl pointer-events-none"></div>
+            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold block">
+              YOUR ASSIGNED DESK STATION
+            </span>
+            <div className="text-4xl sm:text-5xl font-black font-sans text-fest-amber tracking-tight drop-shadow-[0_0_20px_rgba(255,183,0,0.6)] py-1">
+              {session.deskNumber || 'Desk 01'}
+            </div>
+            <div className="flex items-center justify-center gap-2 pt-1 text-xs text-slate-300">
+              <span className="px-2 py-0.5 rounded bg-fest-cyan/15 text-fest-cyan border border-fest-cyan/30 font-bold">
+                {session.participantId}
+              </span>
+              <span className="text-white/20">•</span>
+              <span className="text-fest-pink font-semibold">
+                {session.teamName || 'Solo'}
+              </span>
+            </div>
+          </div>
+
+          {/* Instruction Note */}
+          <div className="p-3.5 rounded-xl bg-fest-pes/10 border border-fest-pes/30 text-fest-pes text-xs text-left flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-fest-pes" />
+            <p className="text-[11px] leading-relaxed text-slate-300">
+              Please take your seat at <strong className="text-fest-amber">{session.deskNumber || 'your designated desk'}</strong>. Your station will be visited by organizers for prompt verification and grading.
+            </p>
+          </div>
+
+          {/* Action button to proceed to battle */}
+          <button
+            onClick={() => setShowDeskScreen(false)}
+            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-fest-amber via-fest-pes to-fest-cyan text-dark-950 font-bold font-sans uppercase tracking-wider shadow-[0_0_25px_rgba(255,183,0,0.4)] flex items-center justify-center gap-2 hover:opacity-95 transition-all text-xs"
+          >
+            <span>Proceed to Competition Arena</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Contender is Authenticated: render active top profile bar & children
   return (
     <div className="w-full space-y-4">
@@ -238,10 +309,21 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
           </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Designated Desk Pill (Clickable) */}
+          <button
+            type="button"
+            onClick={() => setShowDeskScreen(true)}
+            className="px-2.5 py-1 rounded-lg bg-fest-amber/15 border border-fest-amber/40 text-fest-amber font-bold text-[11px] flex items-center gap-1.5 hover:bg-fest-amber/25 transition-all shadow-[0_0_10px_rgba(255,183,0,0.2)]"
+            title="Click to view assigned desk station"
+          >
+            <MapPin className="w-3.5 h-3.5 text-fest-amber animate-pulse" />
+            <span>{session.deskNumber || 'Desk 01'}</span>
+          </button>
+
           <span className="hidden sm:inline-flex items-center gap-1.5 text-emerald-400 text-[11px]">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Station Active</span>
+            <span>Online</span>
           </span>
 
           <button
