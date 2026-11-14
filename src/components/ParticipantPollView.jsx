@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useBattle, toSafeArray, DEFAULT_POLL } from '../context/BattleContext';
+import { setupTabSwitchGuard } from '../lib/focusGuard';
 import { 
   Vote, 
   CheckCircle2, 
@@ -11,8 +12,8 @@ import {
   Clock
 } from 'lucide-react';
 
-export default function ParticipantPollView() {
-  const { poll, submitVote } = useBattle();
+export default function ParticipantPollView({ isSimulator = false }) {
+  const { poll, submitVote, registerPresence, reportTabSwitch } = useBattle();
 
   const safePoll = poll || DEFAULT_POLL;
   const optionsList = toSafeArray(safePoll.options, DEFAULT_POLL.options);
@@ -28,6 +29,8 @@ export default function ParticipantPollView() {
   const [focusViolated, setFocusViolated] = useState(false);
   const [violationCount, setViolationCount] = useState(0);
 
+  const questionStartTimeRef = useRef(Date.now());
+
   const participantId = useState(() => {
     let id = localStorage.getItem('pb_participant_uuid');
     if (!id) {
@@ -37,38 +40,43 @@ export default function ParticipantPollView() {
     return id;
   })[0];
 
-  // Detect whether already voted in this poll
+  // Register presence & detect whether already voted in this poll
   useEffect(() => {
+    registerPresence({
+      participantId,
+      name: voterName || 'Contender',
+      teamName: 'Solo',
+      arena: 'poll',
+    });
+
     if (safePoll?.votes && safePoll.votes[participantId]) {
       setHasVoted(true);
       setSelectedOptId(safePoll.votes[participantId].optionId);
     }
-  }, [safePoll, participantId]);
+  }, [safePoll, participantId, registerPresence, voterName]);
 
-  // Anti-Switching Focus Protection
+  // Anti-Switching Focus Protection (with Smart Screen Lock bypass on phones)
   useEffect(() => {
-    const handleVisibility = () => {
-      if (document.hidden && !hasVoted) {
-        setFocusViolated(true);
-        setViolationCount((prev) => prev + 1);
-      }
-    };
+    if (isSimulator) return;
 
-    const handleBlur = () => {
-      if (!hasVoted) {
-        setFocusViolated(true);
-        setViolationCount((prev) => prev + 1);
-      }
-    };
+    const cleanup = setupTabSwitchGuard({
+      isSimulator,
+      onTabSwitch: () => {
+        if (!hasVoted) {
+          setFocusViolated(true);
+          setViolationCount((prev) => prev + 1);
+          reportTabSwitch({
+            participantId,
+            name: voterName || 'Contender',
+            teamName: 'Solo',
+            arena: 'poll',
+          });
+        }
+      },
+    });
 
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('blur', handleBlur);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('blur', handleBlur);
-    };
-  }, [hasVoted]);
+    return cleanup;
+  }, [hasVoted, isSimulator, participantId, voterName, reportTabSwitch]);
 
   const handleCastVote = (optId) => {
     if (hasVoted) return;
@@ -80,10 +88,14 @@ export default function ParticipantPollView() {
     const nameToSave = voterName.trim() || 'Contender';
     localStorage.setItem('pb_voter_name', nameToSave);
 
+    const timeTakenSec = Math.max(1, Math.round((Date.now() - questionStartTimeRef.current) / 1000));
+
     const res = submitVote({
       participantId,
       participantName: nameToSave,
+      teamName: 'Solo',
       optionId: optId,
+      timeTakenSec,
     });
 
     if (res.success) {

@@ -12,9 +12,10 @@ import {
   Flame,
   Sparkles
 } from 'lucide-react';
+import { setupTabSwitchGuard } from '../lib/focusGuard';
 
-export default function ParticipantQuizView() {
-  const { quiz, submitQuizAnswer } = useBattle();
+export default function ParticipantQuizView({ isSimulator = false }) {
+  const { quiz, submitQuizAnswer, registerPresence, reportTabSwitch } = useBattle();
 
   const [participantName, setParticipantName] = useState(() => {
     return localStorage.getItem('pb_quiz_participant_name') || '';
@@ -70,30 +71,38 @@ export default function ParticipantQuizView() {
     }
   }, [currentIdx, mySubmission]);
 
-  // Anti-Switching Focus Protection
+  // Register presence
   useEffect(() => {
-    const handleVisibility = () => {
-      if (document.hidden && isQuestionRunning && !hasAnsweredCurrent) {
-        setFocusViolated(true);
-        setViolationCount((prev) => prev + 1);
-      }
-    };
+    registerPresence({
+      participantId,
+      name: participantName || 'Contender',
+      teamName: teamName || 'Solo',
+      arena: 'quiz',
+    });
+  }, [participantId, participantName, teamName, registerPresence]);
 
-    const handleBlur = () => {
-      if (isQuestionRunning && !hasAnsweredCurrent) {
-        setFocusViolated(true);
-        setViolationCount((prev) => prev + 1);
-      }
-    };
+  // Anti-Switching Focus Protection (with Smart Screen Lock bypass on phones)
+  useEffect(() => {
+    if (isSimulator) return;
 
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('blur', handleBlur);
+    const cleanup = setupTabSwitchGuard({
+      isSimulator,
+      onTabSwitch: () => {
+        if (isQuestionRunning && !hasAnsweredCurrent) {
+          setFocusViolated(true);
+          setViolationCount((prev) => prev + 1);
+          reportTabSwitch({
+            participantId,
+            name: participantName || 'Contender',
+            teamName: teamName || 'Solo',
+            arena: 'quiz',
+          });
+        }
+      },
+    });
 
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('blur', handleBlur);
-    };
-  }, [isQuestionRunning, hasAnsweredCurrent]);
+    return cleanup;
+  }, [isQuestionRunning, hasAnsweredCurrent, isSimulator, participantId, participantName, teamName, reportTabSwitch]);
 
   const handleRegister = (e) => {
     e.preventDefault();

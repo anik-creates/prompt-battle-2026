@@ -90,8 +90,8 @@ export default function TimerDisplay({ size = 'large', showControls = false }) {
         {/* Digital Digits */}
         <div className={`relative flex items-baseline font-mono font-extrabold tracking-tight select-none ${
           size === 'large'
-            ? 'text-6xl sm:text-7xl md:text-8xl lg:text-9xl'
-            : 'text-4xl sm:text-5xl md:text-6xl'
+            ? 'text-5xl sm:text-7xl md:text-8xl lg:text-9xl'
+            : 'text-3xl sm:text-4xl md:text-5xl'
         } ${
           isCritical
             ? 'text-rose-500 animate-pulse'
@@ -122,7 +122,7 @@ export default function TimerDisplay({ size = 'large', showControls = false }) {
         </div>
 
         {/* Time Units Labels */}
-        <div className="flex justify-center space-x-12 sm:space-x-20 text-[11px] sm:text-xs font-mono uppercase tracking-widest text-slate-400 mt-1">
+        <div className="flex justify-center space-x-8 sm:space-x-16 md:space-x-20 text-[10px] sm:text-xs font-mono uppercase tracking-widest text-slate-400 mt-1">
           {hours > 0 && <span>Hours</span>}
           <span>Minutes</span>
           <span>Seconds</span>

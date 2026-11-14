@@ -160,9 +160,9 @@ export default function LeaderboardView() {
             })}
           </div>
 
-          {/* Full Plain Data Table (Sleek, transparent, no cards) */}
-          <div className="overflow-x-auto border-y border-white/10">
-            <table className="w-full text-left font-mono text-xs">
+          {/* Full Plain Data Table (Sleek, transparent, responsive horizontal scroll) */}
+          <div className="overflow-x-auto border-y border-white/10 scrollbar-thin">
+            <table className="w-full min-w-[850px] text-left font-mono text-xs">
               <thead className="bg-dark-900/80 text-slate-400 uppercase tracking-wider text-[11px] border-b border-white/10">
                 <tr>
                   <th className="py-4 px-4">Rank</th>
@@ -201,7 +201,14 @@ export default function LeaderboardView() {
                       </td>
 
                       <td className="py-4 px-4 font-sans">
-                        <div className="font-bold text-white text-sm">{p.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white text-sm">{p.name}</span>
+                          {p.tabSwitches > 0 && (
+                            <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-mono text-[10px] font-bold border border-rose-500/40">
+                              ⚠️ {p.tabSwitches} switches
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-fest-cyan font-mono">{p.teamName}</div>
                       </td>
 

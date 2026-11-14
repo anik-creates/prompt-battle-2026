@@ -34,7 +34,12 @@ import {
   Radio,
   Check,
   Smartphone,
-  ExternalLink
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  LayoutGrid,
+  List,
+  BarChart3
 } from 'lucide-react';
 
 export default function AdminView() {
@@ -46,6 +51,9 @@ export default function AdminView() {
     published, 
     poll,
     quiz,
+    totalJoinedCount,
+    setPollDisplayMode,
+    joinedParticipants,
     isAdminAuthenticated, 
     authenticateAdmin, 
     logoutAdmin,
@@ -70,8 +78,10 @@ export default function AdminView() {
     firebaseStatus
   } = useBattle();
 
-  // Admin Section Tab: 'battle' | 'poll' | 'quiz' | 'preview'
+  // Admin Section Tab: 'battle' | 'poll' | 'quiz'
   const [adminTab, setAdminTab] = useState('battle');
+  const [showMobileSimulator, setShowMobileSimulator] = useState(false);
+  const [evaluationViewMode, setEvaluationViewMode] = useState('table'); // 'table' | 'cards'
 
   // Login form state
   const [passwordInput, setPasswordInput] = useState('');
@@ -284,16 +294,51 @@ export default function AdminView() {
     );
   }
 
+  // Smartphone frame simulator renderer
+  const renderPhoneSimulator = () => (
+    <div className="w-full max-w-[340px] 2xl:max-w-[360px] mx-auto rounded-[44px] p-3.5 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 shadow-[0_0_50px_rgba(0,0,0,0.95)] border-4 border-slate-600">
+      <div className="rounded-[34px] bg-dark-950 overflow-hidden border border-white/15 relative h-[620px] 2xl:h-[660px] flex flex-col shadow-inner">
+        {/* Smartphone Top Notch / Speaker */}
+        <div className="pt-2.5 pb-1 bg-dark-950 flex items-center justify-between px-5 border-b border-white/5 select-none shrink-0">
+          <span className="text-[10px] font-mono text-slate-400">9:41</span>
+          <div className="w-20 h-3.5 rounded-full bg-black border border-white/15 flex items-center justify-center">
+            <div className="w-2 h-2 rounded-full bg-slate-900 border border-white/10 mr-1.5"></div>
+          </div>
+          <span className="text-[10px] font-mono text-emerald-400 font-bold">5G</span>
+        </div>
+
+        {/* Live Broadcast Pill Inside Phone */}
+        <div className="px-3 py-1 bg-dark-900/90 border-b border-white/5 flex items-center justify-between text-[10px] font-mono shrink-0">
+          <span className="flex items-center gap-1.5 text-slate-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-fest-cyan animate-pulse"></span>
+            <span>Mirrored Phone Screen</span>
+          </span>
+          <span className="text-fest-cyan font-bold uppercase">{activeArena}</span>
+        </div>
+
+        {/* Mobile Screen Content (Live View with isSimulator={true}) */}
+        <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
+          <ParticipantSubmitView isSimulator={true} />
+        </div>
+
+        {/* Smartphone Home Indicator Bar */}
+        <div className="py-2 bg-dark-950 flex justify-center border-t border-white/5 shrink-0">
+          <div className="w-28 h-1 rounded-full bg-white/30"></div>
+        </div>
+      </div>
+    </div>
+  );
+
   // --- AUTHENTICATED ADMIN PANEL ---
   return (
-    <div className="w-full max-w-7xl mx-auto py-6 sm:py-8 space-y-8">
+    <div className="w-full max-w-[1750px] mx-auto py-4 sm:py-6 space-y-6">
       
       {/* Top Action Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
         <div>
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-fest-pes" />
-            <h1 className="text-2xl sm:text-3xl font-extrabold font-sans text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold font-sans text-white tracking-tight">
               ADMIN CONTROL ARENA
             </h1>
           </div>
@@ -302,18 +347,27 @@ export default function AdminView() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-mono">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-mono w-full sm:w-auto justify-start sm:justify-end">
+          {/* Live Connected Presence Counter */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-950 border border-white/10 text-xs font-mono">
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span><strong>{totalJoinedCount}</strong> Joined</span>
+            </span>
+            <span className="text-white/20">|</span>
+            <span className="text-fest-cyan">
+              <strong>{participants.length}</strong> Submitted
+            </span>
+          </div>
+
+          {/* Mobile phone toggle button for screens < xl */}
           <button
-            onClick={() => setAdminTab('preview')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded border transition-all ${
-              adminTab === 'preview'
-                ? 'bg-fest-cyan/20 border-fest-cyan text-fest-cyan font-bold shadow-[0_0_12px_rgba(0,229,255,0.3)]'
-                : 'bg-dark-900 border-white/10 text-slate-300 hover:text-white'
-            }`}
-            title="View Live Participant Mobile Simulator"
+            onClick={() => setShowMobileSimulator(!showMobileSimulator)}
+            className="xl:hidden flex items-center gap-1.5 px-3 py-2 rounded bg-fest-cyan/15 border border-fest-cyan/40 text-fest-cyan font-bold transition-all"
+            title="Toggle Live Participant Screen"
           >
-            <Smartphone className="w-3.5 h-3.5" />
-            <span>Live Phone Preview</span>
+            <Smartphone className="w-3.5 h-3.5 animate-pulse" />
+            <span>{showMobileSimulator ? 'Hide Phone' : 'Live Phone View'}</span>
           </button>
 
           <button
@@ -321,7 +375,8 @@ export default function AdminView() {
             className="flex items-center gap-1.5 px-3 py-2 rounded bg-fest-cyan/10 border border-fest-cyan/40 text-fest-cyan"
           >
             <Cloud className="w-3.5 h-3.5" />
-            <span>Cloud Sync Active</span>
+            <span className="hidden sm:inline">Cloud Sync Active</span>
+            <span className="sm:hidden">Sync</span>
           </button>
 
           <button
@@ -329,7 +384,7 @@ export default function AdminView() {
             className="flex items-center gap-1.5 px-3 py-2 rounded bg-dark-900 border border-white/10 text-slate-300 hover:text-white"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Export CSV</span>
+            <span>CSV</span>
           </button>
 
           <button
@@ -366,7 +421,7 @@ export default function AdminView() {
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => switchArena('battle')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all ${
@@ -405,57 +460,145 @@ export default function AdminView() {
         </div>
       </div>
 
-      {/* ADMIN CONTROL SECTION TABS */}
-      <div className="flex border-b border-white/10 font-mono text-sm space-x-6 overflow-x-auto pb-0.5">
-        <button
-          onClick={() => setAdminTab('battle')}
-          className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
-            adminTab === 'battle'
-              ? 'border-fest-cyan text-fest-cyan'
-              : 'border-transparent text-slate-400 hover:text-white'
-          }`}
-        >
-          <Flame className="w-4 h-4" />
-          <span>Battle Timers & Scoring</span>
-        </button>
+      {/* MOBILE EXPANDED SIMULATOR (< xl) */}
+      {showMobileSimulator && (
+        <div className="xl:hidden p-4 rounded-2xl bg-dark-900 border border-fest-cyan/30 space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-white/10 font-mono text-xs">
+            <div className="flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-fest-cyan animate-pulse" />
+              <span className="font-bold text-white">Live Participant Screen Mirror</span>
+            </div>
+            <button
+              onClick={() => setShowMobileSimulator(false)}
+              className="px-2.5 py-1 rounded bg-dark-950 text-slate-400 hover:text-white text-[11px]"
+            >
+              Close
+            </button>
+          </div>
+          <div className="flex justify-center">
+            {renderPhoneSimulator()}
+          </div>
+        </div>
+      )}
 
-        <button
-          onClick={() => setAdminTab('poll')}
-          className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
-            adminTab === 'poll'
-              ? 'border-fest-pink text-fest-pink'
-              : 'border-transparent text-slate-400 hover:text-white'
-          }`}
-        >
-          <Vote className="w-4 h-4" />
-          <span>Live Poll & MCQ Manager</span>
-        </button>
+      {/* TWO-COLUMN COMMAND CENTER LAYOUT (Desktop xl: Side-by-side with Pinned Phone) */}
+      <div className="flex flex-col xl:flex-row items-start gap-8">
+        
+        {/* LEFT COLUMN: Pinned Live Participant Phone Simulator (PINNED FOR ALL TIMES ON DESKTOP) */}
+        <aside className="hidden xl:block w-[360px] 2xl:w-[380px] shrink-0 sticky top-24 self-start space-y-3">
+          <div className="p-4 rounded-2xl bg-dark-900/90 border border-white/15 space-y-3 shadow-[0_0_40px_rgba(0,0,0,0.7)] backdrop-blur-md">
+            
+            {/* Simulator Header / Status */}
+            <div className="flex items-center justify-between font-mono text-xs pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-fest-cyan animate-pulse" />
+                <span className="font-bold text-white uppercase tracking-wider text-[11px]">
+                  Participant Screen
+                </span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-dark-950 text-fest-cyan border border-fest-cyan/30 font-bold uppercase">
+                {activeArena} Live
+              </span>
+            </div>
 
-        <button
-          onClick={() => setAdminTab('quiz')}
-          className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
-            adminTab === 'quiz'
-              ? 'border-fest-amber text-fest-amber'
-              : 'border-transparent text-slate-400 hover:text-white'
-          }`}
-        >
-          <HelpCircle className="w-4 h-4" />
-          <span>Kahoot Quiz Manager</span>
-        </button>
+            {/* Render Smartphone Frame */}
+            {renderPhoneSimulator()}
 
-        <button
-          onClick={() => setAdminTab('preview')}
-          className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
-            adminTab === 'preview'
-              ? 'border-fest-cyan text-fest-cyan'
-              : 'border-transparent text-slate-400 hover:text-white'
-          }`}
-        >
-          <Smartphone className="w-4 h-4" />
-          <span>Participant Live Preview</span>
-          <span className="w-2 h-2 rounded-full bg-fest-cyan animate-pulse"></span>
-        </button>
-      </div>
+            {/* Quick Testing Controls & Meta */}
+            <div className="pt-2 border-t border-white/10 space-y-2 font-mono text-xs">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                  <span>Mirrored to All Phones</span>
+                </span>
+                <a
+                  href="./#submit"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-fest-cyan hover:text-fest-pink transition-colors inline-flex items-center gap-1"
+                  title="Open real phone view in new window"
+                >
+                  <span>Open #submit</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              {/* Stage switch test buttons right under phone */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => switchArena('battle')}
+                  className={`py-1 rounded text-center transition-all ${
+                    activeArena === 'battle' ? 'bg-fest-cyan text-dark-950 font-bold' : 'bg-dark-950 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Battle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchArena('poll')}
+                  className={`py-1 rounded text-center transition-all ${
+                    activeArena === 'poll' ? 'bg-fest-pink text-white font-bold' : 'bg-dark-950 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Poll
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchArena('quiz')}
+                  className={`py-1 rounded text-center transition-all ${
+                    activeArena === 'quiz' ? 'bg-fest-amber text-dark-950 font-bold' : 'bg-dark-950 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Kahoot
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </aside>
+
+        {/* RIGHT COLUMN: Master Controls & Tabs */}
+        <main className="flex-1 min-w-0 space-y-6 w-full">
+          
+          {/* ADMIN CONTROL SECTION TABS */}
+          <div className="flex border-b border-white/10 font-mono text-xs sm:text-sm space-x-4 sm:space-x-6 overflow-x-auto pb-0.5">
+            <button
+              onClick={() => setAdminTab('battle')}
+              className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
+                adminTab === 'battle'
+                  ? 'border-fest-cyan text-fest-cyan'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <Flame className="w-4 h-4" />
+              <span>Battle Timers & Scoring</span>
+            </button>
+
+            <button
+              onClick={() => setAdminTab('poll')}
+              className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
+                adminTab === 'poll'
+                  ? 'border-fest-pink text-fest-pink'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <Vote className="w-4 h-4" />
+              <span>Live Poll & MCQ Manager</span>
+            </button>
+
+            <button
+              onClick={() => setAdminTab('quiz')}
+              className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
+                adminTab === 'quiz'
+                  ? 'border-fest-amber text-fest-amber'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span>Kahoot Quiz Manager</span>
+            </button>
+          </div>
 
       {/* TAB 1: BATTLE TIMERS & SCORING */}
       {adminTab === 'battle' && (
@@ -566,13 +709,45 @@ export default function AdminView() {
                 </p>
               </div>
 
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded bg-fest-cyan/15 hover:bg-fest-cyan/25 border border-fest-cyan/40 text-fest-cyan font-mono text-xs font-bold transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Contender Manually</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* View Mode Toggle */}
+                <div className="flex items-center p-1 rounded-lg bg-dark-950 border border-white/10 text-xs font-mono">
+                  <button
+                    type="button"
+                    onClick={() => setEvaluationViewMode('table')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
+                      evaluationViewMode === 'table'
+                        ? 'bg-fest-cyan/20 text-fest-cyan font-bold border border-fest-cyan/30'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Spreadsheet Table View (PC Optimized)"
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    <span>Table</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEvaluationViewMode('cards')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
+                      evaluationViewMode === 'cards'
+                        ? 'bg-fest-pink/20 text-fest-pink font-bold border border-fest-pink/30'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Mobile Card Touch View (Mobile & Tablet Optimized)"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>Cards</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded bg-fest-cyan/15 hover:bg-fest-cyan/25 border border-fest-cyan/40 text-fest-cyan font-mono text-xs font-bold transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Contender</span>
+                </button>
+              </div>
             </div>
 
             {participants.length === 0 ? (
@@ -582,9 +757,152 @@ export default function AdminView() {
                   Participants scanning the QR code will appear here automatically with their exact finish times.
                 </p>
               </div>
+            ) : evaluationViewMode === 'cards' ? (
+              /* MOBILE & TOUCH FRIENDLY CARDS VIEW */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {participants.map((p, idx) => (
+                  <div key={p.id} className="p-4 sm:p-5 rounded-xl bg-dark-900 border border-white/10 space-y-4 hover:border-fest-cyan/30 transition-all shadow-md">
+                    {/* Card Header: Contender Name & Total Score Badge */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded bg-dark-950 border border-white/10 text-fest-cyan font-mono text-xs font-bold flex items-center justify-center shrink-0">
+                            #{idx + 1}
+                          </span>
+                          <span className="font-sans font-bold text-base text-white truncate">{p.name}</span>
+                        </div>
+                        <span className="text-xs text-fest-pink font-mono block mt-0.5 truncate">{p.teamName}</span>
+                        <div className="mt-1 flex items-center gap-2">
+                          {p.tabSwitches > 0 ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold text-[10px]">
+                              <AlertCircle className="w-3 h-3 text-rose-400" />
+                              <span>{p.tabSwitches} tab switch{p.tabSwitches > 1 ? 'es' : ''}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px]">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Zero tab switches</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end shrink-0">
+                        <span className="text-[10px] text-slate-400 font-mono uppercase">Total Score</span>
+                        <div className="text-xl font-extrabold text-white font-mono flex items-baseline gap-0.5">
+                          <span>{p.totalScore || 0}</span>
+                          <span className="text-xs text-slate-400 font-normal">/100</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Inputs Grid */}
+                    <div className="grid grid-cols-2 gap-3 font-mono text-xs">
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">Finish Time Recorded</label>
+                        <input
+                          type="text"
+                          value={p.finishTimeFormatted || ''}
+                          onChange={(e) => updateParticipantMarks(p.id, { finishTimeFormatted: e.target.value })}
+                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-white/15 text-white text-xs font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">Tokens Consumed</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={p.tokensUsed || 0}
+                          onChange={(e) => updateParticipantMarks(p.id, { tokensUsed: Number(e.target.value) })}
+                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-white/15 text-white text-xs font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-fest-cyan font-semibold">Objective</span>
+                          <span className="text-fest-cyan">{p.objectiveScore || 0}/30</span>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          max="30"
+                          value={p.objectiveScore || 0}
+                          onChange={(e) => updateParticipantMarks(p.id, { objectiveScore: Number(e.target.value) })}
+                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-fest-cyan/40 text-fest-cyan text-xs font-bold text-center"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">Finish Status</label>
+                        <select
+                          value={p.finishStatus || 'Partially Fulfilled'}
+                          onChange={(e) => updateParticipantMarks(p.id, { finishStatus: e.target.value })}
+                          className="w-full px-2 py-1.5 rounded bg-dark-950 border border-white/15 text-slate-200 text-xs"
+                        >
+                          <option value="Fully Completed">Fully Completed (20 pts)</option>
+                          <option value="Substantially Completed">Substantially Completed (16 pts)</option>
+                          <option value="Partially Fulfilled">Partially Fulfilled (12 pts)</option>
+                          <option value="Minimal Fulfillment">Minimal Fulfillment (6 pts)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-slate-300">Presentation</span>
+                          <span className="text-slate-300">{p.presentationScore || 0}/25</span>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          max="25"
+                          value={p.presentationScore || 0}
+                          onChange={(e) => updateParticipantMarks(p.id, { presentationScore: Number(e.target.value) })}
+                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-white/15 text-white text-xs text-center"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-fest-pink font-semibold">Novelty</span>
+                          <span className="text-fest-pink">{p.noveltyScore || 0}/25</span>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          max="25"
+                          value={p.noveltyScore || 0}
+                          onChange={(e) => updateParticipantMarks(p.id, { noveltyScore: Number(e.target.value) })}
+                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-fest-pink/40 text-fest-pink text-xs font-bold text-center"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Card Footer */}
+                    <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[11px] font-mono">
+                      <span className="text-slate-400 truncate max-w-[200px]" title={p.notes || 'No notes'}>
+                        {p.notes ? `Note: ${p.notes}` : 'No notes recorded'}
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete ${p.name}?`)) {
+                            removeParticipant(p.id);
+                          }
+                        }}
+                        className="flex items-center gap-1 text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-500/10 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Remove</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
+              /* SPREADSHEET TABLE VIEW (PC OPTIMIZED) */
               <div className="overflow-x-auto border border-white/10 rounded-lg">
-                <table className="w-full text-left font-mono text-xs">
+                <table className="w-full min-w-[960px] text-left font-mono text-xs">
                   <thead className="bg-dark-950 text-slate-400 uppercase tracking-wider text-[11px] border-b border-white/10">
                     <tr>
                       <th className="py-3 px-3">Contender</th>
@@ -594,6 +912,7 @@ export default function AdminView() {
                       <th className="py-3 px-3">Finish Status</th>
                       <th className="py-3 px-3">Presentation (0-25)</th>
                       <th className="py-3 px-3">Novelty (0-25)</th>
+                      <th className="py-3 px-3 text-center">Tab Switches</th>
                       <th className="py-3 px-3 text-right">Total Score</th>
                       <th className="py-3 px-3 text-center">Action</th>
                     </tr>
@@ -674,6 +993,20 @@ export default function AdminView() {
                             onChange={(e) => updateParticipantMarks(p.id, { noveltyScore: Number(e.target.value) })}
                             className="w-16 px-2 py-1 rounded bg-dark-950 border border-fest-pink/40 text-fest-pink font-mono text-xs font-bold text-center"
                           />
+                        </td>
+
+                        <td className="py-3 px-3 text-center">
+                          {p.tabSwitches > 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold text-[11px]" title="Screen/tab switch detected">
+                              <AlertCircle className="w-3 h-3 text-rose-400" />
+                              <span>{p.tabSwitches}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[11px]">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>0</span>
+                            </span>
+                          )}
                         </td>
 
                         <td className="py-3 px-3 text-right">
@@ -774,6 +1107,104 @@ export default function AdminView() {
                 </div>
               ))}
             </div>
+
+            {/* Display Mode Selection (for MCQ) */}
+            {poll?.type === 'mcq' && (
+              <div className="p-3 rounded-lg bg-dark-950 border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 font-mono text-xs">
+                <span className="text-slate-300 flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-fest-cyan" />
+                  <span>Auditorium Projector View:</span>
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPollDisplayMode('percentage')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                      (poll?.displayMode || 'percentage') === 'percentage'
+                        ? 'bg-fest-cyan text-dark-950 font-bold shadow-[0_0_12px_rgba(0,229,255,0.4)]'
+                        : 'bg-dark-900 border border-white/10 text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    <span>Option Percentages View</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPollDisplayMode('leaderboard')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                      poll?.displayMode === 'leaderboard'
+                        ? 'bg-fest-amber text-dark-950 font-bold shadow-[0_0_12px_rgba(255,183,0,0.4)]'
+                        : 'bg-dark-900 border border-white/10 text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    <Trophy className="w-3.5 h-3.5" />
+                    <span>MCQ Best Performers (Speed & Accuracy)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Live Respondents List */}
+            {Object.keys(poll?.votes || {}).length > 0 && (
+              <div className="pt-3 border-t border-white/10 space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-fest-pink" />
+                    <span>Live Contender Votes ({Object.keys(poll?.votes || {}).length} Submitted / {totalJoinedCount} Joined)</span>
+                  </span>
+                </div>
+                <div className="overflow-x-auto max-h-56 scrollbar-thin border border-white/10 rounded-lg">
+                  <table className="w-full text-left font-mono text-xs">
+                    <thead className="bg-dark-950 text-slate-400 text-[11px] uppercase tracking-wider sticky top-0">
+                      <tr>
+                        <th className="py-2 px-3">Contender</th>
+                        <th className="py-2 px-3">Team</th>
+                        <th className="py-2 px-3">Selected Option</th>
+                        {poll?.type === 'mcq' && <th className="py-2 px-3 text-center">Correctness</th>}
+                        <th className="py-2 px-3 text-center">Speed</th>
+                        {poll?.type === 'mcq' && <th className="py-2 px-3 text-right">Score</th>}
+                        <th className="py-2 px-3 text-center">Tab Switches</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 bg-dark-950/60">
+                      {Object.values(poll?.votes || {}).map((vote) => {
+                        const opt = poll?.options?.find(o => o.id === vote.optionId);
+                        return (
+                          <tr key={vote.participantId} className="hover:bg-white/[0.02]">
+                            <td className="py-2 px-3 font-sans font-bold text-white">{vote.name}</td>
+                            <td className="py-2 px-3 text-fest-pink">{vote.teamName || 'Solo'}</td>
+                            <td className="py-2 px-3 text-slate-300">{opt?.text || 'Option'}</td>
+                            {poll?.type === 'mcq' && (
+                              <td className="py-2 px-3 text-center">
+                                {vote.isCorrect ? (
+                                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">CORRECT</span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold text-[10px]">WRONG</span>
+                                )}
+                              </td>
+                            )}
+                            <td className="py-2 px-3 text-center text-fest-cyan font-bold">{vote.timeTakenSec ? `${vote.timeTakenSec}s` : '—'}</td>
+                            {poll?.type === 'mcq' && (
+                              <td className="py-2 px-3 text-right text-fest-amber font-bold">{vote.score || 0} pts</td>
+                            )}
+                            <td className="py-2 px-3 text-center">
+                              {vote.tabSwitches > 0 ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold">
+                                  <AlertCircle className="w-3 h-3 text-rose-400" />
+                                  <span>{vote.tabSwitches}</span>
+                                </span>
+                              ) : (
+                                <span className="text-emerald-400 text-[10px]">0</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Create New Poll Form */}
@@ -890,7 +1321,7 @@ export default function AdminView() {
                 <div className="text-xs font-mono text-slate-400 mt-2 flex items-center gap-3">
                   <span>Status: <strong className="text-fest-cyan uppercase">{quiz?.status}</strong></span>
                   <span>•</span>
-                  <span>Responses: <strong className="text-white">{Object.keys(quiz?.submissions || {}).length}</strong></span>
+                  <span>Responses: <strong className="text-white">{Object.keys(quiz?.submissions || {}).length}</strong> / <strong className="text-emerald-400">{totalJoinedCount}</strong> Joined</span>
                 </div>
               </div>
 
@@ -941,6 +1372,67 @@ export default function AdminView() {
                 </button>
               </div>
             </div>
+
+            {/* Live Quiz Responses Roster */}
+            {Object.keys(quiz?.submissions || {}).length > 0 && (
+              <div className="pt-3 border-t border-white/10 space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-fest-amber" />
+                    <span>Live Contender Submissions ({Object.keys(quiz?.submissions || {}).length} Answered / {totalJoinedCount} Joined)</span>
+                  </span>
+                </div>
+                <div className="overflow-x-auto max-h-56 scrollbar-thin border border-white/10 rounded-lg">
+                  <table className="w-full text-left font-mono text-xs">
+                    <thead className="bg-dark-950 text-slate-400 text-[11px] uppercase tracking-wider sticky top-0">
+                      <tr>
+                        <th className="py-2 px-3">Contender</th>
+                        <th className="py-2 px-3">Team</th>
+                        <th className="py-2 px-3 text-center">Selected Option</th>
+                        <th className="py-2 px-3 text-center">Status</th>
+                        <th className="py-2 px-3 text-center">Speed</th>
+                        <th className="py-2 px-3 text-right">Points</th>
+                        <th className="py-2 px-3 text-center">Tab Switches</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 bg-dark-950/60">
+                      {Object.values(quiz?.submissions || {}).map((sub) => {
+                        const optLabels = ['A', 'B', 'C', 'D'];
+                        const optText = quiz?.questions?.[quiz?.currentQuestionIndex || 0]?.options?.[sub.selectedIndex];
+                        return (
+                          <tr key={sub.participantId} className="hover:bg-white/[0.02]">
+                            <td className="py-2 px-3 font-sans font-bold text-white">{sub.name}</td>
+                            <td className="py-2 px-3 text-fest-amber">{sub.teamName || 'Solo'}</td>
+                            <td className="py-2 px-3 text-center font-bold text-slate-200">
+                              Option {optLabels[sub.selectedIndex] || '—'} {optText ? `(${optText})` : ''}
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              {sub.isCorrect ? (
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">CORRECT</span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold text-[10px]">WRONG</span>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-center text-fest-cyan font-bold">{sub.timeTakenSec ? `${sub.timeTakenSec}s` : '—'}</td>
+                            <td className="py-2 px-3 text-right text-fest-amber font-bold">+{sub.score || 0}</td>
+                            <td className="py-2 px-3 text-center">
+                              {sub.tabSwitches > 0 ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold">
+                                  <AlertCircle className="w-3 h-3 text-rose-400" />
+                                  <span>{sub.tabSwitches}</span>
+                                </span>
+                              ) : (
+                                <span className="text-emerald-400 text-[10px]">0</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
 
           <form onSubmit={handleAddQuestion} className="p-6 rounded-xl bg-dark-900/60 border border-white/15 space-y-4">
@@ -1020,139 +1512,8 @@ export default function AdminView() {
         </div>
       )}
 
-      {/* TAB 4: PARTICIPANT LIVE PREVIEW (SMARTPHONE SIMULATOR) */}
-      {adminTab === 'preview' && (
-        <div className="space-y-6">
-          
-          <div className="p-6 rounded-xl bg-dark-900 border border-white/15 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-fest-cyan" />
-                <h3 className="font-sans font-bold text-white text-lg">
-                  Participant Live Mobile Simulator
-                </h3>
-              </div>
-              <p className="text-xs font-mono text-slate-400 mt-1">
-                Real-time interactive mobile screen mirror demonstrating what contenders see on their smartphones
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 font-mono text-xs">
-              <span className="text-slate-400">Broadcast Stage:</span>
-              <button
-                onClick={() => switchArena('battle')}
-                className={`px-3 py-1.5 rounded transition-all ${
-                  activeArena === 'battle'
-                    ? 'bg-fest-cyan text-dark-950 font-bold shadow-[0_0_12px_rgba(0,229,255,0.3)]'
-                    : 'bg-dark-950 border border-white/10 text-slate-300 hover:text-white'
-                }`}
-              >
-                Battle
-              </button>
-              <button
-                onClick={() => switchArena('poll')}
-                className={`px-3 py-1.5 rounded transition-all ${
-                  activeArena === 'poll'
-                    ? 'bg-fest-pink text-white font-bold shadow-[0_0_12px_rgba(255,0,122,0.3)]'
-                    : 'bg-dark-950 border border-white/10 text-slate-300 hover:text-white'
-                }`}
-              >
-                Poll
-              </button>
-              <button
-                onClick={() => switchArena('quiz')}
-                className={`px-3 py-1.5 rounded transition-all ${
-                  activeArena === 'quiz'
-                    ? 'bg-fest-amber text-dark-950 font-bold shadow-[0_0_12px_rgba(255,183,0,0.3)]'
-                    : 'bg-dark-950 border border-white/10 text-slate-300 hover:text-white'
-                }`}
-              >
-                Kahoot Quiz
-              </button>
-            </div>
-          </div>
-
-          {/* Smartphone Simulator Frame */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            
-            {/* Phone Mockup Frame (Col 7) */}
-            <div className="lg:col-span-7 flex justify-center py-2">
-              <div className="w-full max-w-sm rounded-[50px] p-4 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 shadow-[0_0_60px_rgba(0,0,0,0.95)] border-4 border-slate-600">
-                <div className="rounded-[40px] bg-dark-950 overflow-hidden border border-white/15 relative h-[700px] flex flex-col shadow-inner">
-                  
-                  {/* Smartphone Top Notch / Speaker */}
-                  <div className="pt-3 pb-1 bg-dark-950 flex items-center justify-between px-6 border-b border-white/5 select-none">
-                    <span className="text-[10px] font-mono text-slate-400">9:41</span>
-                    <div className="w-20 h-4 rounded-full bg-black border border-white/15 flex items-center justify-center">
-                      <div className="w-2 h-2 rounded-full bg-slate-900 border border-white/10 mr-1.5"></div>
-                    </div>
-                    <span className="text-[10px] font-mono text-emerald-400 font-bold">5G</span>
-                  </div>
-
-                  {/* Mobile Screen Content (Live View) */}
-                  <div className="flex-1 overflow-y-auto p-2">
-                    <ParticipantSubmitView />
-                  </div>
-
-                  {/* Smartphone Home Indicator Bar */}
-                  <div className="py-2.5 bg-dark-950 flex justify-center border-t border-white/5">
-                    <div className="w-28 h-1 rounded-full bg-white/30"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Control & Live Inspection Sidecard (Col 5) */}
-            <div className="lg:col-span-5 space-y-4 font-mono text-xs">
-              <div className="p-5 rounded-xl bg-dark-900 border border-white/15 space-y-3">
-                <div className="flex items-center gap-2 text-fest-cyan font-bold">
-                  <Radio className="w-4 h-4 animate-pulse" />
-                  <span>Real-Time Device Synchronization</span>
-                </div>
-                <p className="text-slate-300 leading-relaxed">
-                  Whatever mode is active on this simulator is <strong>identical to what every participant sees on their smartphone</strong> when scanning the venue QR code.
-                </p>
-                <div className="p-3 rounded bg-dark-950 border border-white/10 space-y-1.5 text-[11px]">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Current Broadcast Stage:</span>
-                    <strong className="text-fest-cyan uppercase">{activeArena}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Firebase Realtime Sync:</span>
-                    <strong className="text-emerald-400">Active</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Anti-Cheat Lock:</span>
-                    <strong className="text-amber-400">Enabled</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5 rounded-xl bg-dark-900 border border-white/15 space-y-3">
-                <span className="text-white font-bold block">Testing Tips:</span>
-                <ul className="space-y-2 text-slate-300 text-[11px] leading-relaxed">
-                  <li>• You can interact with the smartphone on the left directly — tap buttons, vote, or submit to test the flow.</li>
-                  <li>• To see what happens on an actual phone, scan the QR code projected on the presentation screen or open <code className="text-fest-cyan">#submit</code> on your mobile browser.</li>
-                  <li>• Switching the stage here immediately updates all active participant phones and the venue projector simultaneously.</li>
-                </ul>
-                <div className="pt-2">
-                  <a
-                    href="./#submit"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded bg-fest-cyan/15 hover:bg-fest-cyan/25 border border-fest-cyan/40 text-fest-cyan font-bold transition-all"
-                  >
-                    <span>Open Phone View in Separate Window</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      )}
+        </main>
+      </div>
 
       {/* Manual Contender Add Modal */}
       {showAddModal && (

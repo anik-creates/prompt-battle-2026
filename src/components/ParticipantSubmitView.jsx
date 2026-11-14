@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useBattle } from '../context/BattleContext';
 import ParticipantPollView from './ParticipantPollView';
 import ParticipantQuizView from './ParticipantQuizView';
+import { setupTabSwitchGuard } from '../lib/focusGuard';
 import { 
   Send, 
   CheckCircle2, 
@@ -18,11 +19,13 @@ import {
   HelpCircle
 } from 'lucide-react';
 
-export default function ParticipantSubmitView() {
+export default function ParticipantSubmitView({ isSimulator = false }) {
   const { 
     activeArena, 
     timer, 
-    submitParticipantWork 
+    submitParticipantWork,
+    registerPresence,
+    reportTabSwitch
   } = useBattle();
 
   const [name, setName] = useState('');
@@ -30,6 +33,44 @@ export default function ParticipantSubmitView() {
   const [notes, setNotes] = useState('');
   const [submittedData, setSubmittedData] = useState(null);
   const [error, setError] = useState('');
+
+  const participantId = useState(() => {
+    let id = localStorage.getItem('pb_participant_uuid');
+    if (!id) {
+      id = `pt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      localStorage.setItem('pb_participant_uuid', id);
+    }
+    return id;
+  })[0];
+
+  useEffect(() => {
+    registerPresence({
+      participantId,
+      name: name || 'Contender',
+      teamName: teamName || 'Solo',
+      arena: activeArena,
+    });
+  }, [participantId, name, teamName, activeArena, registerPresence]);
+
+  useEffect(() => {
+    if (isSimulator || activeArena !== 'battle') return;
+
+    const cleanup = setupTabSwitchGuard({
+      isSimulator,
+      onTabSwitch: () => {
+        if (!submittedData) {
+          reportTabSwitch({
+            participantId,
+            name: name || 'Contender',
+            teamName: teamName || 'Solo',
+            arena: 'battle',
+          });
+        }
+      },
+    });
+
+    return cleanup;
+  }, [isSimulator, activeArena, submittedData, participantId, name, teamName, reportTabSwitch]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -83,9 +124,9 @@ export default function ParticipantSubmitView() {
       </div>
 
       {/* DYNAMIC VIEW DRIVEN BY ADMIN PORTAL */}
-      {activeArena === 'poll' && <ParticipantPollView />}
+      {activeArena === 'poll' && <ParticipantPollView isSimulator={isSimulator} />}
       
-      {activeArena === 'quiz' && <ParticipantQuizView />}
+      {activeArena === 'quiz' && <ParticipantQuizView isSimulator={isSimulator} />}
 
       {activeArena === 'battle' && (
         <div className="space-y-6">

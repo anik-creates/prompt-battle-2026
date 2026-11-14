@@ -35,26 +35,26 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 bg-dark-950/95 backdrop-blur-md border-b border-white/10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20 md:h-24">
+      <div className="w-full max-w-[1750px] mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 sm:h-20 md:h-24">
           
           {/* Left: IEEE PES DIU SBC Logo (BIG) & EEE Fest 2026 Logo */}
-          <div className="flex items-center space-x-3 sm:space-x-5">
+          <div className="flex items-center space-x-2.5 sm:space-x-5">
             <div className="flex items-center">
               <img 
                 src="./assets/ieee-pes-diu-logo.png" 
                 alt="IEEE PES DIU Student Branch Chapter" 
-                className="h-14 sm:h-16 md:h-20 w-auto object-contain filter drop-shadow-[0_0_15px_rgba(108,179,63,0.35)]"
+                className="h-11 sm:h-16 md:h-20 w-auto object-contain filter drop-shadow-[0_0_15px_rgba(108,179,63,0.35)]"
               />
             </div>
 
-            <div className="h-8 md:h-12 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent"></div>
+            <div className="h-6 sm:h-8 md:h-12 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent"></div>
 
             <div className="flex items-center">
               <img 
                 src="./assets/eee-fest-logo.png" 
                 alt="EEE Fest 2026" 
-                className="h-9 sm:h-11 md:h-14 w-auto object-contain filter drop-shadow-[0_0_12px_rgba(0,229,255,0.25)]"
+                className="h-7 sm:h-10 md:h-14 w-auto object-contain filter drop-shadow-[0_0_12px_rgba(0,229,255,0.25)]"
               />
             </div>
 

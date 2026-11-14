@@ -95,6 +95,7 @@ export const DEFAULT_POLL = {
   type: 'mcq', // 'voting' or 'mcq'
   status: 'active', // 'active' | 'closed'
   published: false,
+  displayMode: 'percentage', // 'percentage' | 'leaderboard'
   options: [
     { id: 'opt-1', text: 'Mixture of Experts (MoE) with CoT', isCorrect: true, votes: 0 },
     { id: 'opt-2', text: 'Dense Monolithic 7B Parameter Model', isCorrect: false, votes: 0 },
@@ -115,6 +116,7 @@ export const DEFAULT_STATE = {
   },
   published: false,
   participants: [],
+  joinedParticipants: {}, // [participantId]: { id, name, teamName, arena, lastSeen, tabSwitches }
 
   // Live Poll State
   poll: DEFAULT_POLL,
@@ -152,9 +154,11 @@ export function sanitizeState(raw) {
       ...DEFAULT_STATE.timer,
       ...(raw.timer || {}),
     },
+    joinedParticipants: (raw.joinedParticipants && typeof raw.joinedParticipants === 'object') ? raw.joinedParticipants : {},
     poll: {
       ...DEFAULT_POLL,
       ...rawPoll,
+      displayMode: rawPoll.displayMode || 'percentage',
       options: pollOptions.length > 0 ? pollOptions : DEFAULT_POLL.options,
       votes: rawPoll.votes || {},
       status: rawPoll.status || 'active',
@@ -615,21 +619,35 @@ export function BattleProvider({ children }) {
     });
   }, [battleState, syncState]);
 
-  const submitVote = useCallback(({ participantId, participantName, optionId }) => {
+  const submitVote = useCallback(({ participantId, participantName, teamName, optionId, timeTakenSec }) => {
     const now = Date.now();
     const currentPoll = battleState.poll || DEFAULT_POLL;
     if (currentPoll.status === 'closed') {
       return { success: false, error: 'Voting is currently closed.' };
     }
 
+    const optionsList = toSafeArray(currentPoll.options, DEFAULT_POLL.options);
+    const chosenOption = optionsList.find((o) => o.id === optionId);
+    const isCorrect = Boolean(chosenOption?.isCorrect);
+
+    // Speed & accuracy score calculation for MCQ (Kahoot style)
+    const timeSec = Number(timeTakenSec) || 4;
+    const score = isCorrect ? Math.max(100, Math.round((1 - Math.min(1, timeSec / 25) / 2) * 1000)) : 0;
+
     const currentVotes = { ...(currentPoll.votes || {}) };
+    const existingVote = currentVotes[participantId] || {};
+
     currentVotes[participantId] = {
       optionId,
-      name: participantName || 'Contender',
+      name: participantName || existingVote.name || 'Contender',
+      teamName: teamName || existingVote.teamName || 'Solo',
       timestamp: now,
+      timeTakenSec: timeSec,
+      isCorrect,
+      score,
+      tabSwitches: existingVote.tabSwitches || 0,
     };
 
-    const optionsList = toSafeArray(currentPoll.options, DEFAULT_POLL.options);
     const updatedOptions = optionsList.map((opt) => {
       const voteCount = Object.values(currentVotes).filter((v) => v.optionId === opt.id).length;
       return { ...opt, votes: voteCount };
@@ -662,6 +680,18 @@ export function BattleProvider({ children }) {
     });
   }, [battleState, syncState]);
 
+  const setPollDisplayMode = useCallback((displayMode) => {
+    const now = Date.now();
+    syncState({
+      ...battleState,
+      poll: {
+        ...battleState.poll,
+        displayMode: displayMode || 'percentage',
+      },
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
   const publishPollResults = useCallback((shouldPublish) => {
     const now = Date.now();
     syncState({
@@ -673,6 +703,113 @@ export function BattleProvider({ children }) {
       lastUpdated: now,
     });
   }, [battleState, syncState]);
+
+  const registerPresence = useCallback(({ participantId, name, teamName, arena }) => {
+    if (!participantId) return;
+    setBattleState((prev) => {
+      const currentJoined = { ...(prev.joinedParticipants || {}) };
+      const existing = currentJoined[participantId] || {};
+      const updated = {
+        id: participantId,
+        name: name || existing.name || 'Contender',
+        teamName: teamName || existing.teamName || 'Solo',
+        arena: arena || prev.activeArena || 'battle',
+        lastSeen: Date.now(),
+        tabSwitches: existing.tabSwitches || 0,
+      };
+      currentJoined[participantId] = updated;
+
+      const newState = {
+        ...prev,
+        joinedParticipants: currentJoined,
+        lastUpdated: Date.now(),
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+      } catch (e) {}
+      if (broadcastRef.current) {
+        try {
+          broadcastRef.current.postMessage({ type: 'STATE_UPDATE', payload: newState });
+        } catch (e) {}
+      }
+      pushStateToCloud(newState).catch(() => {});
+      return newState;
+    });
+  }, []);
+
+  const reportTabSwitch = useCallback(({ participantId, name, teamName, arena }) => {
+    if (!participantId) return;
+    setBattleState((prev) => {
+      const currentJoined = { ...(prev.joinedParticipants || {}) };
+      const existing = currentJoined[participantId] || {
+        id: participantId,
+        name: name || 'Contender',
+        teamName: teamName || 'Solo',
+        tabSwitches: 0,
+      };
+      const switchCount = (existing.tabSwitches || 0) + 1;
+      currentJoined[participantId] = {
+        ...existing,
+        name: name || existing.name,
+        teamName: teamName || existing.teamName,
+        arena: arena || prev.activeArena,
+        tabSwitches: switchCount,
+        lastSeen: Date.now(),
+      };
+
+      // Also update in participants list
+      const updatedParticipants = toSafeArray(prev.participants, []).map((p) => {
+        if (p.id === participantId || (p.name && p.name.toLowerCase() === (name || '').toLowerCase())) {
+          return { ...p, tabSwitches: switchCount };
+        }
+        return p;
+      });
+
+      // Also update in poll.votes
+      const currentVotes = { ...(prev.poll?.votes || {}) };
+      if (currentVotes[participantId]) {
+        currentVotes[participantId] = {
+          ...currentVotes[participantId],
+          tabSwitches: switchCount,
+        };
+      }
+
+      // Also update in quiz.submissions
+      const currentSubmissions = { ...(prev.quiz?.submissions || {}) };
+      if (currentSubmissions[participantId]) {
+        currentSubmissions[participantId] = {
+          ...currentSubmissions[participantId],
+          tabSwitches: switchCount,
+        };
+      }
+
+      const newState = {
+        ...prev,
+        joinedParticipants: currentJoined,
+        participants: updatedParticipants,
+        poll: {
+          ...prev.poll,
+          votes: currentVotes,
+        },
+        quiz: {
+          ...prev.quiz,
+          submissions: currentSubmissions,
+        },
+        lastUpdated: Date.now(),
+      };
+
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+      } catch (e) {}
+      if (broadcastRef.current) {
+        try {
+          broadcastRef.current.postMessage({ type: 'STATE_UPDATE', payload: newState });
+        } catch (e) {}
+      }
+      pushStateToCloud(newState).catch(() => {});
+      return newState;
+    });
+  }, []);
 
   const resetPoll = useCallback(() => {
     const now = Date.now();
@@ -876,8 +1013,16 @@ export function BattleProvider({ children }) {
     timer: battleState.timer,
     participants: toSafeArray(battleState.participants, []),
     published: battleState.published,
+    joinedParticipants: battleState.joinedParticipants || {},
+    totalJoinedCount: Math.max(
+      Object.keys(battleState.joinedParticipants || {}).length,
+      toSafeArray(battleState.participants, []).length,
+      Object.keys(battleState.poll?.votes || {}).length,
+      Object.keys(battleState.quiz?.submissions || {}).length
+    ),
     poll: {
       ...safePoll,
+      displayMode: safePoll.displayMode || 'percentage',
       options: toSafeArray(safePoll.options, DEFAULT_POLL.options),
       votes: safePoll.votes || {},
     },
@@ -908,8 +1053,13 @@ export function BattleProvider({ children }) {
     createPoll,
     submitVote,
     setPollStatus,
+    setPollDisplayMode,
     publishPollResults,
     resetPoll,
+
+    // Presence & Anti-Cheat
+    registerPresence,
+    reportTabSwitch,
 
     // Quiz
     launchQuizQuestion,

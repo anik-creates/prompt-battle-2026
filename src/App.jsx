@@ -58,7 +58,7 @@ function MainContent() {
   const { activeView } = useBattle();
 
   return (
-    <main className="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6">
+    <main className="flex-1 w-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
       {activeView === 'presentation' && <PresentationView />}
       {activeView === 'submit' && <ParticipantSubmitView />}
       {activeView === 'admin' && <AdminView />}

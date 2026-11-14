@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export default function QuizArenaView() {
-  const { quiz } = useBattle();
+  const { quiz, totalJoinedCount } = useBattle();
 
   const safeQuiz = quiz || {};
   const currentIdx = safeQuiz.currentQuestionIndex || 0;
@@ -113,14 +113,15 @@ export default function QuizArenaView() {
             </div>
 
             {/* Complete Contenders Table */}
-            <div className="overflow-x-auto border border-white/10 rounded-lg">
-              <table className="w-full text-left font-mono text-xs">
+            <div className="overflow-x-auto border border-white/10 rounded-lg scrollbar-thin">
+              <table className="w-full min-w-[700px] text-left font-mono text-xs">
                 <thead className="bg-dark-950 text-slate-400 uppercase tracking-wider text-[11px] border-b border-white/10">
                   <tr>
                     <th className="py-3 px-4">Rank</th>
                     <th className="py-3 px-4 font-sans font-bold">Contender / Team</th>
                     <th className="py-3 px-4 text-center">Correct Answers</th>
                     <th className="py-3 px-4 text-center">Accuracy</th>
+                    <th className="py-3 px-4 text-center">Tab Switches</th>
                     <th className="py-3 px-4 text-right font-bold text-white">Total Kahoot Points</th>
                   </tr>
                 </thead>
@@ -129,13 +130,22 @@ export default function QuizArenaView() {
                     <tr key={p.participantId || idx} className="hover:bg-white/[0.02]">
                       <td className="py-3 px-4 font-bold text-fest-cyan">#{idx + 1}</td>
                       <td className="py-3 px-4 font-sans font-semibold text-white">
-                        {p.name} <span className="text-xs text-slate-400 font-mono">({p.teamName})</span>
+                        {p.name} <span className="text-xs text-slate-400 font-mono">({p.teamName || 'Solo'})</span>
                       </td>
                       <td className="py-3 px-4 text-center text-emerald-400 font-bold">
                         {p.correctCount || 0} / {questions.length}
                       </td>
                       <td className="py-3 px-4 text-center text-slate-300">
                         {Math.round(((p.correctCount || 0) / (questions.length || 1)) * 100)}%
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {p.tabSwitches > 0 ? (
+                          <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold border border-rose-500/40">
+                            ⚠️ {p.tabSwitches} switches
+                          </span>
+                        ) : (
+                          <span className="text-emerald-400">✓ Clean</span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right text-base font-extrabold text-white font-mono">
                         {p.totalScore || 0}
@@ -156,10 +166,10 @@ export default function QuizArenaView() {
 
   // Active Question Screen (During Live Kahoot Battle)
   return (
-    <div className="w-full max-w-6xl mx-auto py-6 sm:py-10 space-y-8">
+    <div className="w-full max-w-6xl mx-auto py-6 sm:py-10 space-y-6">
       
       {/* Top Question Tracker */}
-      <div className="flex items-center justify-between pb-4 border-b border-white/10 font-mono text-xs text-slate-400">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/10 font-mono text-xs text-slate-400">
         <div className="flex items-center gap-2">
           <HelpCircle className="w-4 h-4 text-fest-cyan" />
           <span className="text-white font-bold uppercase tracking-wider">
@@ -167,10 +177,12 @@ export default function QuizArenaView() {
           </span>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <span className="flex items-center gap-1.5 text-fest-pink font-bold">
             <Users className="w-3.5 h-3.5" />
-            {answeredForCurrent.length} Responses Received
+            <span>{answeredForCurrent.length} Answered</span>
+            <span className="text-slate-500">/</span>
+            <span className="text-slate-300">{Math.max(answeredForCurrent.length, totalJoinedCount)} Connected</span>
           </span>
           <span>•</span>
           <span className={`px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
@@ -182,14 +194,45 @@ export default function QuizArenaView() {
       </div>
 
       {/* Main Massive Question Banner */}
-      <div className="p-8 sm:p-12 rounded-2xl bg-dark-900/80 border border-white/15 text-center relative overflow-hidden shadow-[0_0_35px_rgba(0,0,0,0.8)]">
-        <div className="text-xs uppercase font-mono tracking-widest text-fest-cyan mb-3">
+      <div className="p-6 sm:p-10 rounded-2xl bg-dark-900/80 border border-white/15 text-center relative overflow-hidden shadow-[0_0_35px_rgba(0,0,0,0.8)]">
+        <div className="text-xs uppercase font-mono tracking-widest text-fest-cyan mb-2">
           Prompt Engineering Kahoot Challenge
         </div>
-        <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white font-sans tracking-tight max-w-4xl mx-auto leading-tight">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white font-sans tracking-tight max-w-4xl mx-auto leading-tight">
           {currentQ?.question}
         </h2>
       </div>
+
+      {/* Live Contenders Response Roster (Who Submitted) */}
+      {answeredForCurrent.length > 0 && (
+        <div className="p-3.5 rounded-xl bg-dark-900/80 border border-white/10 space-y-2">
+          <div className="flex items-center justify-between text-xs font-mono">
+            <span className="text-slate-400 uppercase tracking-wider font-semibold flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Answers Locked In ({answeredForCurrent.length}):</span>
+            </span>
+            <span className="text-[11px] text-slate-500">Live submission ticker</span>
+          </div>
+
+          <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto pr-1 scrollbar-thin">
+            {answeredForCurrent.map((s, idx) => (
+              <span 
+                key={s.participantId || idx} 
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-dark-950 border border-white/10 text-xs font-mono text-slate-200"
+              >
+                <span className="w-2 h-2 rounded-full bg-fest-cyan animate-pulse"></span>
+                <span className="font-semibold text-white">{s.name}</span>
+                <span className="text-slate-500 text-[11px]">({s.teamName || 'Solo'})</span>
+                {s.tabSwitches > 0 && (
+                  <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 font-bold border border-rose-500/40 text-[10px]">
+                    ⚠️ {s.tabSwitches} sw
+                  </span>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Kahoot 4-Quadrant Option Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
@@ -222,7 +265,7 @@ export default function QuizArenaView() {
               }`}
             >
               <div className="flex items-center space-x-4">
-                <span className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-base font-mono shadow-md ${t.badge}`}>
+                <span className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg shadow-md ${t.badge}`}>
                   {t.shape}
                 </span>
                 <span className="font-sans font-bold text-white text-lg sm:text-xl">
@@ -230,13 +273,20 @@ export default function QuizArenaView() {
                 </span>
               </div>
 
-              <div className="flex items-center gap-2">
-                {showAnswer && isCorrect && (
-                  <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-                )}
-                {showAnswer && (
-                  <span className="font-mono text-sm text-slate-300 font-bold px-2 py-1 rounded bg-black/40">
-                    {choseThisCount}
+              {/* Live Answer Count / Checkmark */}
+              <div className="flex items-center space-x-2 font-mono">
+                {showAnswer && isCorrect ? (
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs font-bold uppercase">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Correct
+                  </span>
+                ) : showAnswer ? (
+                  <span className="text-xs text-slate-500">
+                    {choseThisCount} votes
+                  </span>
+                ) : (
+                  <span className="text-xs text-slate-400">
+                    {choseThisCount} chose
                   </span>
                 )}
               </div>

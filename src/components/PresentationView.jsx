@@ -24,7 +24,8 @@ export default function PresentationView() {
     activeArena,
     timer, 
     participants, 
-    published 
+    published,
+    totalJoinedCount 
   } = useBattle();
 
   // If active arena is Live Poll or Kahoot Quiz, render those arenas
@@ -77,12 +78,12 @@ export default function PresentationView() {
 
           <TimerDisplay size="large" showControls={false} />
           
-          <div className="mt-4 text-xs font-mono text-slate-400 text-center flex items-center gap-4">
+          <div className="mt-4 text-xs font-mono text-slate-400 text-center flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-fest-pink"></span>
               Synchronized Live Across All Devices
             </span>
-            <span>•</span>
+            <span className="hidden sm:inline">•</span>
             <span className="text-fest-cyan">Time recorded at instant of finish</span>
           </div>
         </div>
@@ -135,8 +136,8 @@ export default function PresentationView() {
             <h2 className="text-lg font-bold font-sans tracking-wide text-white uppercase">
               Submitted Contenders
             </h2>
-            <span className="px-2 py-0.5 rounded-full bg-dark-900 border border-white/10 text-xs font-mono text-fest-cyan">
-              {participants.length} Finished
+            <span className="px-2.5 py-0.5 rounded-full bg-dark-900 border border-white/10 text-xs font-mono text-fest-cyan font-bold">
+              {participants.length} Finished / {Math.max(participants.length, totalJoinedCount)} Connected
             </span>
           </div>
 
@@ -171,6 +172,11 @@ export default function PresentationView() {
                         {p.name}
                       </span>
                       <CheckCircle className="w-4 h-4 text-emerald-400" />
+                      {p.tabSwitches > 0 && (
+                        <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-mono text-[10px] font-bold border border-rose-500/40">
+                          ⚠️ {p.tabSwitches} switches
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-fest-pink font-mono">
                       {p.teamName}
