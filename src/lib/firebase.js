@@ -1,7 +1,14 @@
 // Real-Time Cross-Device Synchronization Engine
-// Seamlessly syncs between Projector Presentation Screen, Admin Laptop, and Participants' Mobile phones
+// Supports both Firebase Realtime Database (RTDB) and Cloud Firestore
+// Seamlessly syncs Projector Screen, Admin Laptop, and Participants' Mobile phones
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
+import { 
+  getDatabase, 
+  ref as rtdbRef, 
+  set as rtdbSet, 
+  onValue as rtdbOnValue 
+} from 'firebase/database';
 import { 
   getFirestore, 
   doc, 
@@ -12,9 +19,12 @@ import {
 const STORAGE_KEY = 'pb_firebase_config_v1';
 const FIRESTORE_COLLECTION = 'prompt_battles';
 const FIRESTORE_DOC = 'eee_fest_2026';
+const RTDB_PATH = 'prompt_battles/eee_fest_2026';
 
 let appInstance = null;
-let dbInstance = null;
+let firestoreInstance = null;
+let rtdbInstance = null;
+let activeDatabaseType = null; // 'rtdb' | 'firestore'
 let unsubscribeSnapshot = null;
 
 export function getStoredFirebaseConfig() {
@@ -43,7 +53,7 @@ export function saveStoredFirebaseConfig(config) {
 export function initFirebase(config = null) {
   const activeConfig = config || getStoredFirebaseConfig();
   if (!activeConfig || !activeConfig.apiKey || !activeConfig.projectId) {
-    return { success: false, error: 'Incomplete or missing Firebase configuration' };
+    return { success: false, error: 'Incomplete or missing Firebase configuration (apiKey, projectId required)' };
   }
 
   try {
@@ -52,8 +62,28 @@ export function initFirebase(config = null) {
     } else {
       appInstance = initializeApp(activeConfig);
     }
-    dbInstance = getFirestore(appInstance);
-    return { success: true, app: appInstance, db: dbInstance };
+
+    // Detect if Realtime Database is configured (via databaseURL or explicit config)
+    if (activeConfig.databaseURL) {
+      rtdbInstance = getDatabase(appInstance, activeConfig.databaseURL);
+      activeDatabaseType = 'rtdb';
+      return { success: true, app: appInstance, db: rtdbInstance, type: 'rtdb' };
+    }
+
+    // Try Realtime Database with default URL if not specified
+    try {
+      const defaultUrl = `https://${activeConfig.projectId}-default-rtdb.firebaseio.com`;
+      rtdbInstance = getDatabase(appInstance, defaultUrl);
+      activeDatabaseType = 'rtdb';
+      return { success: true, app: appInstance, db: rtdbInstance, type: 'rtdb' };
+    } catch (rtdbErr) {
+      console.info('Falling back to Cloud Firestore:', rtdbErr);
+    }
+
+    // Fallback to Cloud Firestore
+    firestoreInstance = getFirestore(appInstance);
+    activeDatabaseType = 'firestore';
+    return { success: true, app: appInstance, db: firestoreInstance, type: 'firestore' };
   } catch (err) {
     console.error('Firebase initialization error:', err);
     return { success: false, error: err.message };
@@ -61,11 +91,11 @@ export function initFirebase(config = null) {
 }
 
 export function isFirebaseReady() {
-  return !!dbInstance;
+  return !!(rtdbInstance || firestoreInstance);
 }
 
 export function subscribeToCloudState(callback, onError) {
-  if (!dbInstance) {
+  if (!rtdbInstance && !firestoreInstance) {
     const res = initFirebase();
     if (!res.success) return () => {};
   }
@@ -73,45 +103,85 @@ export function subscribeToCloudState(callback, onError) {
   try {
     if (unsubscribeSnapshot) {
       unsubscribeSnapshot();
+      unsubscribeSnapshot = null;
     }
 
-    const docRef = doc(dbInstance, FIRESTORE_COLLECTION, FIRESTORE_DOC);
-    unsubscribeSnapshot = onSnapshot(
-      docRef,
-      (snapshot) => {
-        if (snapshot.exists()) {
-          callback(snapshot.data());
+    // 1. If using Firebase Realtime Database
+    if (rtdbInstance && activeDatabaseType === 'rtdb') {
+      const dbReference = rtdbRef(rtdbInstance, RTDB_PATH);
+      const unsub = rtdbOnValue(
+        dbReference,
+        (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            callback(data);
+          }
+        },
+        (err) => {
+          console.warn('Realtime Database onValue error:', err);
+          if (onError) onError(err);
         }
-      },
-      (err) => {
-        console.warn('Firebase onSnapshot error:', err);
-        if (onError) onError(err);
-      }
-    );
+      );
 
-    return unsubscribeSnapshot;
+      unsubscribeSnapshot = unsub;
+      return unsub;
+    }
+
+    // 2. If using Cloud Firestore
+    if (firestoreInstance) {
+      const docRef = doc(firestoreInstance, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+      const unsub = onSnapshot(
+        docRef,
+        (snapshot) => {
+          if (snapshot.exists()) {
+            callback(snapshot.data());
+          }
+        },
+        (err) => {
+          console.warn('Firestore onSnapshot error:', err);
+          if (onError) onError(err);
+        }
+      );
+
+      unsubscribeSnapshot = unsub;
+      return unsub;
+    }
+
+    return () => {};
   } catch (e) {
-    console.error('Failed to subscribe to Firestore:', e);
+    console.error('Failed to subscribe to cloud database:', e);
     if (onError) onError(e);
     return () => {};
   }
 }
 
 export async function pushStateToCloud(stateData) {
-  if (!dbInstance) {
+  if (!rtdbInstance && !firestoreInstance) {
     const res = initFirebase();
     if (!res.success) return false;
   }
 
   try {
-    const docRef = doc(dbInstance, FIRESTORE_COLLECTION, FIRESTORE_DOC);
-    // Sanitize state for Firestore (no undefined values)
     const sanitized = JSON.parse(JSON.stringify(stateData));
     sanitized.lastUpdated = Date.now();
-    await setDoc(docRef, sanitized, { merge: true });
-    return true;
+
+    // 1. Push to Realtime Database
+    if (rtdbInstance && activeDatabaseType === 'rtdb') {
+      const dbReference = rtdbRef(rtdbInstance, RTDB_PATH);
+      await rtdbSet(dbReference, sanitized);
+      return true;
+    }
+
+    // 2. Push to Firestore
+    if (firestoreInstance) {
+      const docRef = doc(firestoreInstance, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+      await setDoc(docRef, sanitized, { merge: true });
+      return true;
+    }
+
+    return false;
   } catch (err) {
-    console.error('Error writing to Firestore:', err);
+    console.error('Error writing state to cloud database:', err);
     return false;
   }
 }
