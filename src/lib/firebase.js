@@ -1,6 +1,6 @@
 // Real-Time Cross-Device Synchronization Engine
-// Supports both Firebase Realtime Database (RTDB) and Cloud Firestore
-// Seamlessly syncs Projector Screen, Admin Laptop, and Participants' Mobile phones
+// Pre-configured with IEEE PES DIU SBC Prompt Battle Firebase Realtime Database
+// Syncs Projector Screen, Admin Laptop, and Participants' Mobile Phones in Real-Time
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
@@ -21,6 +21,18 @@ const FIRESTORE_COLLECTION = 'prompt_battles';
 const FIRESTORE_DOC = 'eee_fest_2026';
 const RTDB_PATH = 'prompt_battles/eee_fest_2026';
 
+// Official EEE FEST 2026 Prompt Battle Firebase Project Configuration
+export const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCKXamq-_3Z_vOXP_2o4oY7LEd4SDKu3_M",
+  authDomain: "promptbattle-25930.firebaseapp.com",
+  databaseURL: "https://promptbattle-25930-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "promptbattle-25930",
+  storageBucket: "promptbattle-25930.firebasestorage.app",
+  messagingSenderId: "521534790921",
+  appId: "1:521534790921:web:75f1a5d712ba58a14107d8",
+  measurementId: "G-6WDSG1TDQL"
+};
+
 let appInstance = null;
 let firestoreInstance = null;
 let rtdbInstance = null;
@@ -30,12 +42,11 @@ let unsubscribeSnapshot = null;
 export function getStoredFirebaseConfig() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    if (raw) return JSON.parse(raw);
   } catch (e) {
     console.error('Failed to parse stored firebase config:', e);
-    return null;
   }
+  return DEFAULT_FIREBASE_CONFIG;
 }
 
 export function saveStoredFirebaseConfig(config) {
@@ -53,7 +64,7 @@ export function saveStoredFirebaseConfig(config) {
 export function initFirebase(config = null) {
   const activeConfig = config || getStoredFirebaseConfig();
   if (!activeConfig || !activeConfig.apiKey || !activeConfig.projectId) {
-    return { success: false, error: 'Incomplete or missing Firebase configuration (apiKey, projectId required)' };
+    return { success: false, error: 'Incomplete or missing Firebase configuration' };
   }
 
   try {
@@ -63,24 +74,24 @@ export function initFirebase(config = null) {
       appInstance = initializeApp(activeConfig);
     }
 
-    // Detect if Realtime Database is configured (via databaseURL or explicit config)
+    // Connect to Firebase Realtime Database
     if (activeConfig.databaseURL) {
       rtdbInstance = getDatabase(appInstance, activeConfig.databaseURL);
       activeDatabaseType = 'rtdb';
       return { success: true, app: appInstance, db: rtdbInstance, type: 'rtdb' };
     }
 
-    // Try Realtime Database with default URL if not specified
+    // Try default regional RTDB URL if not explicitly defined
     try {
-      const defaultUrl = `https://${activeConfig.projectId}-default-rtdb.firebaseio.com`;
+      const defaultUrl = `https://${activeConfig.projectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
       rtdbInstance = getDatabase(appInstance, defaultUrl);
       activeDatabaseType = 'rtdb';
       return { success: true, app: appInstance, db: rtdbInstance, type: 'rtdb' };
-    } catch (rtdbErr) {
-      console.info('Falling back to Cloud Firestore:', rtdbErr);
+    } catch (e) {
+      console.info('Falling back to Cloud Firestore:', e);
     }
 
-    // Fallback to Cloud Firestore
+    // Cloud Firestore Fallback
     firestoreInstance = getFirestore(appInstance);
     activeDatabaseType = 'firestore';
     return { success: true, app: appInstance, db: firestoreInstance, type: 'firestore' };
@@ -106,7 +117,7 @@ export function subscribeToCloudState(callback, onError) {
       unsubscribeSnapshot = null;
     }
 
-    // 1. If using Firebase Realtime Database
+    // 1. Realtime Database Listener
     if (rtdbInstance && activeDatabaseType === 'rtdb') {
       const dbReference = rtdbRef(rtdbInstance, RTDB_PATH);
       const unsub = rtdbOnValue(
@@ -127,7 +138,7 @@ export function subscribeToCloudState(callback, onError) {
       return unsub;
     }
 
-    // 2. If using Cloud Firestore
+    // 2. Cloud Firestore Listener
     if (firestoreInstance) {
       const docRef = doc(firestoreInstance, FIRESTORE_COLLECTION, FIRESTORE_DOC);
       const unsub = onSnapshot(
