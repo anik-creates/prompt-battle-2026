@@ -153,7 +153,7 @@ export default function LeaderboardView() {
                       Finish Time: <span className="text-white font-semibold">{p.finishTimeFormatted || 'N/A'}</span>
                     </div>
                     <div className="text-slate-400">
-                      Tokens: <span className="text-white font-semibold">{p.tokensUsed || 0}</span>
+                      Antigravity Limit: <span className="text-white font-semibold">{p.tokensUsed || 0}% ({p.tokenScore !== undefined ? p.tokenScore : 15} pts)</span>
                     </div>
                     <div className="text-slate-400">
                       Objective: <span className="text-fest-cyan font-semibold">{p.objectiveScore || 0}/30</span>
@@ -180,7 +180,7 @@ export default function LeaderboardView() {
                   <th className="py-4 px-4">Rank</th>
                   <th className="py-4 px-4 font-sans font-bold">Contender / Team</th>
                   <th className="py-4 px-4">Finish Time</th>
-                  <th className="py-4 px-4">Tokens</th>
+                  <th className="py-4 px-4">Antigravity Limit %</th>
                   <th className="py-4 px-4">Objective (30)</th>
                   <th className="py-4 px-4">Status</th>
                   <th className="py-4 px-4">Presentation (25)</th>
@@ -239,8 +239,8 @@ export default function LeaderboardView() {
                         {p.finishTimeFormatted || 'N/A'}
                       </td>
 
-                      <td className="py-4 px-4 text-slate-300">
-                        {p.tokensUsed ? p.tokensUsed.toLocaleString() : '0'}
+                      <td className="py-4 px-4 text-slate-300 font-mono">
+                        {p.tokensUsed || 0}% ({p.tokenScore !== undefined ? p.tokenScore : 15} pts)
                       </td>
 
                       <td className="py-4 px-4 text-fest-cyan font-semibold">

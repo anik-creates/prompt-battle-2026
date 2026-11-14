@@ -837,7 +837,7 @@ export default function AdminView() {
                           </span>
                           <span className="text-white/20">•</span>
                           <span className="text-fest-pink">
-                            Tokens: <strong>{p.tokenScore !== undefined ? p.tokenScore : 15}/15</strong>
+                            Antigravity: <strong>{p.tokensUsed || 0}% ({p.tokenScore !== undefined ? p.tokenScore : 15}/15 pts)</strong>
                           </span>
                         </div>
 
@@ -882,16 +882,22 @@ export default function AdminView() {
 
                       <div>
                         <div className="flex justify-between text-[11px] mb-1">
-                          <span className="text-slate-400">Tokens</span>
+                          <span className="text-slate-400">Antigravity Limit %</span>
                           <span className="text-fest-pink">{p.tokenScore !== undefined ? p.tokenScore : 15}/15 pts</span>
                         </div>
-                        <input
-                          type="number"
-                          min="0"
-                          value={p.tokensUsed || 0}
-                          onChange={(e) => updateParticipantMarks(p.id, { tokensUsed: Number(e.target.value) })}
-                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-white/15 text-white text-xs font-mono"
-                        />
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={p.tokensUsed || 0}
+                            onChange={(e) => updateParticipantMarks(p.id, { tokensUsed: Number(e.target.value) })}
+                            className="w-full pl-2.5 pr-6 py-1.5 rounded bg-dark-950 border border-white/15 text-white text-xs font-mono focus:border-fest-pink"
+                            placeholder="e.g. 15%"
+                          />
+                          <span className="absolute right-2 top-1.5 text-fest-pink font-bold text-xs">%</span>
+                        </div>
                       </div>
 
                       <div>
@@ -995,7 +1001,7 @@ export default function AdminView() {
                     <tr>
                       <th className="py-3 px-3">Station & Contender</th>
                       <th className="py-3 px-3">Finish Time (15)</th>
-                      <th className="py-3 px-3">Tokens Used (15)</th>
+                      <th className="py-3 px-3">Antigravity Limit % (15)</th>
                       <th className="py-3 px-3">Objective (0-25)</th>
                       <th className="py-3 px-3">Finish Status (0-15)</th>
                       <th className="py-3 px-3">Presentation (0-15)</th>
@@ -1051,15 +1057,20 @@ export default function AdminView() {
                         </td>
 
                         <td className="py-3 px-3">
-                          <input
-                            type="number"
-                            min="0"
-                            value={p.tokensUsed || 0}
-                            onChange={(e) => updateParticipantMarks(p.id, { tokensUsed: Number(e.target.value) })}
-                            className="w-20 px-2 py-1 rounded bg-dark-950 border border-white/10 text-white font-mono text-xs focus:border-fest-cyan"
-                          />
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.1"
+                              value={p.tokensUsed || 0}
+                              onChange={(e) => updateParticipantMarks(p.id, { tokensUsed: Number(e.target.value) })}
+                              className="w-16 px-2 py-1 rounded bg-dark-950 border border-white/10 text-white font-mono text-xs focus:border-fest-pink text-center"
+                            />
+                            <span className="text-[11px] text-fest-pink font-bold">%</span>
+                          </div>
                           <div className="text-[10px] text-fest-pink font-mono mt-0.5">
-                            Tokens: <strong>{p.tokenScore !== undefined ? p.tokenScore : 15}/15</strong>
+                            Score: <strong>{p.tokenScore !== undefined ? p.tokenScore : 15}/15</strong>
                           </div>
                         </td>
 

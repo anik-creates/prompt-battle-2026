@@ -217,9 +217,9 @@ export default function ParticipantSubmitView({ isSimulator = false }) {
                       </div>
 
                       <div className="p-3 rounded-lg bg-dark-900 border border-white/10 text-left">
-                        <span className="text-[10px] text-slate-400 block uppercase">Tokens Consumed</span>
-                        <span className="text-lg font-bold text-fest-pink block mt-0.5">{submittedData.tokensUsed}</span>
-                        <span className="text-[10px] text-emerald-400">Token Score: {submittedData.tokenScore || 0}/15</span>
+                        <span className="text-[10px] text-slate-400 block uppercase">Antigravity Daily Limit</span>
+                        <span className="text-lg font-bold text-fest-pink block mt-0.5">{submittedData.tokensUsed}% Used</span>
+                        <span className="text-[10px] text-emerald-400">Token Score: {submittedData.tokenScore || 0}/15 pts</span>
                       </div>
                     </div>
 
@@ -277,29 +277,39 @@ export default function ParticipantSubmitView({ isSimulator = false }) {
                     </span>
                   </div>
 
-                  {/* Tokens Consumed Input (With Formula Penalty Explanation) */}
+                  {/* Antigravity Daily Token Limit Used (%) Input */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <label className="text-slate-200 font-bold flex items-center gap-1.5">
                         <Zap className="w-3.5 h-3.5 text-fest-pink" />
-                        <span>Tokens Consumed *</span>
+                        <span>Antigravity Daily Token Limit Used (%) *</span>
                       </label>
-                      <span className="text-[10px] text-fest-pink">
-                        Benchmark: {tokenBudget || 2000} Tokens
+                      <span className="text-[10px] text-fest-pink font-bold">
+                        0% - 100% of Daily Quota
                       </span>
                     </div>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      value={tokensUsed}
-                      onChange={(e) => setTokensUsed(e.target.value)}
-                      placeholder="e.g. 450 (Check model info tab or token count)"
-                      className="w-full px-3.5 py-2.5 rounded-lg bg-dark-950 border border-white/15 focus:border-fest-pink text-white font-mono text-sm"
-                    />
-                    <p className="text-[10px] text-slate-400">
-                      ℹ️ <strong>Token Efficiency Scoring:</strong> Lower token usage yields a higher score (up to 15 points). Excessive token consumption incurs a percentage penalty.
-                    </p>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        required
+                        value={tokensUsed}
+                        onChange={(e) => setTokensUsed(e.target.value)}
+                        placeholder="e.g. 15.5 (Check Antigravity daily limit % used)"
+                        className="w-full pl-3.5 pr-8 py-2.5 rounded-lg bg-dark-950 border border-white/15 focus:border-fest-pink text-white font-mono text-sm"
+                      />
+                      <span className="absolute right-3.5 top-2.5 text-fest-pink font-bold font-mono text-sm pointer-events-none">%</span>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-fest-pink/10 border border-fest-pink/20 text-[11px] text-slate-300 space-y-1">
+                      <p>
+                        ℹ️ <strong>Antigravity Token Scoring (15 pts):</strong> The token mark is solely calculated from the percentage of your daily token limit consumed in Antigravity.
+                      </p>
+                      <p className="text-[10px] text-fest-pink font-mono">
+                        Formula: Score = (100% - Used%) × 15 pts • 0% Used = 15/15 pts | 20% Used = 12/15 pts | 50% Used = 8/15 pts | 100% Used = 0 pts
+                      </p>
+                    </div>
                   </div>
 
                   {/* Work URL / Prompt Link */}

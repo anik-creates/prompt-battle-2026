@@ -11,25 +11,46 @@
  * 6. Idea Novelty & Prompt Craft (15 pts): Advanced prompt frameworks & zero-shot craft.
  */
 
-export const DEFAULT_TOKEN_BUDGET = 2000;
+export const DEFAULT_TOKEN_BUDGET = 100; // 100% of Antigravity Daily Limit
 export const DEFAULT_BATTLE_DURATION = 1200; // 20 minutes
 
 /**
  * Calculates Token Efficiency Score.
- * More tokens used = lower score (percentage-based penalty).
+ * Solely calculated from the percentage of daily token limit used in Antigravity (0% - 100%).
+ * More percentage of daily limit used = lower score (15 points down to 0).
+ * 
+ * Formula: Token Score = max(0, round((1 - (percentageUsed / 100)) * 15))
+ * 
+ * Examples:
+ * - 0% of daily limit used -> 15/15 pts
+ * - 10% of daily limit used -> 14/15 pts
+ * - 20% of daily limit used -> 12/15 pts
+ * - 50% of daily limit used -> 8/15 pts
+ * - 80% of daily limit used -> 3/15 pts
+ * - 100% of daily limit used -> 0/15 pts
+ * 
+ * @param {number} dailyLimitPercentageUsed - Percentage of daily limit used in Antigravity (e.g. 15 for 15%)
+ * @param {number} [tokenBudget=100] - Benchmark budget (default: 100%)
+ * @param {number} [maxPoints=15] - Maximum points for token efficiency
  */
-export function calculateTokenScore(tokensUsed = 0, tokenBudget = DEFAULT_TOKEN_BUDGET, maxPoints = 15) {
-  const tokens = Math.max(0, Number(tokensUsed) || 0);
-  const budget = Math.max(1, Number(tokenBudget) || DEFAULT_TOKEN_BUDGET);
-  const ratio = Math.min(1, tokens / budget);
+export function calculateTokenScore(dailyLimitPercentageUsed = 0, tokenBudget = 100, maxPoints = 15) {
+  let percent = Number(dailyLimitPercentageUsed) || 0;
+  if (percent > 100 && tokenBudget && tokenBudget > 100) {
+    percent = Math.min(100, (percent / tokenBudget) * 100);
+  } else {
+    percent = Math.min(100, Math.max(0, percent));
+  }
+
+  const ratio = percent / 100;
   const score = Math.max(0, Math.round((1 - ratio) * maxPoints));
-  const percentageUsed = Math.min(100, Math.round(ratio * 100));
+  const roundedPercent = Math.round(percent * 10) / 10;
 
   return {
     score,
-    percentageUsed,
-    tokensUsed: tokens,
-    tokenBudget: budget,
+    percentageUsed: roundedPercent,
+    dailyLimitPercentageUsed: roundedPercent,
+    tokensUsed: roundedPercent,
+    tokenBudget: 100,
     maxPoints,
     penalty: maxPoints - score,
   };
@@ -74,7 +95,9 @@ export function getFinishStatusScore(status) {
  */
 export function evaluateTotalScore({
   tokensUsed = 0,
-  tokenBudget = DEFAULT_TOKEN_BUDGET,
+  tokenPercentage = null,
+  dailyLimitPercentage = null,
+  tokenBudget = 100,
   finishSeconds = 0,
   totalDurationSec = DEFAULT_BATTLE_DURATION,
   objectiveScore = 0,
@@ -82,7 +105,13 @@ export function evaluateTotalScore({
   presentationScore = 0,
   noveltyScore = 0,
 }) {
-  const tokenRes = calculateTokenScore(tokensUsed, tokenBudget, 15);
+  const percentInput = tokenPercentage !== null && tokenPercentage !== undefined
+    ? tokenPercentage
+    : dailyLimitPercentage !== null && dailyLimitPercentage !== undefined
+    ? dailyLimitPercentage
+    : tokensUsed;
+
+  const tokenRes = calculateTokenScore(percentInput, tokenBudget, 15);
   const timeRes = calculateTimeScore(finishSeconds, totalDurationSec, 15);
   const statusScore = getFinishStatusScore(finishStatus);
   const obj = Math.min(25, Math.max(0, Number(objectiveScore) || 0));
@@ -94,6 +123,7 @@ export function evaluateTotalScore({
   return {
     tokenScore: tokenRes.score,
     tokenPercentageUsed: tokenRes.percentageUsed,
+    dailyLimitPercentageUsed: tokenRes.percentageUsed,
     timeScore: timeRes.score,
     timePercentageUsed: timeRes.percentageTime,
     statusScore,

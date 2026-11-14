@@ -199,6 +199,15 @@ export default function PresentationView() {
                 <div className="flex items-center space-x-6 text-xs font-mono">
                   <div className="flex flex-col sm:items-end">
                     <span className="text-[11px] text-slate-400 uppercase tracking-wider">
+                      Antigravity Limit
+                    </span>
+                    <span className="text-sm font-bold text-fest-pink">
+                      {p.tokensUsed || 0}% ({p.tokenScore !== undefined ? p.tokenScore : 15} pts)
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col sm:items-end">
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider">
                       Time Recorded
                     </span>
                     <span className="text-sm font-bold text-fest-cyan">

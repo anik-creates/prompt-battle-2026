@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useBattle } from '../context/BattleContext';
 import { parseContenderFile, downloadContenderTemplate } from '../lib/excelParser';
 import { parseContenderJSON, downloadSampleContenderJSON } from '../lib/jsonParser';
-import { getFinishStatusScore, evaluateTotalScore } from '../lib/scoringCalculator';
+import { getFinishStatusScore, evaluateTotalScore, calculateTokenScore } from '../lib/scoringCalculator';
 import { 
   Users, 
   Upload, 
@@ -206,18 +206,32 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
 
   // Open Evaluation Modal for a Contender
   const handleOpenEvaluation = (battleSub, contender) => {
+    const rawTokens = Number(battleSub.tokensUsed) || 0;
+    const computedTokenScore = calculateTokenScore(rawTokens).score;
+
     setEvaluatingSubmission({
       ...battleSub,
       deskNumber: battleSub.deskNumber || contender?.deskNumber || 'Desk Station'
     });
     setEvaluatingMarks({
+      tokensUsed: rawTokens, // Antigravity daily limit % used
+      tokenScore: battleSub.tokenScore !== undefined ? battleSub.tokenScore : computedTokenScore,
       objectiveScore: battleSub.objectiveScore || 0,
       finishStatus: battleSub.finishStatus || 'Partially Fulfilled',
       presentationScore: battleSub.presentationScore || 0,
       noveltyScore: battleSub.noveltyScore || 0,
       timeScore: battleSub.timeScore !== undefined ? battleSub.timeScore : 15,
-      tokenScore: battleSub.tokenScore !== undefined ? battleSub.tokenScore : 15,
     });
+  };
+
+  const handleTokenPercentChange = (val) => {
+    const percent = Math.min(100, Math.max(0, Number(val) || 0));
+    const newScore = calculateTokenScore(percent).score;
+    setEvaluatingMarks((prev) => ({
+      ...prev,
+      tokensUsed: percent,
+      tokenScore: newScore
+    }));
   };
 
   // Live Composite Score in Evaluation Modal
@@ -238,6 +252,8 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
     if (!evaluatingSubmission) return;
 
     updateParticipantMarks(evaluatingSubmission.id, {
+      tokensUsed: Number(evaluatingMarks.tokensUsed) || 0,
+      tokenScore: Number(evaluatingMarks.tokenScore) || 0,
       objectiveScore: Number(evaluatingMarks.objectiveScore) || 0,
       finishStatus: evaluatingMarks.finishStatus,
       presentationScore: Number(evaluatingMarks.presentationScore) || 0,
@@ -455,64 +471,55 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
           )}
         </div>
 
-        {/* Card 3: Benchmark Token Budget & Scoring Rule */}
+        {/* Card 3: Antigravity Daily Token Limit Formula Card */}
         <div className="p-6 rounded-2xl bg-dark-900 border border-white/15 space-y-4 flex flex-col justify-between shadow-xl">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Zap className="w-5 h-5 text-fest-pink" />
               <h3 className="font-sans font-bold text-base text-white uppercase tracking-tight">
-                Token Budget & Penalty Formula
+                Antigravity Token Scoring (15 pts)
               </h3>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Tokens are penalized proportionally. The more tokens used by the contender, the lower their score.
+              The token mark is calculated solely from the percentage of daily token limit consumed in Google Antigravity.
             </p>
           </div>
 
-          <form onSubmit={handleSaveBudget} className="space-y-3 pt-2">
-            <div>
-              <label className="block text-[11px] text-slate-300 mb-1">
-                Benchmark Token Limit (Budget)
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="200"
-                  max="50000"
-                  step="100"
-                  value={budgetInput}
-                  onChange={(e) => setBudgetInput(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded bg-dark-950 border border-white/15 text-white font-bold text-sm focus:border-fest-pink"
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded bg-fest-pink text-white font-bold uppercase tracking-wider hover:opacity-90"
-                >
-                  Save
-                </button>
+          <div className="p-3.5 rounded-xl bg-dark-950 border border-white/10 space-y-2 text-[11px]">
+            <span className="text-[10px] text-fest-pink uppercase tracking-widest block font-bold">
+              Formula: (100% - Used%) × 15 pts
+            </span>
+            <div className="space-y-1 font-mono text-[10px]">
+              <div className="flex justify-between text-slate-300">
+                <span>0% Daily Limit:</span>
+                <span className="text-emerald-400 font-bold">15 / 15 pts</span>
               </div>
-              {budgetSavedMsg && (
-                <span className="text-[10px] text-emerald-400 mt-1 block">
-                  ✓ Token budget set to {budgetInput} tokens.
-                </span>
-              )}
+              <div className="flex justify-between text-slate-300">
+                <span>10% Daily Limit:</span>
+                <span className="text-emerald-400 font-bold">14 / 15 pts</span>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>20% Daily Limit:</span>
+                <span className="text-emerald-400 font-bold">12 / 15 pts</span>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>50% Daily Limit:</span>
+                <span className="text-amber-400 font-bold">8 / 15 pts</span>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>80% Daily Limit:</span>
+                <span className="text-rose-400 font-bold">3 / 15 pts</span>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>100% Daily Limit:</span>
+                <span className="text-rose-500 font-bold">0 / 15 pts</span>
+              </div>
             </div>
+          </div>
 
-            <div className="p-2.5 rounded bg-dark-950 border border-white/10 text-[10px] text-slate-400 space-y-1">
-              <div className="flex justify-between">
-                <span>0 Tokens Consumed:</span>
-                <span className="text-emerald-400 font-bold">15 / 15 pts (100%)</span>
-              </div>
-              <div className="flex justify-between">
-                <span>50% Budget Consumed:</span>
-                <span className="text-amber-400 font-bold">8 / 15 pts (50%)</span>
-              </div>
-              <div className="flex justify-between">
-                <span>≥ 100% Budget Consumed:</span>
-                <span className="text-rose-400 font-bold">0 / 15 pts (0%)</span>
-              </div>
-            </div>
-          </form>
+          <p className="text-[10px] text-slate-400 italic">
+            Judges verify the Antigravity daily limit percentage at the contender's desk station during mark entry.
+          </p>
         </div>
 
       </div>
@@ -853,7 +860,7 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                               </span>
                             </div>
                             <div className="text-[10px] text-slate-400">
-                              Tokens: <strong className="text-fest-pink">{battleSub.tokensUsed || 0}</strong> • Time: <strong className="text-emerald-400">{battleSub.timeScore || 0}/15</strong>
+                              Antigravity Limit: <strong className="text-fest-pink">{battleSub.tokensUsed || 0}%</strong> • Score: <strong className="text-emerald-400">{battleSub.tokenScore || 0}/15</strong>
                             </div>
                             {battleSub.workUrl && (
                               <a
@@ -1057,7 +1064,7 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
             <div className="p-3.5 rounded-xl bg-dark-950 border border-white/10 space-y-2 text-xs">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-slate-400">Finish Time: <strong className="text-white">{evaluatingSubmission.finishTimeFormatted}</strong></span>
-                <span className="text-slate-400">Tokens Consumed: <strong className="text-fest-pink">{evaluatingSubmission.tokensUsed || 0}</strong></span>
+                <span className="text-slate-400">Antigravity Daily Limit: <strong className="text-fest-pink">{evaluatingSubmission.tokensUsed || 0}% Used</strong></span>
               </div>
               {evaluatingSubmission.workUrl ? (
                 <div className="flex items-center justify-between pt-1 border-t border-white/5">
@@ -1080,22 +1087,35 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
             {/* Rubric Inputs Form */}
             <form onSubmit={handleSaveMarks} className="space-y-4 text-xs">
               
-              {/* Automated Penalties (Preview) */}
+              {/* Automated Penalties (Preview & Token Percentage Adjustment) */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-xl bg-dark-950 border border-white/10">
                   <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-400">Time Score</span>
+                    <span className="text-slate-400 font-bold">Time Score</span>
                     <span className="text-emerald-400 font-bold">{evaluatingMarks.timeScore}/15 pts</span>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-0.5">Automated time elapsed penalty</p>
                 </div>
 
-                <div className="p-3 rounded-xl bg-dark-950 border border-white/10">
+                <div className="p-3 rounded-xl bg-dark-950 border border-fest-pink/30 space-y-1">
                   <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-400">Token Score</span>
+                    <span className="text-slate-300 font-bold">Antigravity Token Score</span>
                     <span className="text-fest-pink font-bold">{evaluatingMarks.tokenScore}/15 pts</span>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Automated token budget penalty</p>
+                  <div className="flex items-center gap-1.5 pt-0.5">
+                    <span className="text-[10px] text-slate-400">Daily Limit:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={evaluatingMarks.tokensUsed}
+                      onChange={(e) => handleTokenPercentChange(e.target.value)}
+                      className="w-16 px-1.5 py-0.5 rounded bg-dark-900 border border-white/20 text-white font-mono text-[11px] font-bold text-center"
+                    />
+                    <span className="text-[10px] text-fest-pink font-bold">%</span>
+                  </div>
+                  <p className="text-[9px] text-slate-400">(100% - {evaluatingMarks.tokensUsed}%) × 15 = {evaluatingMarks.tokenScore} pts</p>
                 </div>
               </div>
 
