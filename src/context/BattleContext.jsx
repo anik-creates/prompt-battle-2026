@@ -10,95 +10,122 @@ import { playCountdownTick, playStartHorn, playFinishFanfare, playTimesUpAlert }
 
 const BattleContext = createContext(null);
 
-const STORAGE_KEY = 'pb_local_state_v1';
-const BROADCAST_CHANNEL_NAME = 'prompt_battle_broadcast_v1';
+const STORAGE_KEY = 'pb_local_state_v2';
+const BROADCAST_CHANNEL_NAME = 'prompt_battle_broadcast_v2';
 const ADMIN_PASSWORD = 'eeefestadmin';
 
 const INITIAL_DURATION = 1200; // 20 minutes default
 
+// Pre-built AI Prompt Engineering questions for the Kahoot-Style Quiz
+export const DEFAULT_QUIZ_QUESTIONS = [
+  {
+    id: 'q-1',
+    question: 'Which prompting technique explicitly asks the model to break reasoning into intermediate steps before concluding?',
+    options: [
+      'Chain-of-Thought (CoT)',
+      'Zero-Shot Direct Directive',
+      'Few-Shot Classification',
+      'Temperature Scaling Prompting'
+    ],
+    correctIndex: 0,
+    timeLimit: 20, // seconds
+  },
+  {
+    id: 'q-2',
+    question: 'In prompt optimization, what is the primary consequence of exceeding the context window limit?',
+    options: [
+      'Model raises API error or truncates earlier tokens',
+      'Model automatically increases token generation speed',
+      'Temperature drops to 0.0 automatically',
+      'System prompt permanently overrides user instructions'
+    ],
+    correctIndex: 0,
+    timeLimit: 20,
+  },
+  {
+    id: 'q-3',
+    question: 'Which method is most effective at preventing adversarial "Prompt Injection" attacks?',
+    options: [
+      'Strict input delimitation & systemic guardrail schemas',
+      'Setting temperature to 1.0',
+      'Asking the model "please be secure"',
+      'Removing system instructions completely'
+    ],
+    correctIndex: 0,
+    timeLimit: 20,
+  },
+  {
+    id: 'q-4',
+    question: 'What role does "Persona Anchoring" play in system prompts?',
+    options: [
+      'Establishes domain tone, vocabulary, and behavioral constraints',
+      'Directly reduces GPU compute memory',
+      'Eliminates all token generation latency',
+      'Forces model to always answer in JSON format'
+    ],
+    correctIndex: 0,
+    timeLimit: 20,
+  },
+  {
+    id: 'q-5',
+    question: 'Organized by IEEE PES DIU SBC for EEE FEST 2026, what is this grand championship named?',
+    options: [
+      'Prompt Battle 2026',
+      'Robo Wars 2026',
+      'Circuits & Chips Hack',
+      'Code Clash 2026'
+    ],
+    correctIndex: 0,
+    timeLimit: 15,
+  }
+];
+
+export const DEFAULT_POLL = {
+  id: 'poll-1',
+  question: 'Which AI Model Architecture excels the most at complex logical prompt decomposition?',
+  type: 'mcq', // 'voting' (opinion) or 'mcq' (has correct answer)
+  status: 'active', // 'idle' | 'active' | 'closed'
+  published: false,
+  options: [
+    { id: 'opt-1', text: 'Mixture of Experts (MoE) with CoT', isCorrect: true, votes: 0 },
+    { id: 'opt-2', text: 'Dense Monolithic 7B Parameter Model', isCorrect: false, votes: 0 },
+    { id: 'opt-3', text: 'Unquantized Recurrent Baseline', isCorrect: false, votes: 0 },
+    { id: 'opt-4', text: 'Standard Zero-Shot Feedforward', isCorrect: false, votes: 0 }
+  ],
+  votes: {}, // participantId -> { optionId, name, timestamp }
+};
+
 const DEFAULT_STATE = {
+  activeArena: 'battle', // 'battle' | 'poll' | 'quiz'
   timer: {
     duration: INITIAL_DURATION,
     remaining: INITIAL_DURATION,
-    status: 'idle', // 'idle' | 'running' | 'paused' | 'finished'
+    status: 'idle',
     startedAt: null,
     endsAt: null,
   },
   published: false,
   participants: [],
+
+  // Live Polling State
+  poll: DEFAULT_POLL,
+
+  // Kahoot-Style Live Quiz State
+  quiz: {
+    id: 'quiz-main',
+    title: 'Prompt Battle 2026 Kahoot Arena',
+    status: 'idle', // 'idle' | 'in_progress' | 'question_ended' | 'finished'
+    currentQuestionIndex: 0,
+    questionEndsAt: null,
+    published: false,
+    questions: DEFAULT_QUIZ_QUESTIONS,
+    submissions: {}, // participantId -> { name, teamName, answers: { [qIdx]: { selectedIndex, isCorrect, points, timeTakenSec } }, totalScore: 0 }
+  },
+
   lastUpdated: Date.now(),
 };
 
-// Demo participants for testing/rehearsals
-export const DEMO_PARTICIPANTS = [
-  {
-    id: 'demo-1',
-    name: 'Tanvir Mahmud',
-    teamName: 'Prompt Architects',
-    submittedAt: Date.now() - 1000 * 60 * 7,
-    finishSeconds: 524,
-    finishTimeFormatted: '08m 44s',
-    notes: 'Used multi-chain prompt decomposition with zero-shot constraint verification.',
-    tokensUsed: 620,
-    objectiveScore: 29,
-    finishStatus: 'Fully Completed',
-    finishStatusNotes: 'Met 100% test assertions on edge cases',
-    presentationScore: 24,
-    noveltyScore: 25,
-    totalScore: 96,
-  },
-  {
-    id: 'demo-2',
-    name: 'Amina Khatun',
-    teamName: 'Syntax Sorcerers',
-    submittedAt: Date.now() - 1000 * 60 * 5,
-    finishSeconds: 672,
-    finishTimeFormatted: '11m 12s',
-    notes: 'Implemented few-shot persona anchoring and markdown syntax strict formatting.',
-    tokensUsed: 890,
-    objectiveScore: 27,
-    finishStatus: 'Fully Completed',
-    finishStatusNotes: 'Excellent output structure and clarity',
-    presentationScore: 23,
-    noveltyScore: 22,
-    totalScore: 89,
-  },
-  {
-    id: 'demo-3',
-    name: 'Rafiqul Islam',
-    teamName: 'Neural Pulse DIU',
-    submittedAt: Date.now() - 1000 * 60 * 3,
-    finishSeconds: 835,
-    finishTimeFormatted: '13m 55s',
-    notes: 'Step-by-step reasoning technique with self-correction loops.',
-    tokensUsed: 1140,
-    objectiveScore: 24,
-    finishStatus: 'Substantially Completed',
-    finishStatusNotes: 'Minor omission in edge case #3',
-    presentationScore: 20,
-    noveltyScore: 21,
-    totalScore: 80,
-  },
-  {
-    id: 'demo-4',
-    name: 'Mehedi Hasan',
-    teamName: 'Quantum Coders',
-    submittedAt: Date.now() - 1000 * 60 * 1,
-    finishSeconds: 980,
-    finishTimeFormatted: '16m 20s',
-    notes: 'Direct systemic prompt with strict guardrail definitions.',
-    tokensUsed: 740,
-    objectiveScore: 22,
-    finishStatus: 'Partially Fulfilled',
-    finishStatusNotes: 'Functional solution, pending final formatting',
-    presentationScore: 19,
-    noveltyScore: 18,
-    totalScore: 74,
-  }
-];
-
 export function BattleProvider({ children }) {
-  // Master app state
   const [battleState, setBattleState] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -106,17 +133,15 @@ export function BattleProvider({ children }) {
         return { ...DEFAULT_STATE, ...JSON.parse(saved) };
       }
     } catch (e) {
-      console.warn('Failed to load local battle state:', e);
+      console.warn('Failed to load local state:', e);
     }
     return DEFAULT_STATE;
   });
 
-  // Admin session authentication
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
     return sessionStorage.getItem('pb_admin_auth') === 'true';
   });
 
-  // Active view routing ('presentation' | 'admin' | 'submit')
   const [activeView, setActiveView] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const viewParam = params.get('view');
@@ -130,15 +155,12 @@ export function BattleProvider({ children }) {
     return 'presentation';
   });
 
-  // Firebase status
-  const [firebaseStatus, setFirebaseStatus] = useState('unconfigured'); // 'unconfigured' | 'connecting' | 'connected' | 'error'
+  const [firebaseStatus, setFirebaseStatus] = useState('connecting');
   const [firebaseError, setFirebaseError] = useState(null);
 
-  // Cross-tab broadcast channel ref
   const broadcastRef = useRef(null);
-  const isInternalUpdateRef = useRef(false);
 
-  // Sync state to local storage and broadcast to other tabs
+  // Sync state to local storage and broadcast to other tabs & cloud
   const syncState = useCallback((newState, shouldPushCloud = true) => {
     setBattleState(newState);
     try {
@@ -168,7 +190,6 @@ export function BattleProvider({ children }) {
 
       channel.onmessage = (event) => {
         if (event.data?.type === 'STATE_UPDATE' && event.data.payload) {
-          isInternalUpdateRef.current = true;
           setBattleState(event.data.payload);
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(event.data.payload));
@@ -193,22 +214,14 @@ export function BattleProvider({ children }) {
     window.addEventListener('storage', handleStorageEvent);
 
     return () => {
-      if (broadcastRef.current) {
-        broadcastRef.current.close();
-      }
+      if (broadcastRef.current) broadcastRef.current.close();
       window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);
 
-  // Initialize Firebase Cloud sync if config exists
+  // Initialize Firebase Cloud sync
   useEffect(() => {
     const config = getStoredFirebaseConfig();
-    if (!config) {
-      setFirebaseStatus('unconfigured');
-      return;
-    }
-
-    setFirebaseStatus('connecting');
     const initRes = initFirebase(config);
     if (!initRes.success) {
       setFirebaseStatus('error');
@@ -235,7 +248,7 @@ export function BattleProvider({ children }) {
       },
       (err) => {
         setFirebaseStatus('error');
-        setFirebaseError(err.message || 'Firestore connection issue');
+        setFirebaseError(err.message || 'Firestore/RTDB connection issue');
       }
     );
 
@@ -244,7 +257,7 @@ export function BattleProvider({ children }) {
     };
   }, []);
 
-  // Active Timer Tick Loop
+  // Active Timer Tick Loop for Battle
   useEffect(() => {
     let intervalId = null;
 
@@ -267,23 +280,19 @@ export function BattleProvider({ children }) {
             lastUpdated: Date.now(),
           });
         } else {
-          // Play tick in final 10 seconds
           if (remainingSec <= 10 && remainingSec !== battleState.timer.remaining) {
             playCountdownTick();
           }
 
           setBattleState((prev) => {
             if (prev.timer.remaining === remainingSec) return prev;
-            const updated = {
+            return {
               ...prev,
               timer: {
                 ...prev.timer,
                 remaining: remainingSec,
               },
             };
-            // Note: Don't write to storage every second to avoid performance drag;
-            // endsAt is preserved, so any reload computes remaining automatically.
-            return updated;
           });
         }
       }, 250);
@@ -294,22 +303,61 @@ export function BattleProvider({ children }) {
     };
   }, [battleState.timer.status, battleState.timer.endsAt, battleState, syncState]);
 
-  // Sync URL hash / query with active view
+  // Active Quiz Question Countdown Tick
+  useEffect(() => {
+    let quizInterval = null;
+
+    if (battleState.quiz?.status === 'in_progress' && battleState.quiz.questionEndsAt) {
+      quizInterval = setInterval(() => {
+        const now = Date.now();
+        const diffMs = battleState.quiz.questionEndsAt - now;
+
+        if (diffMs <= 0) {
+          clearInterval(quizInterval);
+          playTimesUpAlert();
+          // Automatically transition to question_ended
+          syncState({
+            ...battleState,
+            quiz: {
+              ...battleState.quiz,
+              status: 'question_ended',
+              questionEndsAt: null,
+            },
+            lastUpdated: Date.now(),
+          });
+        } else if (diffMs <= 5000 && Math.floor(diffMs / 1000) !== Math.floor((diffMs + 250) / 1000)) {
+          playCountdownTick();
+        }
+      }, 250);
+    }
+
+    return () => {
+      if (quizInterval) clearInterval(quizInterval);
+    };
+  }, [battleState.quiz?.status, battleState.quiz?.questionEndsAt, battleState, syncState]);
+
   const switchView = useCallback((newView) => {
     setActiveView(newView);
     window.location.hash = `#${newView}`;
   }, []);
 
-  // --- ACTIONS ---
+  const switchArena = useCallback((arena) => {
+    const now = Date.now();
+    const newState = {
+      ...battleState,
+      activeArena: arena,
+      lastUpdated: now,
+    };
+    syncState(newState);
+  }, [battleState, syncState]);
 
+  // --- BATTLE ACTIONS ---
   const startTimer = useCallback((customDurationSec = null) => {
     const duration = customDurationSec !== null ? customDurationSec : battleState.timer.duration;
     const now = Date.now();
     const endsAt = now + duration * 1000;
-
     playStartHorn();
-
-    const newState = {
+    syncState({
       ...battleState,
       timer: {
         duration,
@@ -319,8 +367,7 @@ export function BattleProvider({ children }) {
         endsAt,
       },
       lastUpdated: now,
-    };
-    syncState(newState);
+    });
   }, [battleState, syncState]);
 
   const pauseTimer = useCallback(() => {
@@ -329,8 +376,7 @@ export function BattleProvider({ children }) {
     if (battleState.timer.endsAt) {
       currentRemaining = Math.max(0, Math.ceil((battleState.timer.endsAt - now) / 1000));
     }
-
-    const newState = {
+    syncState({
       ...battleState,
       timer: {
         ...battleState.timer,
@@ -339,18 +385,15 @@ export function BattleProvider({ children }) {
         endsAt: null,
       },
       lastUpdated: now,
-    };
-    syncState(newState);
+    });
   }, [battleState, syncState]);
 
   const resumeTimer = useCallback(() => {
     const now = Date.now();
     const remaining = battleState.timer.remaining > 0 ? battleState.timer.remaining : battleState.timer.duration;
     const endsAt = now + remaining * 1000;
-
     playStartHorn();
-
-    const newState = {
+    syncState({
       ...battleState,
       timer: {
         ...battleState.timer,
@@ -360,15 +403,13 @@ export function BattleProvider({ children }) {
         endsAt,
       },
       lastUpdated: now,
-    };
-    syncState(newState);
+    });
   }, [battleState, syncState]);
 
   const resetTimer = useCallback((newDurationSec = null) => {
     const duration = newDurationSec !== null ? newDurationSec : battleState.timer.duration;
     const now = Date.now();
-
-    const newState = {
+    syncState({
       ...battleState,
       timer: {
         duration,
@@ -378,21 +419,15 @@ export function BattleProvider({ children }) {
         endsAt: null,
       },
       lastUpdated: now,
-    };
-    syncState(newState);
+    });
   }, [battleState, syncState]);
 
-  // Participant finishes and submits work
   const submitParticipantWork = useCallback(({ name, teamName, notes = '' }) => {
     const now = Date.now();
     let elapsedSec = 0;
-    
     if (battleState.timer.startedAt) {
       elapsedSec = Math.max(1, Math.floor((now - battleState.timer.startedAt) / 1000));
-    } else {
-      elapsedSec = 0;
     }
-
     const minutes = Math.floor(elapsedSec / 60);
     const seconds = elapsedSec % 60;
     const finishTimeFormatted = `${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
@@ -415,26 +450,19 @@ export function BattleProvider({ children }) {
     };
 
     playFinishFanfare();
-
-    const newState = {
+    syncState({
       ...battleState,
       participants: [newParticipant, ...battleState.participants],
       lastUpdated: now,
-    };
-
-    syncState(newState);
+    });
     return newParticipant;
   }, [battleState, syncState]);
 
-  // Admin marks / updates a participant
   const updateParticipantMarks = useCallback((id, updates) => {
     const now = Date.now();
-    const updatedParticipants = battleState.participants.map((p) => {
+    const updated = battleState.participants.map((p) => {
       if (p.id !== id) return p;
       const merged = { ...p, ...updates };
-
-      // Calculate total score based on factors:
-      // Objective (max 30) + Status weight (max 20) + Presentation (max 25) + Novelty (max 25)
       let statusWeight = 12;
       if (merged.finishStatus === 'Fully Completed') statusWeight = 20;
       else if (merged.finishStatus === 'Substantially Completed') statusWeight = 16;
@@ -444,20 +472,16 @@ export function BattleProvider({ children }) {
       const obj = Number(merged.objectiveScore) || 0;
       const pres = Number(merged.presentationScore) || 0;
       const nov = Number(merged.noveltyScore) || 0;
-      
-      // Auto-compute total if not manually overridden
       const computedTotal = obj + statusWeight + pres + nov;
       merged.totalScore = updates.totalScore !== undefined ? Number(updates.totalScore) : computedTotal;
-
       return merged;
     });
 
-    const newState = {
+    syncState({
       ...battleState,
-      participants: updatedParticipants,
+      participants: updated,
       lastUpdated: now,
-    };
-    syncState(newState);
+    });
   }, [battleState, syncState]);
 
   const addManualParticipant = useCallback((participantData) => {
@@ -478,37 +502,274 @@ export function BattleProvider({ children }) {
       noveltyScore: Number(participantData.noveltyScore) || 0,
       totalScore: Number(participantData.totalScore) || 0,
     };
-
-    const newState = {
+    syncState({
       ...battleState,
       participants: [newParticipant, ...battleState.participants],
       lastUpdated: now,
-    };
-    syncState(newState);
+    });
   }, [battleState, syncState]);
 
   const removeParticipant = useCallback((id) => {
     const now = Date.now();
-    const newState = {
+    syncState({
       ...battleState,
       participants: battleState.participants.filter((p) => p.id !== id),
       lastUpdated: now,
-    };
-    syncState(newState);
+    });
   }, [battleState, syncState]);
 
-  // Admin toggles Leaderboard publication on presentation screen
   const togglePublishLeaderboard = useCallback((shouldPublish) => {
     const now = Date.now();
-    const newState = {
+    syncState({
       ...battleState,
       published: shouldPublish,
       lastUpdated: now,
-    };
-    syncState(newState);
+    });
   }, [battleState, syncState]);
 
-  // Admin Authentication
+  // --- LIVE POLL ACTIONS ---
+  const createPoll = useCallback(({ question, type, options }) => {
+    const now = Date.now();
+    const formattedOptions = options.map((opt, idx) => ({
+      id: `opt-${idx + 1}`,
+      text: opt.text.trim(),
+      isCorrect: Boolean(opt.isCorrect),
+      votes: 0,
+    }));
+
+    const newPoll = {
+      id: `poll-${now}`,
+      question: question.trim(),
+      type: type || 'mcq',
+      status: 'active',
+      published: false,
+      options: formattedOptions,
+      votes: {},
+    };
+
+    syncState({
+      ...battleState,
+      poll: newPoll,
+      activeArena: 'poll',
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const submitVote = useCallback(({ participantId, participantName, optionId }) => {
+    const now = Date.now();
+    const currentPoll = battleState.poll || DEFAULT_POLL;
+    if (currentPoll.status === 'closed') {
+      return { success: false, error: 'Voting is currently closed.' };
+    }
+
+    const currentVotes = { ...(currentPoll.votes || {}) };
+    currentVotes[participantId] = {
+      optionId,
+      name: participantName || 'Contender',
+      timestamp: now,
+    };
+
+    // Recalculate option vote counts
+    const updatedOptions = currentPoll.options.map((opt) => {
+      const voteCount = Object.values(currentVotes).filter((v) => v.optionId === opt.id).length;
+      return { ...opt, votes: voteCount };
+    });
+
+    playFinishFanfare();
+
+    syncState({
+      ...battleState,
+      poll: {
+        ...currentPoll,
+        options: updatedOptions,
+        votes: currentVotes,
+      },
+      lastUpdated: now,
+    });
+
+    return { success: true };
+  }, [battleState, syncState]);
+
+  const setPollStatus = useCallback((status) => {
+    const now = Date.now();
+    syncState({
+      ...battleState,
+      poll: {
+        ...battleState.poll,
+        status,
+      },
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const publishPollResults = useCallback((shouldPublish) => {
+    const now = Date.now();
+    syncState({
+      ...battleState,
+      poll: {
+        ...battleState.poll,
+        published: shouldPublish,
+      },
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const resetPoll = useCallback(() => {
+    const now = Date.now();
+    syncState({
+      ...battleState,
+      poll: DEFAULT_POLL,
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  // --- KAHOOT-STYLE LIVE QUIZ ACTIONS ---
+  const launchQuizQuestion = useCallback((questionIdx = 0) => {
+    const now = Date.now();
+    const quiz = battleState.quiz || { questions: DEFAULT_QUIZ_QUESTIONS };
+    const q = quiz.questions[questionIdx] || quiz.questions[0];
+    const duration = q.timeLimit || 20;
+    const questionEndsAt = now + duration * 1000;
+
+    playStartHorn();
+
+    syncState({
+      ...battleState,
+      activeArena: 'quiz',
+      quiz: {
+        ...quiz,
+        status: 'in_progress',
+        currentQuestionIndex: questionIdx,
+        questionEndsAt,
+      },
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const endQuizQuestion = useCallback(() => {
+    const now = Date.now();
+    syncState({
+      ...battleState,
+      quiz: {
+        ...battleState.quiz,
+        status: 'question_ended',
+        questionEndsAt: null,
+      },
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const submitQuizAnswer = useCallback(({ participantId, participantName, teamName, questionIndex, selectedIndex, timeTakenSec }) => {
+    const now = Date.now();
+    const quiz = battleState.quiz;
+    const currentQ = quiz.questions[questionIndex];
+    if (!currentQ) return { success: false };
+
+    const isCorrect = selectedIndex === currentQ.correctIndex;
+    let points = 0;
+
+    if (isCorrect) {
+      // Kahoot speed + accuracy formula:
+      // Base 1000 points, linearly scaled by time taken
+      const maxTime = currentQ.timeLimit || 20;
+      const ratio = Math.max(0, Math.min(1, timeTakenSec / maxTime));
+      points = Math.round((1 - ratio / 2) * 1000);
+    }
+
+    const currentSubmissions = { ...(quiz.submissions || {}) };
+    const userSubmission = currentSubmissions[participantId] || {
+      participantId,
+      name: participantName || 'Contender',
+      teamName: teamName || 'Solo',
+      answers: {},
+      totalScore: 0,
+      correctCount: 0,
+    };
+
+    // Record answer
+    userSubmission.answers[questionIndex] = {
+      selectedIndex,
+      isCorrect,
+      points,
+      timeTakenSec,
+      answeredAt: now,
+    };
+
+    // Recompute total score & accuracy
+    const allAnswers = Object.values(userSubmission.answers);
+    userSubmission.totalScore = allAnswers.reduce((sum, a) => sum + (a.points || 0), 0);
+    userSubmission.correctCount = allAnswers.filter((a) => a.isCorrect).length;
+
+    currentSubmissions[participantId] = userSubmission;
+
+    if (isCorrect) {
+      playFinishFanfare();
+    } else {
+      playTimesUpAlert();
+    }
+
+    syncState({
+      ...battleState,
+      quiz: {
+        ...quiz,
+        submissions: currentSubmissions,
+      },
+      lastUpdated: now,
+    });
+
+    return { success: true, isCorrect, points };
+  }, [battleState, syncState]);
+
+  const publishQuizLeaderboard = useCallback((shouldPublish) => {
+    const now = Date.now();
+    syncState({
+      ...battleState,
+      quiz: {
+        ...battleState.quiz,
+        published: shouldPublish,
+        status: shouldPublish ? 'finished' : battleState.quiz.status,
+      },
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const resetQuiz = useCallback(() => {
+    const now = Date.now();
+    syncState({
+      ...battleState,
+      quiz: {
+        ...battleState.quiz,
+        status: 'idle',
+        currentQuestionIndex: 0,
+        questionEndsAt: null,
+        published: false,
+        submissions: {},
+      },
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  const addQuizQuestion = useCallback((newQ) => {
+    const now = Date.now();
+    const updatedQuestions = [...(battleState.quiz.questions || []), {
+      id: `q-${Date.now()}`,
+      question: newQ.question,
+      options: newQ.options,
+      correctIndex: Number(newQ.correctIndex) || 0,
+      timeLimit: Number(newQ.timeLimit) || 20,
+    }];
+
+    syncState({
+      ...battleState,
+      quiz: {
+        ...battleState.quiz,
+        questions: updatedQuestions,
+      },
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
+  // Auth & General
   const authenticateAdmin = useCallback((enteredPassword) => {
     if (enteredPassword === ADMIN_PASSWORD) {
       setIsAdminAuthenticated(true);
@@ -523,14 +784,12 @@ export function BattleProvider({ children }) {
     sessionStorage.removeItem('pb_admin_auth');
   }, []);
 
-  // Firebase Config Setup
   const configureFirebase = useCallback((configObj) => {
     saveStoredFirebaseConfig(configObj);
     const res = initFirebase(configObj);
     if (res.success) {
       setFirebaseStatus('connected');
       setFirebaseError(null);
-      // Push current state to cloud
       pushStateToCloud(battleState);
       return { success: true };
     } else {
@@ -540,35 +799,30 @@ export function BattleProvider({ children }) {
     }
   }, [battleState]);
 
-  const loadDemo = useCallback(() => {
-    const now = Date.now();
-    const newState = {
-      ...battleState,
-      participants: DEMO_PARTICIPANTS,
-      lastUpdated: now,
-    };
-    syncState(newState);
-  }, [battleState, syncState]);
-
   const resetAllData = useCallback(() => {
     const now = Date.now();
-    const newState = {
+    syncState({
       ...DEFAULT_STATE,
       lastUpdated: now,
-    };
-    syncState(newState);
+    });
   }, [syncState]);
 
   const value = {
     battleState,
+    activeArena: battleState.activeArena || 'battle',
     timer: battleState.timer,
     participants: battleState.participants,
     published: battleState.published,
+    poll: battleState.poll || DEFAULT_POLL,
+    quiz: battleState.quiz,
     isAdminAuthenticated,
     activeView,
     firebaseStatus,
     firebaseError,
     switchView,
+    switchArena,
+
+    // Battle
     startTimer,
     pauseTimer,
     resumeTimer,
@@ -578,10 +832,26 @@ export function BattleProvider({ children }) {
     addManualParticipant,
     removeParticipant,
     togglePublishLeaderboard,
+
+    // Poll
+    createPoll,
+    submitVote,
+    setPollStatus,
+    publishPollResults,
+    resetPoll,
+
+    // Quiz
+    launchQuizQuestion,
+    endQuizQuestion,
+    submitQuizAnswer,
+    publishQuizLeaderboard,
+    resetQuiz,
+    addQuizQuestion,
+
+    // Admin & Sync
     authenticateAdmin,
     logoutAdmin,
     configureFirebase,
-    loadDemo,
     resetAllData,
   };
 

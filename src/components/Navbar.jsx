@@ -9,8 +9,8 @@ import {
   Minimize, 
   Radio, 
   Flame, 
-  Award,
-  Clock,
+  Vote,
+  HelpCircle,
   Sparkles
 } from 'lucide-react';
 
@@ -18,8 +18,12 @@ export default function Navbar() {
   const { 
     activeView, 
     switchView, 
+    activeArena,
+    switchArena,
     timer, 
     published, 
+    poll,
+    quiz,
     isAdminAuthenticated, 
     firebaseStatus 
   } = useBattle();
@@ -48,7 +52,6 @@ export default function Navbar() {
           
           {/* Left: PES Logo (BIG) beside EEE Fest Logo */}
           <div className="flex items-center space-x-3 sm:space-x-5">
-            {/* IEEE PES DIU SBC Logo (Made big as requested) */}
             <div className="flex items-center">
               <img 
                 src="./assets/ieee-pes-diu-logo.png" 
@@ -57,10 +60,8 @@ export default function Navbar() {
               />
             </div>
 
-            {/* Subtle Divider */}
             <div className="h-8 md:h-12 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent"></div>
 
-            {/* EEE Fest Logo */}
             <div className="flex items-center">
               <img 
                 src="./assets/eee-fest-logo.png" 
@@ -69,7 +70,6 @@ export default function Navbar() {
               />
             </div>
 
-            {/* Title / Tagline */}
             <div className="hidden lg:flex flex-col ml-2">
               <div className="flex items-center space-x-2">
                 <span className="text-xl font-extrabold tracking-wider text-fest-gradient font-sans">
@@ -86,13 +86,49 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Center / Right: Navigation Portals (Plain tabs, no card shapes) */}
+          {/* Center: Arena Switcher (Battle / Poll / Quiz) */}
+          <div className="hidden md:flex items-center p-1 rounded-lg bg-dark-900 border border-white/10 font-mono text-xs">
+            <button
+              onClick={() => switchArena('battle')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                activeArena === 'battle'
+                  ? 'bg-fest-cyan/20 text-fest-cyan border border-fest-cyan/40 font-bold shadow-[0_0_12px_rgba(0,229,255,0.2)]'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5" />
+              <span>Battle</span>
+            </button>
+
+            <button
+              onClick={() => switchArena('poll')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                activeArena === 'poll'
+                  ? 'bg-fest-pink/20 text-fest-pink border border-fest-pink/40 font-bold shadow-[0_0_12px_rgba(255,0,122,0.2)]'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Vote className="w-3.5 h-3.5" />
+              <span>Poll</span>
+            </button>
+
+            <button
+              onClick={() => switchArena('quiz')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                activeArena === 'quiz'
+                  ? 'bg-fest-amber/20 text-fest-amber border border-fest-amber/40 font-bold shadow-[0_0_12px_rgba(255,183,0,0.2)]'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Kahoot Quiz</span>
+            </button>
+          </div>
+
+          {/* Right: Navigation Portals */}
           <div className="flex items-center space-x-1 sm:space-x-3">
             
-            {/* Portal Switcher */}
             <nav className="flex items-center p-1 rounded-lg bg-dark-900 border border-white/10">
-              
-              {/* Presentation View */}
               <button
                 onClick={() => switchView('presentation')}
                 className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium transition-all ${
@@ -104,12 +140,8 @@ export default function Navbar() {
               >
                 <Monitor className="w-4 h-4" />
                 <span className="hidden sm:inline">Presentation</span>
-                {published && (
-                  <span className="w-2 h-2 rounded-full bg-fest-pink animate-pulse" title="Leaderboard Live"></span>
-                )}
               </button>
 
-              {/* Participant Submit View */}
               <button
                 onClick={() => switchView('submit')}
                 className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium transition-all ${
@@ -117,13 +149,12 @@ export default function Navbar() {
                     ? 'bg-gradient-to-r from-fest-pink/20 to-purple-600/20 text-fest-pink border border-fest-pink/40 shadow-[0_0_15px_rgba(255,0,122,0.2)]'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
                 }`}
-                title="Participant Submission Portal"
+                title="Participant Portal"
               >
                 <Send className="w-4 h-4" />
-                <span className="hidden sm:inline">Submit Work</span>
+                <span className="hidden sm:inline">Participant</span>
               </button>
 
-              {/* Admin Portal */}
               <button
                 onClick={() => switchView('admin')}
                 className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium transition-all ${
@@ -142,30 +173,16 @@ export default function Navbar() {
               </button>
             </nav>
 
-            {/* Live Battle Badge */}
-            <div className="hidden xl:flex items-center px-3 py-1.5 rounded bg-dark-900 border border-white/10 text-xs font-mono">
-              <span className={`w-2 h-2 rounded-full mr-2 ${
-                timer.status === 'running' 
-                  ? 'bg-emerald-400 animate-ping' 
-                  : timer.status === 'paused'
-                  ? 'bg-amber-400'
-                  : 'bg-slate-500'
-              }`}></span>
-              <span className="text-slate-300 uppercase tracking-wider font-semibold">
-                {timer.status === 'running' ? 'Battle Active' : timer.status === 'paused' ? 'Paused' : 'Standby'}
-              </span>
-            </div>
-
             {/* Cloud Sync Status */}
             <div 
               className="hidden md:flex items-center px-2.5 py-1.5 rounded bg-dark-900 border border-white/10 text-xs font-mono text-slate-400"
-              title={firebaseStatus === 'connected' ? 'Firebase Realtime Connected' : 'Local Multi-Tab Broadcast Sync Active'}
+              title={firebaseStatus === 'connected' ? 'Firebase Realtime Connected' : 'Connecting to Cloud...'}
             >
               <Radio className={`w-3.5 h-3.5 mr-1.5 ${
                 firebaseStatus === 'connected' ? 'text-fest-cyan animate-pulse' : 'text-slate-500'
               }`} />
               <span className="text-[11px]">
-                {firebaseStatus === 'connected' ? 'Cloud Live' : 'Local Sync'}
+                {firebaseStatus === 'connected' ? 'Cloud Live' : 'Syncing'}
               </span>
             </div>
 
