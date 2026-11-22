@@ -49,6 +49,7 @@ export default function AdminView() {
   const { 
     activeArena,
     switchArena,
+    switchView,
     timer, 
     participants, 
     published, 
@@ -290,9 +291,16 @@ export default function AdminView() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-[11px] font-mono text-slate-400 mt-1">
-                Authorized adjudicators only. Password: <code className="text-fest-pes">eeefestadmin</code>
-              </p>
+              <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mt-1.5">
+                <span>Password: <code className="text-fest-pes font-bold">eeefestadmin</code></span>
+                <button
+                  type="button"
+                  onClick={() => setPasswordInput('eeefestadmin')}
+                  className="text-fest-cyan hover:underline text-[10px] font-semibold uppercase tracking-wider"
+                >
+                  ⚡ Auto-Fill
+                </button>
+              </div>
             </div>
 
             <button
@@ -301,6 +309,14 @@ export default function AdminView() {
             >
               <ShieldCheck className="w-4 h-4" />
               <span>Unlock Admin Panel</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => switchView('presentation')}
+              className="w-full text-center text-xs font-mono text-slate-400 hover:text-white pt-2 transition-colors block"
+            >
+              ← Return to Presentation Screen
             </button>
           </form>
 

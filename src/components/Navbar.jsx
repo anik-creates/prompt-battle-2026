@@ -6,13 +6,18 @@ import {
   ExternalLink,
   ShieldCheck, 
   Sparkles,
-  Smartphone
+  Smartphone,
+  Tv,
+  LogOut,
+  Lock
 } from 'lucide-react';
 
 export default function Navbar() {
   const { 
     activeView, 
-    isAdminAuthenticated 
+    switchView,
+    isAdminAuthenticated,
+    logoutAdmin
   } = useBattle();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -40,7 +45,7 @@ export default function Navbar() {
           
           {/* Left: IEEE PES DIU SBC Logo (BIG) & EEE Fest 2026 Logo */}
           <div className="flex items-center space-x-2.5 sm:space-x-5">
-            <div className="flex items-center">
+            <div className="flex items-center cursor-pointer" onClick={() => switchView('presentation')} title="Return to Main Arena">
               <img 
                 src="./assets/ieee-pes-diu-logo.png" 
                 alt="IEEE PES DIU Student Branch Chapter" 
@@ -50,7 +55,7 @@ export default function Navbar() {
 
             <div className="h-6 sm:h-8 md:h-12 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent"></div>
 
-            <div className="flex items-center">
+            <div className="flex items-center cursor-pointer" onClick={() => switchView('presentation')} title="Return to Main Arena">
               <img 
                 src="./assets/eee-fest-logo.png" 
                 alt="EEE Fest 2026" 
@@ -75,59 +80,87 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Right Section: Clean, Minimalist Display per View */}
-          <div className="flex items-center space-x-3">
+          {/* Right Section: Seamless Navigation & Quick View Switcher */}
+          <div className="flex items-center space-x-2 sm:space-x-3">
             
-            {/* 1. PRESENTATION VIEW: 100% Clean Projector Display (NO switching panels or badges) */}
+            {/* View Switcher Navigation Pill Group */}
+            <div className="flex items-center bg-dark-900/90 p-1 rounded-xl border border-white/10 space-x-1">
+              {/* 1. Presentation / Projector View */}
+              <button
+                onClick={() => switchView('presentation')}
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-mono text-xs transition-all ${
+                  activeView === 'presentation'
+                    ? 'bg-fest-cyan/15 text-fest-cyan border border-fest-cyan/40 shadow-[0_0_12px_rgba(0,229,255,0.2)] font-semibold'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+                title="Projector / Audience View (#presentation)"
+              >
+                <Tv className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Projector</span>
+              </button>
+
+              {/* 2. Contender Portal View */}
+              <button
+                onClick={() => switchView('submit')}
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-mono text-xs transition-all ${
+                  activeView === 'submit'
+                    ? 'bg-fest-pink/15 text-fest-pink border border-fest-pink/40 shadow-[0_0_12px_rgba(255,0,128,0.2)] font-semibold'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+                title="Participant Contender Portal (#submit)"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Contender</span>
+              </button>
+
+              {/* 3. Admin Command Arena Button */}
+              <button
+                onClick={() => switchView('admin')}
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg font-mono text-xs font-semibold transition-all ${
+                  activeView === 'admin'
+                    ? 'bg-fest-pes text-dark-950 font-bold border border-fest-pes shadow-[0_0_16px_rgba(108,179,63,0.4)]'
+                    : 'bg-fest-pes/10 border border-fest-pes/40 text-fest-pes hover:bg-fest-pes/20'
+                }`}
+                title="Admin Command Arena (#admin • Password: eeefestadmin)"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Admin</span>
+              </button>
+            </div>
+
+            {/* Extra Controls per Active View */}
             {activeView === 'presentation' && (
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={toggleFullscreen}
-                  className="p-2.5 rounded-lg bg-dark-900 border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
-                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen (Auditorium Projector Mode)'}
-                >
-                  {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-                </button>
-              </div>
+              <button
+                onClick={toggleFullscreen}
+                className="p-2 sm:p-2.5 rounded-lg bg-dark-900 border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen (Auditorium Projector Mode)'}
+              >
+                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+              </button>
             )}
 
-            {/* 2. PARTICIPANT VIEW */}
-            {activeView === 'submit' && (
-              <div className="flex items-center px-3 py-1.5 rounded-full bg-dark-900 border border-white/10 text-xs font-mono text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-fest-cyan animate-pulse mr-2"></span>
-                <span>Contender Portal</span>
-              </div>
-            )}
-
-            {/* 3. ADMIN VIEW */}
             {activeView === 'admin' && (
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center px-3 py-1.5 rounded bg-fest-pes/10 border border-fest-pes/30 text-xs font-mono text-fest-pes">
-                  <ShieldCheck className="w-4 h-4 mr-1.5" />
-                  <span>Admin Command</span>
-                </div>
-
+              <div className="hidden lg:flex items-center space-x-2">
                 <a
                   href="./#presentation"
                   target="_blank"
                   rel="noreferrer"
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-900 border border-white/15 text-fest-cyan hover:text-white font-mono text-xs transition-colors"
-                  title="Open Presentation Screen on a separate monitor/projector"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-dark-900 border border-white/15 text-fest-cyan hover:text-white font-mono text-xs transition-colors"
+                  title="Open Presentation Screen on a separate projector/tab"
                 >
-                  <span>Open Projector</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <ExternalLink className="w-3 h-3" />
+                  <span>New Window</span>
                 </a>
 
-                <a
-                  href="./#submit"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-900 border border-white/15 text-slate-300 hover:text-white font-mono text-xs transition-colors"
-                  title="Open Participant Screen in new tab"
-                >
-                  <Smartphone className="w-3.5 h-3.5" />
-                  <span>Phone View</span>
-                </a>
+                {isAdminAuthenticated && (
+                  <button
+                    onClick={logoutAdmin}
+                    className="p-1.5 rounded bg-dark-900 border border-rose-500/30 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
+                    title="Lock Admin Arena (Log Out)"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             )}
 

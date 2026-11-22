@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBattle } from '../context/BattleContext';
 import { 
   Cpu, 
   Terminal, 
@@ -7,10 +8,12 @@ import {
   Shield,
   Layers,
   Sparkles,
-  Lock
+  Lock,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function Footer() {
+  const { switchView } = useBattle();
   return (
     <footer className="mt-auto border-t border-white/10 bg-dark-950/95 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -93,13 +96,14 @@ export default function Footer() {
             <span>Powered by</span>
             <span className="text-fest-pink font-semibold">AI Prompt Battle Engine</span>
             <span>•</span>
-            <a 
-              href="#admin" 
-              className="text-slate-600 hover:text-slate-400 transition-colors inline-flex items-center gap-1"
-              title="Admin Portal"
+            <button 
+              onClick={() => switchView('admin')}
+              className="text-slate-400 hover:text-fest-pes transition-colors inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-dark-900 border border-white/10 hover:border-fest-pes/40 text-[11px] font-mono"
+              title="Admin Command Portal (Password: eeefestadmin)"
             >
-              <Lock className="w-3 h-3" />
-            </a>
+              <ShieldCheck className="w-3.5 h-3.5 text-fest-pes" />
+              <span>Admin Portal</span>
+            </button>
           </p>
         </div>
 

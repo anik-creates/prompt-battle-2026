@@ -200,6 +200,38 @@ export function sanitizeState(raw) {
   };
 }
 
+export function resolveViewFromUrl() {
+  if (typeof window === 'undefined') return 'presentation';
+
+  // 1. Check search parameter: ?view=admin or ?v=admin
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view') || params.get('v');
+    if (viewParam && ['presentation', 'admin', 'submit'].includes(viewParam.toLowerCase())) {
+      return viewParam.toLowerCase();
+    }
+  } catch (e) {}
+
+  // 2. Check hash: #admin, #/admin, #admin/, #submit, etc.
+  if (window.location.hash) {
+    const cleanHash = window.location.hash.replace(/^[#/]+/, '').replace(/\/+$/, '').toLowerCase();
+    if (['presentation', 'admin', 'submit'].includes(cleanHash)) {
+      return cleanHash;
+    }
+  }
+
+  // 3. Check pathname: /admin or /submit (for direct path routing)
+  try {
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const lastPart = (pathParts[pathParts.length - 1] || '').toLowerCase();
+    if (['presentation', 'admin', 'submit'].includes(lastPart)) {
+      return lastPart;
+    }
+  } catch (e) {}
+
+  return 'presentation';
+}
+
 export function BattleProvider({ children }) {
   const [battleState, setBattleState] = useState(() => {
     try {
@@ -217,18 +249,7 @@ export function BattleProvider({ children }) {
     return sessionStorage.getItem('pb_admin_auth') === 'true';
   });
 
-  const [activeView, setActiveView] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const viewParam = params.get('view');
-    if (viewParam && ['presentation', 'admin', 'submit'].includes(viewParam)) {
-      return viewParam;
-    }
-    const hash = window.location.hash.replace('#', '');
-    if (['presentation', 'admin', 'submit'].includes(hash)) {
-      return hash;
-    }
-    return 'presentation';
-  });
+  const [activeView, setActiveView] = useState(() => resolveViewFromUrl());
 
   const [firebaseStatus, setFirebaseStatus] = useState('connecting');
   const [firebaseError, setFirebaseError] = useState(null);
@@ -414,9 +435,49 @@ export function BattleProvider({ children }) {
   }, [battleState.quiz?.status, battleState.quiz?.questionEndsAt, battleState, syncState]);
 
   const switchView = useCallback((newView) => {
+    if (!['presentation', 'admin', 'submit'].includes(newView)) return;
     setActiveView(newView);
-    window.location.hash = `#${newView}`;
+    const targetHash = `#${newView}`;
+    if (window.location.hash !== targetHash) {
+      window.location.hash = targetHash;
+    }
   }, []);
+
+  // Listen for hashchange, popstate, and keyboard shortcuts
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const detected = resolveViewFromUrl();
+      setActiveView(detected);
+    };
+
+    window.addEventListener('hashchange', handleUrlChange);
+    window.addEventListener('popstate', handleUrlChange);
+
+    // Adjudicator shortcuts: Alt+A or Ctrl+Shift+A opens Admin, Alt+P opens Presentation, Alt+S opens Contender
+    const handleKeyDown = (e) => {
+      if ((e.altKey && (e.key === 'a' || e.key === 'A')) || 
+          (e.ctrlKey && e.shiftKey && (e.key === 'a' || e.key === 'A'))) {
+        e.preventDefault();
+        switchView('admin');
+      } else if ((e.altKey && (e.key === 'p' || e.key === 'P')) || 
+                 (e.ctrlKey && e.shiftKey && (e.key === 'p' || e.key === 'P'))) {
+        e.preventDefault();
+        switchView('presentation');
+      } else if ((e.altKey && (e.key === 's' || e.key === 'S')) || 
+                 (e.ctrlKey && e.shiftKey && (e.key === 's' || e.key === 'S'))) {
+        e.preventDefault();
+        switchView('submit');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('hashchange', handleUrlChange);
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [switchView]);
 
   // ADMIN CONTROL: Master Arena Switcher
   // When Admin switches arena, it broadcasts to all phones & presentation screens
