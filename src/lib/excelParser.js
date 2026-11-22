@@ -34,6 +34,8 @@ export async function parseContenderFile(file) {
           const keys = Object.keys(row);
           let idVal = '';
           let nameVal = '';
+          let emailVal = '';
+          let passcodeVal = '';
           let teamVal = '';
           let deskVal = '';
 
@@ -41,8 +43,12 @@ export async function parseContenderFile(file) {
             const cleanKey = key.trim().toLowerCase().replace(/[\s_\-#]/g, '');
             const val = String(row[key] || '').trim();
 
-            if (!idVal && (cleanKey.includes('id') || cleanKey.includes('participant') || cleanKey.includes('roll') || cleanKey.includes('contender'))) {
+            if (!idVal && (cleanKey === 'id' || cleanKey.includes('participantid') || cleanKey.includes('roll') || cleanKey.includes('contenderid'))) {
               idVal = val;
+            } else if (!emailVal && (cleanKey.includes('email') || cleanKey.includes('mail'))) {
+              emailVal = val;
+            } else if (!passcodeVal && (cleanKey.includes('passcode') || cleanKey.includes('password') || cleanKey.includes('pass') || cleanKey.includes('secret') || cleanKey.includes('code'))) {
+              passcodeVal = val;
             } else if (!nameVal && (cleanKey.includes('name') || cleanKey.includes('participant') || cleanKey.includes('student'))) {
               nameVal = val;
             } else if (!teamVal && (cleanKey.includes('team') || cleanKey.includes('group') || cleanKey.includes('dept') || cleanKey.includes('club'))) {
@@ -53,19 +59,33 @@ export async function parseContenderFile(file) {
           }
 
           // Fallbacks if columns weren't matched by name
-          if (!idVal && keys[0]) idVal = String(row[keys[0]] || '').trim();
-          if (!nameVal && keys[1]) nameVal = String(row[keys[1]] || '').trim();
-          if (!teamVal && keys[2]) teamVal = String(row[keys[2]] || '').trim();
+          if (!nameVal && keys[0] && !keys[0].toLowerCase().includes('id')) nameVal = String(row[keys[0]] || '').trim();
+          if (!emailVal) {
+            for (const k of keys) {
+              const v = String(row[k] || '').trim();
+              if (v.includes('@') && v.includes('.')) {
+                emailVal = v;
+                break;
+              }
+            }
+          }
 
           // Auto-generate ID if missing
           if (!idVal && nameVal) {
             idVal = `PB-${100 + index + 1}`;
           }
 
-          if (idVal || nameVal) {
+          // Auto-generate passcode if missing
+          if (!passcodeVal) {
+            passcodeVal = `PB${Math.floor(1000 + Math.random() * 9000)}`;
+          }
+
+          if (idVal || nameVal || emailVal) {
             normalized.push({
-              participantId: idVal.toUpperCase(),
+              participantId: (idVal || `PB-${100 + index + 1}`).toUpperCase(),
               name: nameVal || `Contender ${idVal}`,
+              email: (emailVal || `${(idVal || 'user').toLowerCase()}@diu.edu.bd`).toLowerCase(),
+              passcode: passcodeVal,
               teamName: teamVal || 'IEEE PES SBC Contender',
               deskNumber: deskVal || `Desk ${index + 1}`
             });
@@ -92,30 +112,40 @@ export function downloadContenderTemplate() {
     {
       'Participant ID': 'PB-101',
       'Name': 'Tanvir Hossain',
+      'Email': 'tanvir.prompt@diu.edu.bd',
+      'Passcode': 'PASS-9821',
       'Team Name': 'DIU Pioneers',
       'Desk Number': 'Desk 01'
     },
     {
       'Participant ID': 'PB-102',
       'Name': 'Anik Sarker',
+      'Email': 'anik.prompt@diu.edu.bd',
+      'Passcode': 'PASS-4412',
       'Team Name': 'PES Titans',
       'Desk Number': 'Desk 02'
     },
     {
       'Participant ID': 'PB-103',
       'Name': 'Sumaiya Akter',
+      'Email': 'sumaiya.prompt@diu.edu.bd',
+      'Passcode': 'PASS-7733',
       'Team Name': 'Cyber Sparks',
       'Desk Number': 'Desk 03'
     },
     {
       'Participant ID': 'PB-104',
       'Name': 'Rakib Hasan',
+      'Email': 'rakib.prompt@diu.edu.bd',
+      'Passcode': 'PASS-2190',
       'Team Name': 'Neural Circuit',
       'Desk Number': 'Desk 04'
     },
     {
       'Participant ID': 'PB-105',
       'Name': 'Farhan Kabir',
+      'Email': 'farhan.prompt@diu.edu.bd',
+      'Passcode': 'PASS-6351',
       'Team Name': 'Vector Core',
       'Desk Number': 'Desk 05'
     }

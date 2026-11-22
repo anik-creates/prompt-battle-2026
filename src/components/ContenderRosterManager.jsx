@@ -55,6 +55,8 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
   // Manual Contender Add State
   const [newId, setNewId] = useState('');
   const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPasscode, setNewPasscode] = useState('');
   const [newTeam, setNewTeam] = useState('');
   const [newDesk, setNewDesk] = useState('');
 
@@ -126,15 +128,20 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
     e.preventDefault();
     if (!newId.trim() || !newName.trim()) return;
 
+    const cleanId = newId.trim().toUpperCase();
     addRegisteredContender({
-      participantId: newId.trim().toUpperCase(),
+      participantId: cleanId,
       name: newName.trim(),
+      email: newEmail.trim().toLowerCase() || `${cleanId.toLowerCase()}@diu.edu.bd`,
+      passcode: newPasscode.trim() || `PB${Math.floor(1000 + Math.random() * 9000)}`,
       teamName: newTeam.trim() || 'Solo Contender',
-      deskNumber: newDesk.trim() || 'Main Floor',
+      deskNumber: newDesk.trim() || 'Desk 01',
     });
 
     setNewId('');
     setNewName('');
+    setNewEmail('');
+    setNewPasscode('');
     setNewTeam('');
     setNewDesk('');
   };
@@ -538,7 +545,7 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
           <div>
             <label className="block text-[11px] text-slate-400 mb-1">Participant ID *</label>
             <input
@@ -552,7 +559,7 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
           </div>
 
           <div>
-            <label className="block text-[11px] text-slate-400 mb-1">Contender Full Name *</label>
+            <label className="block text-[11px] text-slate-400 mb-1">Contender Name *</label>
             <input
               type="text"
               required
@@ -564,7 +571,29 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
           </div>
 
           <div>
-            <label className="block text-[11px] text-slate-400 mb-1">Team Name (Optional)</label>
+            <label className="block text-[11px] text-slate-400 mb-1">Email Address *</label>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="e.g. tanvir@diu.edu.bd"
+              className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] text-slate-400 mb-1">Unique Passcode</label>
+            <input
+              type="text"
+              value={newPasscode}
+              onChange={(e) => setNewPasscode(e.target.value)}
+              placeholder="e.g. PASS-9821"
+              className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-fest-pink font-bold font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] text-slate-400 mb-1">Team Name</label>
             <input
               type="text"
               value={newTeam}
@@ -575,20 +604,20 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
           </div>
 
           <div>
-            <label className="block text-[11px] text-slate-400 mb-1">Desk Station (Optional)</label>
+            <label className="block text-[11px] text-slate-400 mb-1">Desk Station</label>
             <div className="flex items-center gap-2">
               <input
                 type="text"
                 value={newDesk}
                 onChange={(e) => setNewDesk(e.target.value)}
                 placeholder="e.g. Desk 01"
-                className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white"
+                className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-fest-amber font-bold"
               />
               <button
                 type="submit"
-                className="px-4 py-2 rounded-lg bg-fest-cyan text-dark-950 font-bold uppercase shrink-0 hover:opacity-90 shadow-[0_0_12px_rgba(0,229,255,0.3)]"
+                className="px-3.5 py-2 rounded-lg bg-fest-cyan text-dark-950 font-bold uppercase shrink-0 hover:opacity-90 shadow-[0_0_12px_rgba(0,229,255,0.3)] text-xs"
               >
-                Add ID
+                Add
               </button>
             </div>
           </div>
@@ -819,10 +848,18 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                         </span>
                       </td>
 
-                      {/* Name */}
+                      {/* Name & Credentials */}
                       <td className="py-3 px-3 font-sans">
                         <div className="font-bold text-white text-sm">
                           {c.name}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                          <span>{c.email || `${c.participantId?.toLowerCase()}@diu.edu.bd`}</span>
+                          {c.passcode && (
+                            <span className="ml-1.5 text-fest-pink">
+                              Pass: <code className="bg-black/40 px-1 py-0.5 rounded border border-white/10 text-fest-pink">{c.passcode}</code>
+                            </span>
+                          )}
                         </div>
                       </td>
 

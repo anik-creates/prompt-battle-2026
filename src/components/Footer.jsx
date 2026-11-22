@@ -9,7 +9,8 @@ import {
   Layers,
   Sparkles,
   Lock,
-  ShieldCheck
+  ShieldCheck,
+  Scale
 } from 'lucide-react';
 
 export default function Footer() {
@@ -97,9 +98,18 @@ export default function Footer() {
             <span className="text-fest-pink font-semibold">AI Prompt Battle Engine</span>
             <span>•</span>
             <button 
+              onClick={() => switchView('judge')}
+              className="text-slate-400 hover:text-fest-amber transition-colors inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-dark-900 border border-white/10 hover:border-fest-amber/40 text-[11px] font-mono"
+              title="Judge Adjudication Portal"
+            >
+              <Scale className="w-3.5 h-3.5 text-fest-amber" />
+              <span>Judge Portal</span>
+            </button>
+            <span>•</span>
+            <button 
               onClick={() => switchView('admin')}
               className="text-slate-400 hover:text-fest-pes transition-colors inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-dark-900 border border-white/10 hover:border-fest-pes/40 text-[11px] font-mono"
-              title="Admin Command Portal (Password: eeefestadmin)"
+              title="Admin Command Portal (pes.ieee@diu.edu.bd)"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-fest-pes" />
               <span>Admin Portal</span>

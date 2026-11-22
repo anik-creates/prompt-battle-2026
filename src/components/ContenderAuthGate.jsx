@@ -1,9 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useBattle } from '../context/BattleContext';
-import { ShieldCheck, User, Users, Key, AlertCircle, ArrowRight, LogOut, CheckCircle2, MapPin } from 'lucide-react';
+import { 
+  ShieldCheck, 
+  User, 
+  Users, 
+  Key, 
+  AlertCircle, 
+  ArrowRight, 
+  LogOut, 
+  CheckCircle2, 
+  MapPin, 
+  Mail, 
+  Eye, 
+  EyeOff,
+  Sparkles
+} from 'lucide-react';
 
 export default function ContenderAuthGate({ children, onAuthenticated, isSimulator = false }) {
-  const { registeredContenders = [], registerPresence, activeArena } = useBattle();
+  const { 
+    registeredContenders = [], 
+    authenticateContender,
+    registerPresence, 
+    activeArena 
+  } = useBattle();
 
   const [session, setSession] = useState(() => {
     try {
@@ -15,35 +34,10 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
   });
 
   const [showDeskScreen, setShowDeskScreen] = useState(false);
-  const [idInput, setIdInput] = useState('');
-  const [nameInput, setNameInput] = useState('');
-  const [teamInput, setTeamInput] = useState('');
-  const [deskInput, setDeskInput] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [showPasscode, setShowPasscode] = useState(false);
   const [error, setError] = useState('');
-  const [matchedContender, setMatchedContender] = useState(null);
-
-  // When ID input changes, check if it matches a pre-registered contender
-  useEffect(() => {
-    const trimmed = idInput.trim().toUpperCase();
-    if (!trimmed) {
-      setMatchedContender(null);
-      return;
-    }
-
-    const match = (registeredContenders || []).find(
-      (c) => c.participantId?.toUpperCase() === trimmed
-    );
-
-    if (match) {
-      setMatchedContender(match);
-      setNameInput(match.name || '');
-      setTeamInput(match.teamName || '');
-      setDeskInput(match.deskNumber || '');
-      setError('');
-    } else {
-      setMatchedContender(null);
-    }
-  }, [idInput, registeredContenders]);
 
   // When session is active, notify parent and maintain live presence heartbeat (every 20s)
   useEffect(() => {
@@ -55,6 +49,7 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
         registerPresence({
           participantId: session.participantId,
           name: session.name,
+          email: session.email,
           teamName: session.teamName,
           deskNumber: session.deskNumber,
           arena: activeArena,
@@ -68,50 +63,68 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
 
   const handleLogin = (e) => {
     e.preventDefault();
-    const cleanId = idInput.trim().toUpperCase();
-    const cleanName = nameInput.trim();
+    setError('');
 
-    if (!cleanId) {
-      setError('Please provide your official Participant ID.');
+    const cleanEmail = emailInput.trim().toLowerCase();
+    const cleanPasscode = passcodeInput.trim();
+
+    if (!cleanEmail) {
+      setError('Please provide your official registered Email address.');
       return;
     }
 
-    if (!cleanName) {
-      setError('Please provide your Full Name.');
+    if (!cleanPasscode) {
+      setError('Please provide the unique passcode sent to your mail.');
       return;
     }
 
-    const assignedDesk = deskInput.trim() || matchedContender?.deskNumber || 'Desk 01';
+    // Authenticate via context
+    const res = authenticateContender(cleanEmail, cleanPasscode);
 
-    const contenderData = {
-      participantId: cleanId,
-      name: cleanName,
-      teamName: teamInput.trim() || matchedContender?.teamName || 'Solo Contender',
-      deskNumber: assignedDesk,
-      loggedInAt: Date.now(),
-    };
+    if (res.success && res.contender) {
+      const match = res.contender;
+      const contenderData = {
+        participantId: match.participantId || 'PB-CONTENDER',
+        name: match.name || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        teamName: match.teamName || 'Solo Contender',
+        deskNumber: match.deskNumber || 'Desk 01',
+        loggedInAt: Date.now(),
+      };
 
-    try {
-      localStorage.setItem('pb_contender_session', JSON.stringify(contenderData));
-    } catch (e) {
-      console.warn(e);
+      try {
+        localStorage.setItem('pb_contender_session', JSON.stringify(contenderData));
+      } catch (err) {
+        console.warn(err);
+      }
+
+      setSession(contenderData);
+      setShowDeskScreen(true);
+      setError('');
+    } else {
+      // If roster is empty or not found, check if user is using direct fallback
+      if (registeredContenders.length === 0) {
+        setError('No contenders have been registered in the system yet. Please ask the organizers to upload the official roster sheet.');
+      } else {
+        setError(res.error || 'Invalid Email or Passcode. Please verify the credentials sent to your mail.');
+      }
     }
+  };
 
-    setSession(contenderData);
-    setShowDeskScreen(true);
+  const handleQuickFill = (c) => {
+    if (!c) return;
+    setEmailInput(c.email || `${c.participantId?.toLowerCase()}@diu.edu.bd`);
+    setPasscodeInput(c.passcode || c.password || 'PASS-9821');
     setError('');
   };
 
   const handleLogout = () => {
-    if (window.confirm('Switch Contender ID? Any in-progress answers on this device will reset.')) {
+    if (window.confirm('Switch Contender Account? Any in-progress answers on this device will reset.')) {
       localStorage.removeItem('pb_contender_session');
       setSession(null);
       setShowDeskScreen(false);
-      setIdInput('');
-      setNameInput('');
-      setTeamInput('');
-      setDeskInput('');
-      setMatchedContender(null);
+      setEmailInput('');
+      setPasscodeInput('');
     }
   };
 
@@ -125,10 +138,10 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
               <Key className="w-6 h-6" />
             </div>
             <h2 className="text-2xl font-bold font-sans text-white uppercase tracking-tight">
-              Contender Portal Login
+              Contender Login
             </h2>
             <p className="text-xs text-slate-400">
-              Enter your official Participant ID provided by the IEEE PES DIU SBC Organizer
+              Enter your registered Email & unique Passcode provided in your mail by IEEE PES DIU SBC
             </p>
           </div>
 
@@ -140,91 +153,86 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
               </div>
             )}
 
+            {/* Email Field */}
             <div>
-              <label className="block text-slate-300 font-bold mb-1">
-                Participant ID *
+              <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-fest-cyan" />
+                <span>Email Address *</span>
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  required
-                  value={idInput}
-                  onChange={(e) => setIdInput(e.target.value)}
-                  placeholder="e.g. PB-101"
-                  className="w-full px-3 py-2.5 rounded bg-dark-950 border border-white/15 text-fest-cyan font-bold font-mono text-sm focus:border-fest-cyan uppercase"
-                />
-                {matchedContender && (
-                  <span className="absolute right-3 top-3 text-emerald-400 flex items-center gap-1 text-[11px]">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Verified</span>
-                  </span>
-                )}
-              </div>
+              <input
+                type="email"
+                required
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="e.g. contender@diu.edu.bd"
+                className="w-full px-3 py-2.5 rounded bg-dark-950 border border-white/15 text-white font-mono text-sm focus:border-fest-cyan"
+              />
               <p className="text-[10px] text-slate-400 mt-1">
-                Provided on your desk badge or registration slip.
+                The email you registered with for Prompt Battle 2026.
               </p>
             </div>
 
-            {matchedContender ? (
-              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 space-y-1">
-                <div className="flex justify-between font-bold">
-                  <span>Name:</span>
-                  <span className="text-white">{matchedContender.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Team:</span>
-                  <span className="text-fest-pink">{matchedContender.teamName || 'Solo'}</span>
-                </div>
-                {matchedContender.deskNumber && (
-                  <div className="flex justify-between text-[11px] text-slate-300">
-                    <span>Station:</span>
-                    <span className="text-fest-cyan">{matchedContender.deskNumber}</span>
-                  </div>
-                )}
+            {/* Passcode Field */}
+            <div>
+              <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1.5">
+                <Key className="w-3.5 h-3.5 text-fest-pink" />
+                <span>Unique Passcode *</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showPasscode ? 'text' : 'password'}
+                  required
+                  value={passcodeInput}
+                  onChange={(e) => setPasscodeInput(e.target.value)}
+                  placeholder="Enter passcode from your email..."
+                  className="w-full px-3 py-2.5 rounded bg-dark-950 border border-white/15 text-fest-pink font-bold font-mono text-sm focus:border-fest-pink"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasscode(!showPasscode)}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
+                >
+                  {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
-            ) : (
-              <>
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">
-                    Contender Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value)}
-                    placeholder="e.g. Shakib Ahmed"
-                    className="w-full px-3 py-2 rounded bg-dark-950 border border-white/15 text-white font-sans text-sm focus:border-fest-pink"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">
-                    Team Name (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={teamInput}
-                    onChange={(e) => setTeamInput(e.target.value)}
-                    placeholder="e.g. DIU Sparks"
-                    className="w-full px-3 py-2 rounded bg-dark-950 border border-white/15 text-white text-xs focus:border-fest-cyan"
-                  />
-                </div>
-              </>
-            )}
+              <p className="text-[10px] text-slate-400 mt-1">
+                Secret code provided via email by the event organizers.
+              </p>
+            </div>
 
             <button
               type="submit"
               className="w-full py-3 px-4 rounded bg-gradient-to-r from-fest-pink to-fest-cyan text-white font-bold uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(255,0,122,0.35)] flex items-center justify-center gap-2 hover:opacity-95"
             >
-              <span>Enter Competition Arena</span>
+              <span>Verify & Enter Arena</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
-          {registeredContenders.length > 0 && (
+          {/* Quick Helper for Testing or Roster Preview */}
+          {registeredContenders.length > 0 ? (
+            <div className="pt-3 border-t border-white/10 text-left space-y-2">
+              <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-fest-amber" />
+                <span>Registered Contenders on Roster ({registeredContenders.length}):</span>
+              </span>
+              <div className="max-h-28 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                {registeredContenders.slice(0, 5).map((c, i) => (
+                  <button
+                    key={c.participantId || i}
+                    type="button"
+                    onClick={() => handleQuickFill(c)}
+                    className="w-full text-left p-1.5 rounded bg-dark-950/80 border border-white/10 hover:border-fest-cyan/40 text-[10px] flex items-center justify-between text-slate-300 hover:text-white transition-colors"
+                  >
+                    <span>{c.name} ({c.email || `${c.participantId}@diu.edu.bd`})</span>
+                    <span className="text-fest-amber font-bold">{c.deskNumber || 'Desk 01'}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
             <div className="pt-2 border-t border-white/10 text-center text-[10px] text-slate-400">
-              <span>{registeredContenders.length} Contenders Registered by IEEE PES DIU SBC</span>
+              <span>Organizers can upload the roster sheet in the Admin Portal.</span>
             </div>
           )}
         </div>

@@ -5,6 +5,7 @@ import Footer from './components/Footer';
 import PresentationView from './components/PresentationView';
 import AdminView from './components/AdminView';
 import ParticipantSubmitView from './components/ParticipantSubmitView';
+import JudgeView from './components/JudgeView';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 
 class ErrorBoundary extends Component {
@@ -61,6 +62,7 @@ function MainContent() {
     <main className="flex-1 w-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
       {activeView === 'presentation' && <PresentationView />}
       {activeView === 'submit' && <ParticipantSubmitView />}
+      {activeView === 'judge' && <JudgeView />}
       {activeView === 'admin' && <AdminView />}
     </main>
   );

@@ -18,7 +18,7 @@
         var path = window.location.pathname;
         var parts = path.split('/').filter(Boolean);
         var last = (parts[parts.length - 1] || '').toLowerCase();
-        if (['admin', 'submit', 'presentation'].indexOf(last) !== -1) {
+        if (['admin', 'submit', 'presentation', 'judge'].indexOf(last) !== -1) {
           var cleanPath = path.substring(0, path.lastIndexOf('/' + last) + 1);
           window.history.replaceState(null, '', cleanPath + '#' + last + window.location.search);
         }

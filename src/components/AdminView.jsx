@@ -42,7 +42,9 @@ import {
   List,
   BarChart3,
   FileCode,
-  MapPin
+  MapPin,
+  Scale,
+  Mail
 } from 'lucide-react';
 
 export default function AdminView() {
@@ -85,10 +87,13 @@ export default function AdminView() {
     deletePoll,
     tokenBudget,
     resetAllData,
-    firebaseStatus
+    firebaseStatus,
+    judges = [],
+    deleteJudge,
+    registeredContenders = []
   } = useBattle();
 
-  // Admin Section Tab: 'battle' | 'roster' | 'poll' | 'quiz'
+  // Admin Section Tab: 'battle' | 'roster' | 'judges' | 'poll' | 'quiz'
   const [adminTab, setAdminTab] = useState('battle');
   const [showMobileSimulator, setShowMobileSimulator] = useState(false);
   const [evaluationViewMode, setEvaluationViewMode] = useState('table'); // 'table' | 'cards'
@@ -100,6 +105,7 @@ export default function AdminView() {
   const [editingPollModal, setEditingPollModal] = useState(null);
 
   // Login form state
+  const [adminEmailInput, setAdminEmailInput] = useState('pes.ieee@diu.edu.bd');
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -134,7 +140,7 @@ export default function AdminView() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    const res = authenticateAdmin(passwordInput);
+    const res = authenticateAdmin(adminEmailInput, passwordInput);
     if (!res.success) {
       setAuthError(res.error);
     } else {
@@ -271,6 +277,21 @@ export default function AdminView() {
           <form onSubmit={handleLogin} className="space-y-4 text-left">
             <div>
               <label className="block text-xs uppercase font-mono tracking-wider text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-fest-cyan" />
+                Admin Official Gmail
+              </label>
+              <input
+                type="email"
+                required
+                value={adminEmailInput}
+                onChange={(e) => setAdminEmailInput(e.target.value)}
+                placeholder="pes.ieee@diu.edu.bd"
+                className="w-full px-4 py-2.5 rounded bg-dark-950 border border-white/15 focus:border-fest-pes focus:ring-1 focus:ring-fest-pes text-white text-sm font-mono placeholder-slate-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase font-mono tracking-wider text-slate-300 mb-1.5 flex items-center gap-1.5">
                 <Key className="w-3.5 h-3.5 text-fest-pes" />
                 Admin Secret Password
               </label>
@@ -281,24 +302,27 @@ export default function AdminView() {
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
                   placeholder="Enter administrator password..."
-                  className="w-full px-4 py-3 rounded bg-dark-950 border border-white/15 focus:border-fest-pes focus:ring-1 focus:ring-fest-pes text-white text-sm font-mono placeholder-slate-400"
+                  className="w-full px-4 py-2.5 rounded bg-dark-950 border border-white/15 focus:border-fest-pes focus:ring-1 focus:ring-fest-pes text-white text-sm font-mono placeholder-slate-400"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-white"
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mt-1.5">
-                <span>Password: <code className="text-fest-pes font-bold">eeefestadmin</code></span>
+                <span>Pass: <code className="text-fest-pes font-bold">PesDiuSbc2026</code></span>
                 <button
                   type="button"
-                  onClick={() => setPasswordInput('eeefestadmin')}
+                  onClick={() => {
+                    setAdminEmailInput('pes.ieee@diu.edu.bd');
+                    setPasswordInput('PesDiuSbc2026');
+                  }}
                   className="text-fest-cyan hover:underline text-[10px] font-semibold uppercase tracking-wider"
                 >
-                  ⚡ Auto-Fill
+                  ⚡ Auto-Fill Credentials
                 </button>
               </div>
             </div>
@@ -642,6 +666,18 @@ export default function AdminView() {
             >
               <Users className="w-4 h-4" />
               <span>Contender Roster (JSON / Excel Upload)</span>
+            </button>
+
+            <button
+              onClick={() => setAdminTab('judges')}
+              className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
+                adminTab === 'judges'
+                  ? 'border-fest-amber text-fest-amber'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <Scale className="w-4 h-4" />
+              <span>4 Judges Adjudication ({judges.length}/4)</span>
             </button>
 
             <button
@@ -1187,6 +1223,194 @@ export default function AdminView() {
             setAdminTab('battle');
           }}
         />
+      )}
+
+      {/* TAB: 4 JUDGES ADJUDICATION OVERSIGHT */}
+      {adminTab === 'judges' && (
+        <div className="space-y-6 font-mono text-xs">
+          
+          {/* Header */}
+          <div className="p-6 rounded-2xl bg-dark-900 border border-white/15 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center space-x-3.5">
+              <div className="w-12 h-12 rounded-xl bg-fest-amber/20 border border-fest-amber/40 text-fest-amber flex items-center justify-center shadow-[0_0_20px_rgba(255,183,0,0.3)]">
+                <Scale className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold font-sans text-white">
+                  4 Judges Adjudication Management
+                </h3>
+                <p className="text-slate-400 mt-0.5">
+                  Adjudicators register using their Gmail and password. All 4 judges can grade all contenders.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => switchView('judge')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-fest-amber text-dark-950 font-bold uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(255,183,0,0.3)] hover:opacity-95 transition-all"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Open Judge Portal (#judge)</span>
+            </button>
+          </div>
+
+          {/* 4 Judge Slots Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((slotNum) => {
+              const judge = judges.find((j) => j.judgeNumber === slotNum);
+              const evaluationsCount = judge
+                ? participants.filter((p) => p.judgeMarks && p.judgeMarks[judge.id]).length
+                : 0;
+
+              return (
+                <div 
+                  key={slotNum}
+                  className={`p-5 rounded-2xl border transition-all ${
+                    judge
+                      ? 'bg-dark-900 border-fest-amber/40 shadow-[0_0_20px_rgba(255,183,0,0.1)]'
+                      : 'bg-dark-950/60 border-dashed border-white/15 text-slate-500'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      judge ? 'bg-fest-amber text-dark-950' : 'bg-white/5 text-slate-400'
+                    }`}>
+                      Judge #{slotNum}
+                    </span>
+                    {judge && (
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Account Active"></span>
+                    )}
+                  </div>
+
+                  {judge ? (
+                    <div className="space-y-3">
+                      <div>
+                        <h4 className="font-bold text-white text-sm font-sans truncate">{judge.name}</h4>
+                        <p className="text-[11px] text-fest-cyan truncate mt-0.5">{judge.email}</p>
+                      </div>
+
+                      <div className="p-2.5 rounded-lg bg-dark-950 border border-white/10 flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400">Graded:</span>
+                        <span className="font-bold text-emerald-400">{evaluationsCount} Contenders</span>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Remove Judge #${slotNum} (${judge.name})? This will vacate this judge position.`)) {
+                            deleteJudge(judge.id);
+                          }
+                        }}
+                        className="w-full py-1.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20 text-[10px] font-bold transition-colors"
+                      >
+                        Reset / Vacate Slot
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="py-4 text-center space-y-1">
+                      <span className="text-xs text-slate-400 font-bold block">Slot Available</span>
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        Judge can register using Gmail at <code className="text-fest-amber">/#judge</code>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Contenders vs Judges Marking Matrix */}
+          <div className="p-6 rounded-2xl bg-dark-900 border border-white/15 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <span className="font-bold text-white uppercase tracking-wider text-xs flex items-center gap-2">
+                <Scale className="w-4 h-4 text-fest-amber" />
+                <span>Contender Multi-Judge Evaluation Matrix</span>
+              </span>
+              <span className="text-[11px] text-slate-400">
+                {registeredContenders.length} Roster Contenders • {participants.length} Submissions
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-white/10 text-slate-400 uppercase text-[10px] tracking-wider">
+                    <th className="py-2.5 px-3">Desk / ID</th>
+                    <th className="py-2.5 px-3">Contender Name</th>
+                    <th className="py-2.5 px-3 text-center">Judge 1</th>
+                    <th className="py-2.5 px-3 text-center">Judge 2</th>
+                    <th className="py-2.5 px-3 text-center">Judge 3</th>
+                    <th className="py-2.5 px-3 text-center">Judge 4</th>
+                    <th className="py-2.5 px-3 text-center">Average Score</th>
+                    <th className="py-2.5 px-3 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {(registeredContenders.length > 0 ? registeredContenders : participants).map((contender, idx) => {
+                    const cleanId = (contender.participantId || contender.id || '').toUpperCase();
+                    const participantData = participants.find((p) => (p.participantId?.toUpperCase() === cleanId || p.id === cleanId)) || contender;
+                    const judgeMarks = participantData.judgeMarks || {};
+
+                    // Get scores for judges 1 to 4
+                    const j1 = judges.find(j => j.judgeNumber === 1);
+                    const j2 = judges.find(j => j.judgeNumber === 2);
+                    const j3 = judges.find(j => j.judgeNumber === 3);
+                    const j4 = judges.find(j => j.judgeNumber === 4);
+
+                    const s1 = j1 && judgeMarks[j1.id]?.totalScore;
+                    const s2 = j2 && judgeMarks[j2.id]?.totalScore;
+                    const s3 = j3 && judgeMarks[j3.id]?.totalScore;
+                    const s4 = j4 && judgeMarks[j4.id]?.totalScore;
+
+                    const gradedCount = [s1, s2, s3, s4].filter(s => s !== undefined).length;
+                    const avgScore = participantData.totalScore || 0;
+
+                    return (
+                      <tr key={cleanId || idx} className="hover:bg-white/5 transition-colors">
+                        <td className="py-3 px-3">
+                          <span className="font-bold text-fest-amber mr-2">{contender.deskNumber || 'Desk 01'}</span>
+                          <span className="text-[10px] text-slate-400">{cleanId}</span>
+                        </td>
+                        <td className="py-3 px-3 font-bold text-white">
+                          <div>{contender.name}</div>
+                          <div className="text-[10px] text-fest-pink font-normal">{contender.teamName || 'Solo'}</div>
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono">
+                          {s1 !== undefined ? <span className="text-fest-cyan font-bold">{s1} pts</span> : <span className="text-slate-600">-</span>}
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono">
+                          {s2 !== undefined ? <span className="text-fest-pink font-bold">{s2} pts</span> : <span className="text-slate-600">-</span>}
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono">
+                          {s3 !== undefined ? <span className="text-fest-amber font-bold">{s3} pts</span> : <span className="text-slate-600">-</span>}
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono">
+                          {s4 !== undefined ? <span className="text-fest-pes font-bold">{s4} pts</span> : <span className="text-slate-600">-</span>}
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono">
+                          <span className="px-2 py-0.5 rounded bg-fest-pes/20 text-fest-pes font-extrabold text-xs">
+                            {avgScore} / 100
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            gradedCount >= 4
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : gradedCount > 0
+                              ? 'bg-fest-amber/20 text-fest-amber border border-fest-amber/30'
+                              : 'bg-white/5 text-slate-500 border border-white/5'
+                          }`}>
+                            {gradedCount}/4 Judges Graded
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
       )}
 
       {/* TAB 2: LIVE POLL & MCQ MANAGER */}

@@ -270,9 +270,14 @@ export default function LeaderboardView() {
                       </td>
 
                       <td className="py-4 px-4 text-right">
-                        <span className="text-base font-bold text-white font-mono">
+                        <span className="text-base font-bold text-white font-mono block">
                           {p.totalScore || 0}
                         </span>
+                        {p.evaluatedByJudgesCount > 0 && (
+                          <span className="text-[9px] text-fest-amber font-mono font-bold block">
+                            ⚖️ {p.evaluatedByJudgesCount}/4 Judges
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );

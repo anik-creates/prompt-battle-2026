@@ -19,7 +19,8 @@ const BattleContext = createContext(null);
 
 const STORAGE_KEY = 'pb_local_state_v3';
 const BROADCAST_CHANNEL_NAME = 'prompt_battle_broadcast_v3';
-const ADMIN_PASSWORD = 'eeefestadmin';
+export const ADMIN_EMAIL = 'pes.ieee@diu.edu.bd';
+export const ADMIN_PASSWORD = 'PesDiuSbc2026';
 
 const INITIAL_DURATION = 1200; // 20 minutes default
 
@@ -127,6 +128,7 @@ export const DEFAULT_STATE = {
   participants: [],
   joinedParticipants: {}, // [participantId]: { id, name, teamName, arena, lastSeen, tabSwitches }
   registeredContenders: [],
+  judges: [], // 4 judges: [{ id, name, email, password, judgeNumber, registeredAt }]
   tokenBudget: DEFAULT_TOKEN_BUDGET,
 
   // Live Poll State
@@ -194,6 +196,7 @@ export function sanitizeState(raw) {
     },
     participants: toSafeArray(raw.participants, []),
     registeredContenders: toSafeArray(raw.registeredContenders, []),
+    judges: toSafeArray(raw.judges, []),
     tokenBudget: Number(raw.tokenBudget) || DEFAULT_TOKEN_BUDGET,
     published: Boolean(raw.published),
     lastUpdated: raw.lastUpdated || Date.now(),
@@ -203,28 +206,30 @@ export function sanitizeState(raw) {
 export function resolveViewFromUrl() {
   if (typeof window === 'undefined') return 'presentation';
 
+  const validViews = ['presentation', 'admin', 'submit', 'judge'];
+
   // 1. Check search parameter: ?view=admin or ?v=admin
   try {
     const params = new URLSearchParams(window.location.search);
     const viewParam = params.get('view') || params.get('v');
-    if (viewParam && ['presentation', 'admin', 'submit'].includes(viewParam.toLowerCase())) {
+    if (viewParam && validViews.includes(viewParam.toLowerCase())) {
       return viewParam.toLowerCase();
     }
   } catch (e) {}
 
-  // 2. Check hash: #admin, #/admin, #admin/, #submit, etc.
+  // 2. Check hash: #admin, #/admin, #admin/, #submit, #judge, etc.
   if (window.location.hash) {
     const cleanHash = window.location.hash.replace(/^[#/]+/, '').replace(/\/+$/, '').toLowerCase();
-    if (['presentation', 'admin', 'submit'].includes(cleanHash)) {
+    if (validViews.includes(cleanHash)) {
       return cleanHash;
     }
   }
 
-  // 3. Check pathname: /admin or /submit (for direct path routing)
+  // 3. Check pathname: /admin or /submit or /judge (for direct path routing)
   try {
     const pathParts = window.location.pathname.split('/').filter(Boolean);
     const lastPart = (pathParts[pathParts.length - 1] || '').toLowerCase();
-    if (['presentation', 'admin', 'submit'].includes(lastPart)) {
+    if (validViews.includes(lastPart)) {
       return lastPart;
     }
   } catch (e) {}
@@ -435,7 +440,7 @@ export function BattleProvider({ children }) {
   }, [battleState.quiz?.status, battleState.quiz?.questionEndsAt, battleState, syncState]);
 
   const switchView = useCallback((newView) => {
-    if (!['presentation', 'admin', 'submit'].includes(newView)) return;
+    if (!['presentation', 'admin', 'submit', 'judge'].includes(newView)) return;
     setActiveView(newView);
     const targetHash = `#${newView}`;
     if (window.location.hash !== targetHash) {
@@ -453,7 +458,7 @@ export function BattleProvider({ children }) {
     window.addEventListener('hashchange', handleUrlChange);
     window.addEventListener('popstate', handleUrlChange);
 
-    // Adjudicator shortcuts: Alt+A or Ctrl+Shift+A opens Admin, Alt+P opens Presentation, Alt+S opens Contender
+    // Adjudicator shortcuts: Alt+A opens Admin, Alt+P opens Presentation, Alt+S opens Contender, Alt+J opens Judge
     const handleKeyDown = (e) => {
       if ((e.altKey && (e.key === 'a' || e.key === 'A')) || 
           (e.ctrlKey && e.shiftKey && (e.key === 'a' || e.key === 'A'))) {
@@ -467,6 +472,10 @@ export function BattleProvider({ children }) {
                  (e.ctrlKey && e.shiftKey && (e.key === 's' || e.key === 'S'))) {
         e.preventDefault();
         switchView('submit');
+      } else if ((e.altKey && (e.key === 'j' || e.key === 'J')) || 
+                 (e.ctrlKey && e.shiftKey && (e.key === 'j' || e.key === 'J'))) {
+        e.preventDefault();
+        switchView('judge');
       }
     };
 
@@ -1279,20 +1288,235 @@ export function BattleProvider({ children }) {
     });
   }, [battleState, syncState]);
 
-  // Auth & General
-  const authenticateAdmin = useCallback((enteredPassword) => {
-    if (enteredPassword === ADMIN_PASSWORD) {
+  // Judge Session State for current browser tab
+  const [currentJudge, setCurrentJudge] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pb_judge_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Admin Authentication: pes.ieee@diu.edu.bd / PesDiuSbc2026
+  const authenticateAdmin = useCallback((enteredEmail, enteredPassword) => {
+    const cleanEmail = (enteredEmail || '').trim().toLowerCase();
+    const cleanPass = (enteredPassword || '').trim();
+
+    // Support both dual-field (email + password) and single-password fallback
+    if (
+      (cleanEmail === ADMIN_EMAIL.toLowerCase() && cleanPass === ADMIN_PASSWORD) ||
+      (cleanPass === ADMIN_PASSWORD && !cleanEmail) ||
+      (cleanEmail === ADMIN_PASSWORD && !cleanPass)
+    ) {
       setIsAdminAuthenticated(true);
       sessionStorage.setItem('pb_admin_auth', 'true');
+      sessionStorage.setItem('pb_admin_email', ADMIN_EMAIL);
       return { success: true };
     }
-    return { success: false, error: 'Incorrect administrator password' };
+    return { success: false, error: 'Incorrect credentials. Admin Email: pes.ieee@diu.edu.bd' };
   }, []);
 
   const logoutAdmin = useCallback(() => {
     setIsAdminAuthenticated(false);
     sessionStorage.removeItem('pb_admin_auth');
+    sessionStorage.removeItem('pb_admin_email');
   }, []);
+
+  // Contender (User) Authentication: Email + Passcode
+  const authenticateContender = useCallback((enteredEmail, enteredPasscode) => {
+    const cleanEmail = (enteredEmail || '').trim().toLowerCase();
+    const cleanPass = (enteredPasscode || '').trim();
+
+    if (!cleanEmail || !cleanPass) {
+      return { success: false, error: 'Please enter both your Email address and your unique Passcode.' };
+    }
+
+    const currentList = toSafeArray(battleState.registeredContenders, []);
+    const match = currentList.find((c) => {
+      const cEmail = (c.email || c.mail || '').trim().toLowerCase();
+      const cPass = String(c.passcode || c.password || '').trim();
+      return cEmail === cleanEmail && cPass === cleanPass;
+    });
+
+    if (match) {
+      return { success: true, contender: match };
+    }
+
+    return { 
+      success: false, 
+      error: 'Invalid Email or Passcode. Please check the unique passcode sent to your mail by the organizers.' 
+    };
+  }, [battleState.registeredContenders]);
+
+  // Judge Registration (Max 4 Judges using their Gmail and Password)
+  const registerJudge = useCallback(({ name, email, password }) => {
+    const cleanName = (name || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPass = (password || '').trim();
+
+    if (!cleanName) return { success: false, error: 'Please enter your Full Name.' };
+    if (!cleanEmail || !cleanEmail.includes('@')) return { success: false, error: 'Please enter a valid Gmail / Email address.' };
+    if (!cleanPass || cleanPass.length < 4) return { success: false, error: 'Password must be at least 4 characters long.' };
+
+    const currentJudges = toSafeArray(battleState.judges, []);
+    if (currentJudges.length >= 4) {
+      return { success: false, error: 'All 4 Judge positions are already registered. Please log into your existing account.' };
+    }
+
+    if (currentJudges.some(j => j.email?.toLowerCase() === cleanEmail)) {
+      return { success: false, error: 'This Gmail address is already registered as an adjudicator. Please log in.' };
+    }
+
+    const judgeNumber = currentJudges.length + 1;
+    const newJudge = {
+      id: `judge-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      name: cleanName,
+      email: cleanEmail,
+      password: cleanPass,
+      judgeNumber,
+      registeredAt: Date.now(),
+    };
+
+    const updated = [...currentJudges, newJudge];
+    syncState({
+      ...battleState,
+      judges: updated,
+      lastUpdated: Date.now(),
+    });
+
+    setCurrentJudge(newJudge);
+    try {
+      localStorage.setItem('pb_judge_session', JSON.stringify(newJudge));
+    } catch (e) {}
+
+    return { success: true, judge: newJudge };
+  }, [battleState, syncState]);
+
+  // Judge Authentication (Login with Gmail & Password)
+  const authenticateJudge = useCallback((enteredEmail, enteredPassword) => {
+    const cleanEmail = (enteredEmail || '').trim().toLowerCase();
+    const cleanPass = (enteredPassword || '').trim();
+
+    if (!cleanEmail || !cleanPass) {
+      return { success: false, error: 'Please enter both your Gmail and password.' };
+    }
+
+    const currentJudges = toSafeArray(battleState.judges, []);
+    const match = currentJudges.find(j => j.email?.toLowerCase() === cleanEmail && j.password === cleanPass);
+
+    if (match) {
+      setCurrentJudge(match);
+      try {
+        localStorage.setItem('pb_judge_session', JSON.stringify(match));
+      } catch (e) {}
+      return { success: true, judge: match };
+    }
+
+    return { success: false, error: 'Invalid Gmail or password. If you have not created your judge account yet, please sign up.' };
+  }, [battleState.judges]);
+
+  const logoutJudge = useCallback(() => {
+    setCurrentJudge(null);
+    try {
+      localStorage.removeItem('pb_judge_session');
+    } catch (e) {}
+  }, []);
+
+  const deleteJudge = useCallback((judgeId) => {
+    const currentJudges = toSafeArray(battleState.judges, []);
+    const filtered = currentJudges.filter(j => j.id !== judgeId);
+    const reindexed = filtered.map((j, idx) => ({ ...j, judgeNumber: idx + 1 }));
+    syncState({
+      ...battleState,
+      judges: reindexed,
+      lastUpdated: Date.now(),
+    });
+    if (currentJudge?.id === judgeId) {
+      logoutJudge();
+    }
+  }, [battleState, currentJudge, syncState, logoutJudge]);
+
+  // Judge Evaluation Submission: Calculates per-judge marks and aggregate average score
+  const submitJudgeEvaluation = useCallback(({ participantId, judgeId, marks }) => {
+    const now = Date.now();
+    const cleanId = (participantId || '').trim().toUpperCase();
+    const currentParticipants = toSafeArray(battleState.participants, []);
+
+    let existing = currentParticipants.find(p => (p.participantId?.toUpperCase() === cleanId || p.id === cleanId));
+
+    if (!existing) {
+      const reg = (battleState.registeredContenders || []).find(c => c.participantId?.toUpperCase() === cleanId);
+      existing = {
+        id: cleanId,
+        participantId: cleanId,
+        name: reg?.name || `Contender ${cleanId}`,
+        teamName: reg?.teamName || 'Solo Contender',
+        deskNumber: reg?.deskNumber || 'Desk 01',
+        email: reg?.email || '',
+        finishTimeFormatted: '12m 00s',
+        finishSeconds: 720,
+        tokensUsed: 0,
+        dailyLimitPercentageUsed: 0,
+        judgeMarks: {},
+        totalScore: 0,
+        status: 'Evaluated',
+      };
+    }
+
+    const currentJudgeMarks = existing.judgeMarks || {};
+    const judgeInfo = (battleState.judges || []).find(j => j.id === judgeId) || currentJudge;
+
+    const newJudgeEntry = {
+      judgeId,
+      judgeName: judgeInfo?.name || `Judge ${judgeInfo?.judgeNumber || 1}`,
+      judgeNumber: judgeInfo?.judgeNumber || 1,
+      judgeEmail: judgeInfo?.email || '',
+      objectiveScore: Number(marks.objectiveScore) || 0,
+      noveltyScore: Number(marks.noveltyScore) || 0,
+      presentationScore: Number(marks.presentationScore) || 0,
+      tokenScore: Number(marks.tokenScore) || 0,
+      timeScore: Number(marks.timeScore) || 0,
+      totalScore: Number(marks.totalScore) || 0,
+      notes: marks.notes || '',
+      evaluatedAt: now,
+    };
+
+    const updatedJudgeMarks = {
+      ...currentJudgeMarks,
+      [judgeId]: newJudgeEntry,
+    };
+
+    // Calculate composite / average score across all judges who marked this contender
+    const judgeScoresList = Object.values(updatedJudgeMarks);
+    const avgTotalScore = judgeScoresList.length > 0
+      ? Math.round(judgeScoresList.reduce((sum, j) => sum + (Number(j.totalScore) || 0), 0) / judgeScoresList.length)
+      : newJudgeEntry.totalScore;
+
+    const updatedParticipant = {
+      ...existing,
+      judgeMarks: updatedJudgeMarks,
+      totalScore: avgTotalScore,
+      objectiveScore: newJudgeEntry.objectiveScore,
+      noveltyScore: newJudgeEntry.noveltyScore,
+      presentationScore: newJudgeEntry.presentationScore,
+      evaluatedByJudgesCount: judgeScoresList.length,
+      lastEvaluatedAt: now,
+    };
+
+    const existsInList = currentParticipants.some(p => (p.participantId?.toUpperCase() === cleanId || p.id === cleanId));
+    const updatedList = existsInList
+      ? currentParticipants.map(p => (p.participantId?.toUpperCase() === cleanId || p.id === cleanId) ? updatedParticipant : p)
+      : [...currentParticipants, updatedParticipant];
+
+    syncState({
+      ...battleState,
+      participants: updatedList,
+      lastUpdated: now,
+    });
+
+    return { success: true, participant: updatedParticipant };
+  }, [battleState, currentJudge, syncState]);
 
   const configureFirebase = useCallback((configObj) => {
     saveStoredFirebaseConfig(configObj);
@@ -1358,6 +1582,18 @@ export function BattleProvider({ children }) {
     firebaseError,
     switchView,
     switchArena,
+
+    // Contender Auth
+    authenticateContender,
+
+    // Judges
+    judges: toSafeArray(battleState.judges, []),
+    currentJudge,
+    registerJudge,
+    authenticateJudge,
+    logoutJudge,
+    deleteJudge,
+    submitJudgeEvaluation,
 
     // Presence & Anti-Cheat
     registerPresence,
