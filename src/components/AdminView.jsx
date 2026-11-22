@@ -105,7 +105,7 @@ export default function AdminView() {
   const [editingPollModal, setEditingPollModal] = useState(null);
 
   // Login form state
-  const [adminEmailInput, setAdminEmailInput] = useState('pes.ieee@diu.edu.bd');
+  const [adminEmailInput, setAdminEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -285,8 +285,8 @@ export default function AdminView() {
                 required
                 value={adminEmailInput}
                 onChange={(e) => setAdminEmailInput(e.target.value)}
-                placeholder="pes.ieee@diu.edu.bd"
-                className="w-full px-4 py-2.5 rounded bg-dark-950 border border-white/15 focus:border-fest-pes focus:ring-1 focus:ring-fest-pes text-white text-sm font-mono placeholder-slate-400"
+                placeholder="Enter admin email address..."
+                className="w-full px-4 py-2.5 rounded bg-dark-950 border border-white/15 focus:border-fest-pes focus:ring-1 focus:ring-fest-pes text-white text-sm font-mono placeholder-slate-500"
               />
             </div>
 
@@ -302,7 +302,7 @@ export default function AdminView() {
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
                   placeholder="Enter administrator password..."
-                  className="w-full px-4 py-2.5 rounded bg-dark-950 border border-white/15 focus:border-fest-pes focus:ring-1 focus:ring-fest-pes text-white text-sm font-mono placeholder-slate-400"
+                  className="w-full px-4 py-2.5 rounded bg-dark-950 border border-white/15 focus:border-fest-pes focus:ring-1 focus:ring-fest-pes text-white text-sm font-mono placeholder-slate-500"
                 />
                 <button
                   type="button"
@@ -310,19 +310,6 @@ export default function AdminView() {
                   className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mt-1.5">
-                <span>Pass: <code className="text-fest-pes font-bold">PesDiuSbc2026</code></span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAdminEmailInput('pes.ieee@diu.edu.bd');
-                    setPasswordInput('PesDiuSbc2026');
-                  }}
-                  className="text-fest-cyan hover:underline text-[10px] font-semibold uppercase tracking-wider"
-                >
-                  ⚡ Auto-Fill Credentials
                 </button>
               </div>
             </div>

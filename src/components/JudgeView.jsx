@@ -355,7 +355,7 @@ export default function JudgeView() {
                 required
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="e.g. judge.rahman@gmail.com"
+                placeholder="Enter your Gmail address"
                 className="w-full px-3 py-2.5 rounded bg-dark-950 border border-white/15 text-white font-mono text-sm focus:border-fest-amber"
               />
             </div>
@@ -371,7 +371,7 @@ export default function JudgeView() {
                   required
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="Enter your judge password..."
+                  placeholder="Enter your password..."
                   className="w-full px-3 py-2.5 rounded bg-dark-950 border border-white/15 text-white font-mono text-sm focus:border-fest-amber"
                 />
                 <button

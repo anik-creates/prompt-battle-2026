@@ -245,7 +245,7 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
                 required
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="e.g. sifat2305131213@diu.edu.bd or 232-33-213"
+                placeholder="Enter your registered email or Student ID"
                 className="w-full px-3 py-2.5 rounded-lg bg-dark-950 border border-white/15 text-white font-mono text-xs focus:border-fest-cyan"
               />
               <p className="text-[10px] text-slate-400 mt-1">
@@ -255,20 +255,17 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
 
             {/* Coupon Code / Password Field */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-slate-300 font-bold flex items-center gap-1.5">
-                  <Ticket className="w-3.5 h-3.5 text-fest-pink" />
-                  <span>Coupon Code (Password) *</span>
-                </label>
-                <span className="text-[10px] text-fest-pink font-semibold">e.g. PBC001</span>
-              </div>
+              <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1.5">
+                <Ticket className="w-3.5 h-3.5 text-fest-pink" />
+                <span>Coupon Code (Password) *</span>
+              </label>
               <div className="relative">
                 <input
                   type={showPasscode ? 'text' : 'password'}
                   required
                   value={passcodeInput}
                   onChange={(e) => setPasscodeInput(e.target.value)}
-                  placeholder="Enter your Coupon Code..."
+                  placeholder="Enter your password..."
                   className="w-full px-3 py-2.5 rounded-lg bg-dark-950 border border-white/15 text-fest-pink font-bold font-mono text-sm uppercase tracking-wider focus:border-fest-pink"
                 />
                 <button
