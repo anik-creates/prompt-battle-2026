@@ -18,14 +18,14 @@
         var path = window.location.pathname;
         var parts = path.split('/').filter(Boolean);
         var last = (parts[parts.length - 1] || '').toLowerCase();
-        if (['admin', 'submit', 'presentation'].indexOf(last) !== -1) {
+        if (['admin', 'submit', 'presentation', 'judge'].indexOf(last) !== -1) {
           var cleanPath = path.substring(0, path.lastIndexOf('/' + last) + 1);
           window.history.replaceState(null, '', cleanPath + '#' + last + window.location.search);
         }
       })();
     </script>
-    <script type="module" crossorigin src="./assets/index-KTooSfix.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-60ypD1IK.css">
+    <script type="module" crossorigin src="./assets/index-DYvN31FS.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-kSFQBqyu.css">
   </head>
   <body class="bg-dark-950 text-slate-100 min-h-screen antialiased selection:bg-fest-pink selection:text-white">
     <div id="root"></div>
