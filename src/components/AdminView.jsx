@@ -312,6 +312,19 @@ export default function AdminView() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mt-1.5">
+                <span>Pass: <code className="text-fest-pes font-bold">PesDiuSbc2026</code></span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminEmailInput('pes.ieee@diu.edu.bd');
+                    setPasswordInput('PesDiuSbc2026');
+                  }}
+                  className="text-fest-cyan hover:underline text-[10px] font-semibold uppercase tracking-wider"
+                >
+                  ⚡ Auto-Fill Credentials
+                </button>
+              </div>
             </div>
 
             <button
