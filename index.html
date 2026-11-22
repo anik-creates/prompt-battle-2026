@@ -12,15 +12,17 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Pre-bootstrap SPA path to hash converter -->
+    <!-- Clean Path Route Initializer (removes # and maintains clean /submit, /admin, etc.) -->
     <script>
       (function() {
-        var path = window.location.pathname;
-        var parts = path.split('/').filter(Boolean);
-        var last = (parts[parts.length - 1] || '').toLowerCase();
-        if (['admin', 'submit', 'presentation', 'judge'].indexOf(last) !== -1) {
-          var cleanPath = path.substring(0, path.lastIndexOf('/' + last) + 1);
-          window.history.replaceState(null, '', cleanPath + '#' + last + window.location.search);
+        if (window.location.hash) {
+          var clean = window.location.hash.replace(/^[#/]+/, '').replace(/\/+$/, '').toLowerCase();
+          if (['admin', 'submit', 'presentation', 'judge'].indexOf(clean) !== -1) {
+            var isGh = window.location.pathname.indexOf('/prompt-battle-2026') !== -1;
+            var basePath = isGh ? '/prompt-battle-2026' : '';
+            var target = clean === 'presentation' ? basePath + '/' : basePath + '/' + clean;
+            window.history.replaceState(null, '', target + window.location.search);
+          }
         }
       })();
     </script>

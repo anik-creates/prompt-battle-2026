@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Prompt Battle 2026 • Loading Arena...</title>
+    <title>Prompt Battle 2026 • Loading...</title>
     <script>
       (function() {
         var path = window.location.pathname;
@@ -18,17 +18,17 @@
         var search = window.location.search || '';
         var origin = window.location.origin;
         var isGh = window.location.pathname.indexOf('/prompt-battle-2026') !== -1;
-        var basePath = isGh ? '/prompt-battle-2026/' : '/';
+        var basePath = isGh ? '/prompt-battle-2026' : '';
         
-        if (target) {
-          window.location.replace(origin + basePath + '#' + target + search);
+        if (target && target !== 'presentation') {
+          window.location.replace(origin + basePath + '/' + target + search);
         } else {
-          window.location.replace(origin + basePath);
+          window.location.replace(origin + basePath + '/' + search);
         }
       })();
     </script>
   </head>
   <body style="background:#030712;color:#9ca3af;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-    <p>Redirecting to Prompt Battle Arena...</p>
+    <p>Loading Prompt Battle Arena...</p>
   </body>
 </html>

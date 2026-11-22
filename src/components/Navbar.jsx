@@ -94,7 +94,7 @@ export default function Navbar() {
                     ? 'bg-fest-cyan/15 text-fest-cyan border border-fest-cyan/40 shadow-[0_0_12px_rgba(0,229,255,0.2)] font-semibold'
                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`}
-                title="Projector / Audience View (#presentation)"
+                title="Projector / Audience View (/presentation)"
               >
                 <Tv className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Projector</span>
@@ -108,7 +108,7 @@ export default function Navbar() {
                     ? 'bg-fest-pink/15 text-fest-pink border border-fest-pink/40 shadow-[0_0_12px_rgba(255,0,128,0.2)] font-semibold'
                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`}
-                title="Participant Contender Portal (#submit)"
+                title="Participant Contender Portal (/submit)"
               >
                 <Smartphone className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Contender</span>
@@ -122,7 +122,7 @@ export default function Navbar() {
                     ? 'bg-fest-amber/20 text-fest-amber border border-fest-amber/40 shadow-[0_0_12px_rgba(255,183,0,0.25)] font-semibold'
                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`}
-                title="Judge Adjudication Portal (#judge • 4 Judges)"
+                title="Judge Adjudication Portal (/judge • 4 Judges)"
               >
                 <Scale className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Judge</span>
@@ -136,7 +136,7 @@ export default function Navbar() {
                     ? 'bg-fest-pes text-dark-950 font-bold border border-fest-pes shadow-[0_0_16px_rgba(108,179,63,0.4)]'
                     : 'bg-fest-pes/10 border border-fest-pes/40 text-fest-pes hover:bg-fest-pes/20'
                 }`}
-                title="Admin Command Arena (#admin • pes.ieee@diu.edu.bd)"
+                title="Admin Command Arena (/admin • pes.ieee@diu.edu.bd)"
               >
                 <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>Admin</span>
@@ -157,7 +157,7 @@ export default function Navbar() {
             {activeView === 'admin' && (
               <div className="hidden lg:flex items-center space-x-2">
                 <a
-                  href="./#presentation"
+                  href="./presentation"
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-dark-900 border border-white/15 text-fest-cyan hover:text-white font-mono text-xs transition-colors"

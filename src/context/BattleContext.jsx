@@ -203,12 +203,26 @@ export function sanitizeState(raw) {
   };
 }
 
+export function getBasePath() {
+  if (typeof window === 'undefined') return '';
+  return window.location.pathname.startsWith('/prompt-battle-2026') ? '/prompt-battle-2026' : '';
+}
+
 export function resolveViewFromUrl() {
   if (typeof window === 'undefined') return 'presentation';
 
   const validViews = ['presentation', 'admin', 'submit', 'judge'];
 
-  // 1. Check search parameter: ?view=admin or ?v=admin
+  // 1. Check pathname: /submit, /admin, /judge, /presentation, or /prompt-battle-2026/submit
+  try {
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const lastPart = (pathParts[pathParts.length - 1] || '').toLowerCase();
+    if (validViews.includes(lastPart)) {
+      return lastPart;
+    }
+  } catch (e) {}
+
+  // 2. Check search parameter: ?view=admin or ?v=admin
   try {
     const params = new URLSearchParams(window.location.search);
     const viewParam = params.get('view') || params.get('v');
@@ -217,22 +231,13 @@ export function resolveViewFromUrl() {
     }
   } catch (e) {}
 
-  // 2. Check hash: #admin, #/admin, #admin/, #submit, #judge, etc.
+  // 3. Fallback for legacy hash bookmarks (strip # and convert)
   if (window.location.hash) {
     const cleanHash = window.location.hash.replace(/^[#/]+/, '').replace(/\/+$/, '').toLowerCase();
     if (validViews.includes(cleanHash)) {
       return cleanHash;
     }
   }
-
-  // 3. Check pathname: /admin or /submit or /judge (for direct path routing)
-  try {
-    const pathParts = window.location.pathname.split('/').filter(Boolean);
-    const lastPart = (pathParts[pathParts.length - 1] || '').toLowerCase();
-    if (validViews.includes(lastPart)) {
-      return lastPart;
-    }
-  } catch (e) {}
 
   return 'presentation';
 }
@@ -442,21 +447,37 @@ export function BattleProvider({ children }) {
   const switchView = useCallback((newView) => {
     if (!['presentation', 'admin', 'submit', 'judge'].includes(newView)) return;
     setActiveView(newView);
-    const targetHash = `#${newView}`;
-    if (window.location.hash !== targetHash) {
-      window.location.hash = targetHash;
+
+    // Clean Path Routing without #
+    const basePath = getBasePath();
+    const targetPath = newView === 'presentation' ? `${basePath}/` : `${basePath}/${newView}`;
+
+    if (window.location.pathname !== targetPath || window.location.hash) {
+      window.history.pushState(null, '', targetPath);
     }
   }, []);
 
-  // Listen for hashchange, popstate, and keyboard shortcuts
+  // Upgrade any legacy # hash in URL to clean path on mount
+  useEffect(() => {
+    if (window.location.hash) {
+      const cleanHash = window.location.hash.replace(/^[#/]+/, '').replace(/\/+$/, '').toLowerCase();
+      if (['presentation', 'admin', 'submit', 'judge'].includes(cleanHash)) {
+        const basePath = getBasePath();
+        const targetPath = cleanHash === 'presentation' ? `${basePath}/` : `${basePath}/${cleanHash}`;
+        window.history.replaceState(null, '', targetPath + window.location.search);
+      }
+    }
+  }, []);
+
+  // Listen for popstate and keyboard shortcuts
   useEffect(() => {
     const handleUrlChange = () => {
       const detected = resolveViewFromUrl();
       setActiveView(detected);
     };
 
-    window.addEventListener('hashchange', handleUrlChange);
     window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
 
     // Adjudicator shortcuts: Alt+A opens Admin, Alt+P opens Presentation, Alt+S opens Contender, Alt+J opens Judge
     const handleKeyDown = (e) => {
@@ -482,8 +503,8 @@ export function BattleProvider({ children }) {
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      window.removeEventListener('hashchange', handleUrlChange);
       window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [switchView]);

@@ -1250,7 +1250,7 @@ export default function AdminView() {
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-fest-amber text-dark-950 font-bold uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(255,183,0,0.3)] hover:opacity-95 transition-all"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              <span>Open Judge Portal (#judge)</span>
+              <span>Open Judge Portal (/judge)</span>
             </button>
           </div>
 
@@ -1309,7 +1309,7 @@ export default function AdminView() {
                     <div className="py-4 text-center space-y-1">
                       <span className="text-xs text-slate-400 font-bold block">Slot Available</span>
                       <p className="text-[10px] text-slate-400 leading-relaxed">
-                        Judge can register using Gmail at <code className="text-fest-amber">/#judge</code>
+                        Judge can register using Gmail at <code className="text-fest-amber">/judge</code>
                       </p>
                     </div>
                   )}
