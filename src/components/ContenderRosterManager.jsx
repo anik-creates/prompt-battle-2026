@@ -86,10 +86,10 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
       }
 
       if (parsed.length === 0) {
-        setImportError('No valid contender rows found. Ensure the file contains "participantId" (or "id") and "name".');
+        setImportError('No valid participant rows found. Ensure the file contains "participantId" (or "id") and "name".');
       } else {
         bulkAddRegisteredContenders(parsed);
-        setImportStatus(`Successfully registered ${parsed.length} contenders from ${file.name}!`);
+        setImportStatus(`Successfully registered ${parsed.length} participants from ${file.name}!`);
       }
     } catch (err) {
       console.error(err);
@@ -111,12 +111,12 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
     try {
       const parsed = parseContenderJSON(jsonInputText);
       if (parsed.length === 0) {
-        setImportError('No valid contenders found in the pasted JSON. Please check field names ("id" and "name").');
+        setImportError('No valid participants found in the pasted JSON. Please check field names ("id" and "name").');
         return;
       }
 
       bulkAddRegisteredContenders(parsed);
-      setImportStatus(`Successfully registered ${parsed.length} contenders from pasted JSON!`);
+      setImportStatus(`Successfully registered ${parsed.length} participants from pasted JSON!`);
       setJsonInputText('');
     } catch (err) {
       setImportError(err.message || 'Invalid JSON syntax. Please verify commas and braces.');
@@ -134,7 +134,7 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
       name: newName.trim(),
       email: newEmail.trim().toLowerCase() || `${cleanId.toLowerCase()}@diu.edu.bd`,
       passcode: newPasscode.trim() || `PB${Math.floor(1000 + Math.random() * 9000)}`,
-      teamName: newTeam.trim() || 'Solo Contender',
+      teamName: newTeam.trim() || 'Solo Participant',
       deskNumber: newDesk.trim() || 'Desk 01',
     });
 
@@ -318,7 +318,7 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
               <div className="flex items-center gap-2">
                 <FileCode className="w-5 h-5 text-fest-cyan" />
                 <h3 className="font-sans font-bold text-base text-white uppercase tracking-tight">
-                  Upload Contenders via JSON / Excel
+                  Upload Participants via JSON / Excel
                 </h3>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useBattle } from '../context/BattleContext';
 import { 
   Scale, 
@@ -49,6 +49,27 @@ export default function JudgeView() {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
   const [authSuccess, setAuthSuccess] = useState('');
+
+  // Aggressively clear authentication inputs on mount to defeat browser credential autofill
+  useEffect(() => {
+    setEmailInput('');
+    setPasswordInput('');
+    setNameInput('');
+    const t1 = setTimeout(() => {
+      setEmailInput('');
+      setPasswordInput('');
+      setNameInput('');
+    }, 50);
+    const t2 = setTimeout(() => {
+      setEmailInput('');
+      setPasswordInput('');
+      setNameInput('');
+    }, 200);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState('');
@@ -272,6 +293,30 @@ export default function JudgeView() {
       <div className="w-full max-w-lg mx-auto py-12 px-4 font-mono">
         <div className="p-6 sm:p-8 rounded-3xl bg-dark-900 border border-white/15 shadow-[0_0_60px_rgba(0,0,0,0.85)] space-y-6">
           
+          {/* Universal 3-Role Switcher: Participant | Judge (Active) | Admin */}
+          <div className="grid grid-cols-3 p-1 rounded-xl bg-dark-950 border border-white/10 text-xs font-bold font-mono">
+            <button
+              type="button"
+              onClick={() => switchView('submit')}
+              className="py-2 px-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all text-center truncate"
+            >
+              Participant
+            </button>
+            <button
+              type="button"
+              className="py-2 px-1 rounded-lg bg-fest-amber text-dark-950 shadow-[0_0_15px_rgba(255,183,0,0.3)] text-center truncate font-black"
+            >
+              Judge
+            </button>
+            <button
+              type="button"
+              onClick={() => switchView('admin')}
+              className="py-2 px-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all text-center truncate"
+            >
+              Admin
+            </button>
+          </div>
+
           <div className="text-center space-y-2">
             <div className="w-14 h-14 rounded-2xl bg-fest-amber/15 border border-fest-amber/30 text-fest-amber flex items-center justify-center mx-auto shadow-[0_0_25px_rgba(255,183,0,0.3)]">
               <Scale className="w-7 h-7" />
@@ -327,7 +372,23 @@ export default function JudgeView() {
           )}
 
           {/* Form */}
-          <form onSubmit={authMode === 'login' ? handleLogin : handleSignUp} className="space-y-4 text-xs">
+          <form onSubmit={authMode === 'login' ? handleLogin : handleSignUp} autoComplete="off" className="space-y-4 text-xs">
+            {/* Decoy hidden inputs to thwart aggressive browser credential autofill */}
+            <input 
+              type="text" 
+              name="decoy_judge_prevent_autofill_user" 
+              style={{ display: 'none', position: 'absolute', opacity: 0 }} 
+              tabIndex="-1" 
+              autoComplete="off" 
+            />
+            <input 
+              type="password" 
+              name="decoy_judge_prevent_autofill_pwd" 
+              style={{ display: 'none', position: 'absolute', opacity: 0 }} 
+              tabIndex="-1" 
+              autoComplete="off" 
+            />
+
             {authMode === 'signup' && (
               <div>
                 <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1.5">
@@ -336,9 +397,11 @@ export default function JudgeView() {
                 </label>
                 <input
                   type="text"
+                  name="judge_new_account_full_name"
                   required
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
+                  autoComplete="off"
                   placeholder="Enter your full name and title..."
                   className="w-full px-3 py-2.5 rounded bg-dark-950 border border-white/15 text-white font-sans text-sm focus:border-fest-amber"
                 />
@@ -352,9 +415,14 @@ export default function JudgeView() {
               </label>
               <input
                 type="email"
+                name="judge_auth_login_official_email"
                 required
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck="false"
                 placeholder="Enter your Gmail address"
                 className="w-full px-3 py-2.5 rounded bg-dark-950 border border-white/15 text-white font-mono text-sm focus:border-fest-amber"
               />
@@ -368,9 +436,11 @@ export default function JudgeView() {
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  name="judge_auth_secret_password_token"
                   required
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
+                  autoComplete="new-password"
                   placeholder="Enter your password..."
                   className="w-full px-3 py-2.5 rounded bg-dark-950 border border-white/15 text-white font-mono text-sm focus:border-fest-amber"
                 />
@@ -491,7 +561,7 @@ export default function JudgeView() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <div className="p-4 rounded-xl bg-dark-900 border border-white/10 flex items-center justify-between">
           <div>
-            <span className="text-xs text-slate-400 uppercase tracking-wider block">Total Contenders</span>
+            <span className="text-xs text-slate-400 uppercase tracking-wider block">Total Participants</span>
             <span className="text-2xl font-bold font-sans text-white">{unifiedContenders.length}</span>
           </div>
           <Award className="w-8 h-8 text-fest-cyan/40" />
@@ -522,7 +592,7 @@ export default function JudgeView() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by Contender Name, Participant ID, Desk, or Email..."
+            placeholder="Search by Participant Name, ID, Desk, or Email..."
             className="w-full pl-9 pr-4 py-2 rounded-lg bg-dark-950 border border-white/15 text-white text-xs focus:border-fest-amber placeholder-slate-500"
           />
         </div>
@@ -555,14 +625,14 @@ export default function JudgeView() {
         </div>
       </div>
 
-      {/* Contender Evaluation Cards List */}
+      {/* Participant Evaluation Cards List */}
       <div className="space-y-4">
         {filteredContenders.length === 0 ? (
           <div className="p-12 text-center rounded-2xl bg-dark-900 border border-white/10 space-y-2">
             <Scale className="w-10 h-10 text-slate-600 mx-auto" />
-            <h3 className="text-base font-bold text-slate-300">No Contenders Match Filters</h3>
+            <h3 className="text-base font-bold text-slate-300">No Participants Match Filters</h3>
             <p className="text-xs text-slate-500">
-              Ensure contenders have registered or check your active search term.
+              Ensure participants have registered or check your active search term.
             </p>
           </div>
         ) : (
@@ -639,12 +709,12 @@ export default function JudgeView() {
                 {isExpanded && (
                   <div className="p-5 border-t border-white/10 bg-dark-950/70 space-y-5 animate-in fade-in duration-200">
                     
-                    {/* Contender Submission Work Preview */}
+                    {/* Participant Submission Work Preview */}
                     <div className="p-4 rounded-xl bg-dark-900 border border-white/10 space-y-2">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                           <Sparkles className="w-3.5 h-3.5 text-fest-pink" />
-                          <span>Contender Submitted Work & Verification</span>
+                          <span>Participant Submitted Work & Verification</span>
                         </span>
                         {contender.submittedUrl ? (
                           <a
@@ -653,7 +723,7 @@ export default function JudgeView() {
                             rel="noreferrer"
                             className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-fest-cyan/15 text-fest-cyan hover:bg-fest-cyan/25 border border-fest-cyan/30 text-xs font-bold transition-all shadow-[0_0_12px_rgba(0,229,255,0.2)]"
                           >
-                            <span>Open Contender Project Link</span>
+                            <span>Open Participant Project Link</span>
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                         ) : (
@@ -745,7 +815,7 @@ export default function JudgeView() {
                             <span className="text-fest-amber font-bold font-mono">{scores.presentationScore} / 20 Pts</span>
                           </div>
                           <p className="text-[10px] text-slate-400">
-                            Contender explanation of model choices, token reasoning, and prompt defense.
+                            Participant explanation of model choices, token reasoning, and prompt defense.
                           </p>
                           <input
                             type="range"

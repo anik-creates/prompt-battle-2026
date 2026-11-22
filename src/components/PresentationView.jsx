@@ -190,7 +190,7 @@ export default function PresentationView() {
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-fest-cyan" />
             <h2 className="text-lg font-bold font-sans tracking-wide text-white uppercase">
-              Submitted Contenders
+              Submitted Participants
             </h2>
             <span className="px-2.5 py-0.5 rounded-full bg-dark-900 border border-white/10 text-xs font-mono text-fest-cyan font-bold">
               {participants.length} Finished / {Math.max(participants.length, totalJoinedCount)} Connected
@@ -207,7 +207,7 @@ export default function PresentationView() {
             <Terminal className="w-8 h-8 text-slate-400 mx-auto mb-2" />
             <p className="text-sm">Waiting for participants to submit work...</p>
             <p className="text-xs text-slate-400 mt-1">
-              Contenders who click "I Have Finished" will appear here instantaneously with their recorded time.
+              Participants who click "Lock Finish Time & Submit Battle Work" will appear here instantaneously with their recorded time.
             </p>
           </div>
         ) : (

@@ -28,7 +28,8 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
     registeredContenders = [], 
     authenticateContender,
     registerPresence, 
-    activeArena 
+    activeArena,
+    switchView
   } = useBattle();
 
   const [session, setSession] = useState(() => {
@@ -46,6 +47,24 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
   const [showPasscode, setShowPasscode] = useState(false);
   const [error, setError] = useState('');
   const [copiedField, setCopiedField] = useState(null);
+
+  // Clear inputs on mount to completely prevent browser password managers from auto-filling
+  useEffect(() => {
+    setEmailInput('');
+    setPasscodeInput('');
+    const t1 = setTimeout(() => {
+      setEmailInput('');
+      setPasscodeInput('');
+    }, 50);
+    const t2 = setTimeout(() => {
+      setEmailInput('');
+      setPasscodeInput('');
+    }, 200);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
 
   // Quick picker search modal
   const [showQuickPicker, setShowQuickPicker] = useState(false);
@@ -144,7 +163,7 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
         phone: match.phone || '',
         couponCode: match.couponCode || match.passcode || cleanPasscode,
         passcode: match.passcode || match.couponCode || cleanPasscode,
-        teamName: match.teamName || 'Solo Contender',
+        teamName: match.teamName || 'Solo Participant',
         deskNumber: match.deskNumber || 'Desk 01',
         loggedInAt: Date.now(),
       };
@@ -160,7 +179,7 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
       setError('');
     } else {
       if (registeredContenders.length === 0) {
-        setError('No contenders found on roster. Please ask organizers to verify the participants list.');
+        setError('No participants found on roster. Please ask organizers to verify the participants list.');
       } else {
         setError(res.error || 'Invalid Email or Coupon Code. Please check your credentials.');
       }
@@ -214,19 +233,60 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
     return (
       <div className="w-full max-w-md mx-auto py-8 px-4 font-mono">
         <div className="p-6 sm:p-8 rounded-2xl bg-dark-900 border border-white/15 shadow-[0_0_50px_rgba(0,0,0,0.8)] space-y-6">
+          
+          {/* Universal 3-Role Switcher: Default Participant | Judge | Admin */}
+          <div className="grid grid-cols-3 p-1 rounded-xl bg-dark-950 border border-white/10 text-xs font-bold font-mono">
+            <button
+              type="button"
+              className="py-2 px-1 rounded-lg bg-gradient-to-r from-fest-pink to-fest-cyan text-white shadow-[0_0_15px_rgba(255,0,122,0.3)] text-center truncate"
+            >
+              Participant
+            </button>
+            <button
+              type="button"
+              onClick={() => switchView('judge')}
+              className="py-2 px-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all text-center truncate"
+            >
+              Judge
+            </button>
+            <button
+              type="button"
+              onClick={() => switchView('admin')}
+              className="py-2 px-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all text-center truncate"
+            >
+              Admin
+            </button>
+          </div>
+
           <div className="text-center space-y-2">
             <div className="w-12 h-12 rounded-xl bg-fest-pink/15 border border-fest-pink/30 text-fest-pink flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(255,0,122,0.3)]">
               <Key className="w-6 h-6" />
             </div>
             <h2 className="text-2xl font-bold font-sans text-white uppercase tracking-tight">
-              Contender Login
+              Participant Login
             </h2>
             <p className="text-xs text-slate-400">
               Enter your registered Email & unique Coupon Code (Password) provided by IEEE PES DIU SBC
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4 text-xs">
+          <form onSubmit={handleLogin} autoComplete="off" className="space-y-4 text-xs">
+            {/* Decoy hidden fields to intercept aggressive browser password manager autofill */}
+            <input 
+              type="text" 
+              name="chrome_prevent_autofill_bait_user" 
+              style={{ display: 'none', position: 'absolute', opacity: 0 }} 
+              tabIndex="-1" 
+              autoComplete="off" 
+            />
+            <input 
+              type="password" 
+              name="chrome_prevent_autofill_bait_pass" 
+              style={{ display: 'none', position: 'absolute', opacity: 0 }} 
+              tabIndex="-1" 
+              autoComplete="off" 
+            />
+
             {error && (
               <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -242,9 +302,14 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
               </label>
               <input
                 type="text"
+                name="participant_login_unique_id_field"
                 required
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck="false"
                 placeholder="Enter your registered email or Student ID"
                 className="w-full px-3 py-2.5 rounded-lg bg-dark-950 border border-white/15 text-white font-mono text-xs focus:border-fest-cyan"
               />
@@ -262,9 +327,11 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
               <div className="relative">
                 <input
                   type={showPasscode ? 'text' : 'password'}
+                  name="participant_coupon_code_unique_secret"
                   required
                   value={passcodeInput}
                   onChange={(e) => setPasscodeInput(e.target.value)}
+                  autoComplete="new-password"
                   placeholder="Enter your password..."
                   className="w-full px-3 py-2.5 rounded-lg bg-dark-950 border border-white/15 text-fest-pink font-bold font-mono text-sm uppercase tracking-wider focus:border-fest-pink"
                 />
@@ -290,13 +357,13 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
             </button>
           </form>
 
-          {/* Quick Contender Finder / Roster Helper */}
+          {/* Quick Participant Finder / Roster Helper */}
           {registeredContenders.length > 0 && (
             <div className="pt-3 border-t border-white/10 text-left space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-slate-400 flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-fest-amber" />
-                  <span>Registered Contenders ({registeredContenders.length}):</span>
+                  <span>Registered Participants ({registeredContenders.length}):</span>
                 </span>
                 <button
                   type="button"
@@ -348,10 +415,10 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
     );
   }
 
-  // Contender is Authenticated: Render Profile Card / Modal (if showProfileModal is true) or the portal view
+  // Participant is Authenticated: Render Profile Card / Modal (if showProfileModal is true) or the portal view
   return (
     <div className="w-full space-y-4">
-      {/* Contender Identification Banner at the top of the Arena */}
+      {/* Participant Identification Banner at the top of the Arena */}
       <div className="w-full p-2.5 sm:p-3 rounded-xl bg-dark-900 border border-white/15 flex flex-wrap items-center justify-between gap-3 text-xs font-mono shadow-sm">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="px-2 py-0.5 rounded bg-fest-cyan/20 border border-fest-cyan/40 text-fest-cyan font-bold tracking-wider shrink-0">
@@ -369,7 +436,7 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
             type="button"
             onClick={() => setShowProfileModal(true)}
             className="px-2.5 py-1 rounded-lg bg-fest-amber/15 border border-fest-amber/40 text-fest-amber font-bold text-[11px] flex items-center gap-1.5 hover:bg-fest-amber/25 transition-all shadow-[0_0_10px_rgba(255,183,0,0.2)]"
-            title="Click to view full contender profile & assigned desk station"
+            title="Click to view full participant profile & assigned desk station"
           >
             <MapPin className="w-3.5 h-3.5 text-fest-amber animate-pulse" />
             <span>{activeContender.deskNumber || 'Desk 01'}</span>
@@ -394,7 +461,7 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
           <button
             onClick={handleLogout}
             className="flex items-center gap-1 px-2.5 py-1 rounded bg-dark-950 border border-white/10 text-slate-400 hover:text-white transition-colors text-[11px]"
-            title="Switch Contender Account"
+            title="Switch Participant Account"
           >
             <LogOut className="w-3 h-3" />
             <span className="hidden sm:inline">Switch ID</span>
@@ -402,7 +469,7 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
         </div>
       </div>
 
-      {/* FULL CONTENDER PROFILE MODAL / SCREEN */}
+      {/* FULL PARTICIPANT PROFILE MODAL / SCREEN */}
       {showProfileModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-3xl bg-dark-900 border-2 border-fest-amber/50 shadow-[0_0_70px_rgba(255,183,0,0.3)] p-6 sm:p-8 space-y-6 font-mono max-h-[92vh] overflow-y-auto custom-scrollbar relative">
@@ -420,13 +487,13 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
             <div className="text-center space-y-2">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fest-cyan/15 border border-fest-cyan/30 text-fest-cyan text-xs font-bold uppercase tracking-wider">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Verified IEEE PES Contender</span>
+                <span>Verified IEEE PES Participant</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold font-sans text-white">
                 {activeContender.name}
               </h2>
               <p className="text-xs text-slate-400">
-                IEEE PES DIU SBC • Prompt Battle 2026 Official Contender
+                IEEE PES DIU SBC • Prompt Battle 2026 Official Participant
               </p>
             </div>
 
@@ -449,7 +516,7 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
             <div className="space-y-2.5">
               <span className="text-[11px] font-bold uppercase text-slate-300 tracking-wider flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-fest-cyan" />
-                <span>Contender Information</span>
+                <span>Participant Information</span>
               </span>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">

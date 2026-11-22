@@ -98,7 +98,9 @@ export default function AdminView() {
     firebaseStatus,
     judges = [],
     deleteJudge,
-    registeredContenders = []
+    registeredContenders = [],
+    promptCheckerActive = false,
+    togglePromptChecker
   } = useBattle();
 
   // Admin Section Tab: 'battle' | 'problem' | 'roster' | 'judges' | 'poll' | 'quiz'
@@ -165,6 +167,24 @@ export default function AdminView() {
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
+
+  // Aggressively clear inputs on mount to prevent browser credential managers from auto-filling
+  useEffect(() => {
+    setAdminEmailInput('');
+    setPasswordInput('');
+    const t1 = setTimeout(() => {
+      setAdminEmailInput('');
+      setPasswordInput('');
+    }, 50);
+    const t2 = setTimeout(() => {
+      setAdminEmailInput('');
+      setPasswordInput('');
+    }, 200);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
 
   // Timer custom duration state
   const [customMinutes, setCustomMinutes] = useState(20);
@@ -309,28 +329,70 @@ export default function AdminView() {
   // IF NOT AUTHENTICATED: Display Login Screen
   if (!isAdminAuthenticated) {
     return (
-      <div className="w-full max-w-md mx-auto py-16 px-4">
-        <div className="border border-white/10 p-8 rounded-lg bg-dark-900/90 shadow-[0_0_35px_rgba(0,0,0,0.8)] text-center">
+      <div className="w-full max-w-md mx-auto py-12 px-4 font-mono">
+        <div className="border border-white/10 p-6 sm:p-8 rounded-2xl bg-dark-900 shadow-[0_0_50px_rgba(0,0,0,0.85)] text-center space-y-6">
           
-          <div className="w-14 h-14 rounded-full bg-fest-pes/20 border border-fest-pes/40 text-fest-pes flex items-center justify-center mx-auto mb-4">
+          {/* Universal 3-Role Switcher: Participant | Judge | Admin (Active) */}
+          <div className="grid grid-cols-3 p-1 rounded-xl bg-dark-950 border border-white/10 text-xs font-bold font-mono">
+            <button
+              type="button"
+              onClick={() => switchView('submit')}
+              className="py-2 px-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all text-center truncate"
+            >
+              Participant
+            </button>
+            <button
+              type="button"
+              onClick={() => switchView('judge')}
+              className="py-2 px-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all text-center truncate"
+            >
+              Judge
+            </button>
+            <button
+              type="button"
+              className="py-2 px-1 rounded-lg bg-fest-pes text-dark-950 shadow-[0_0_15px_rgba(108,179,63,0.35)] text-center truncate font-black"
+            >
+              Admin
+            </button>
+          </div>
+
+          <div className="w-14 h-14 rounded-full bg-fest-pes/20 border border-fest-pes/40 text-fest-pes flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(108,179,63,0.3)]">
             <Lock className="w-6 h-6" />
           </div>
 
-          <h2 className="text-2xl font-bold font-sans text-white">
-            Admin Portal Access
-          </h2>
-          <p className="text-xs text-slate-400 font-mono mt-1 mb-6">
-            IEEE PES DIU SBC • EEE FEST 2026 Prompt Battle
-          </p>
+          <div className="space-y-1">
+            <h2 className="text-2xl font-bold font-sans text-white">
+              Admin Portal Access
+            </h2>
+            <p className="text-xs text-slate-400 font-mono">
+              IEEE PES DIU SBC • EEE FEST 2026 Prompt Battle
+            </p>
+          </div>
 
           {authError && (
-            <div className="p-3 mb-4 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 font-mono text-xs flex items-center gap-2">
+            <div className="p-3 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 font-mono text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{authError}</span>
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4 text-left">
+          <form onSubmit={handleLogin} autoComplete="off" className="space-y-4 text-left text-xs">
+            {/* Decoy hidden inputs to prevent browser password manager autofill */}
+            <input 
+              type="text" 
+              name="admin_prevent_autofill_bait_user" 
+              style={{ display: 'none', position: 'absolute', opacity: 0 }} 
+              tabIndex="-1" 
+              autoComplete="off" 
+            />
+            <input 
+              type="password" 
+              name="admin_prevent_autofill_bait_pass" 
+              style={{ display: 'none', position: 'absolute', opacity: 0 }} 
+              tabIndex="-1" 
+              autoComplete="off" 
+            />
+
             <div>
               <label className="block text-xs uppercase font-mono tracking-wider text-slate-300 mb-1.5 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-fest-cyan" />
@@ -338,9 +400,14 @@ export default function AdminView() {
               </label>
               <input
                 type="email"
+                name="admin_auth_official_email_code"
                 required
                 value={adminEmailInput}
                 onChange={(e) => setAdminEmailInput(e.target.value)}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck="false"
                 placeholder="Enter admin email address..."
                 className="w-full px-4 py-2.5 rounded bg-dark-950 border border-white/15 focus:border-fest-pes focus:ring-1 focus:ring-fest-pes text-white text-sm font-mono placeholder-slate-500"
               />
@@ -354,9 +421,11 @@ export default function AdminView() {
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  name="admin_auth_secret_password_token"
                   required
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
+                  autoComplete="new-password"
                   placeholder="Enter administrator password..."
                   className="w-full px-4 py-2.5 rounded bg-dark-950 border border-white/15 focus:border-fest-pes focus:ring-1 focus:ring-fest-pes text-white text-sm font-mono placeholder-slate-500"
                 />
@@ -723,7 +792,7 @@ export default function AdminView() {
               }`}
             >
               <Users className="w-4 h-4" />
-              <span>Contender Roster (JSON / Excel Upload)</span>
+              <span>Participant Roster (JSON / Excel Upload)</span>
             </button>
 
             <button
@@ -818,20 +887,20 @@ export default function AdminView() {
                     <Lock className="w-5 h-5 text-fest-amber" />
                   )}
                   <h2 className="text-xl font-bold font-sans text-white uppercase tracking-tight">
-                    Contender Problem Statement Window
+                    Participant Problem Statement Window
                   </h2>
                   <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full border ${
                     problemStatement.status === 'released'
                       ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
                       : 'bg-fest-amber/20 text-fest-amber border-fest-amber/40'
                   }`}>
-                    {problemStatement.status === 'released' ? '● RELEASED (LIVE ON 65 SCREENS)' : 'LOCKED (HIDDEN FROM CONTENDERS)'}
+                    {problemStatement.status === 'released' ? '● RELEASED (LIVE ON 65 SCREENS)' : 'LOCKED (HIDDEN FROM PARTICIPANTS)'}
                   </span>
                 </div>
                 <p className="text-xs font-mono text-slate-300">
                   {problemStatement.status === 'released'
-                    ? `Active Challenge: "${problemStatement.title}". All contenders have this window unlocked with anti-copy and inspect protection.`
-                    : 'Contenders currently see: "Problem Statement Not Released Yet / Waiting for Admin Broadcast". Click below to trigger release.'}
+                    ? `Active Challenge: "${problemStatement.title}". All participants have this window unlocked with anti-copy and inspect protection.`
+                    : 'Participants currently see: "Problem Statement Not Released Yet / Waiting for Admin Broadcast". Click below to trigger release.'}
                 </p>
               </div>
 
@@ -861,10 +930,53 @@ export default function AdminView() {
                     className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-fest-cyan text-dark-950 font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_30px_rgba(16,185,129,0.5)] flex items-center gap-2 hover:opacity-95"
                   >
                     <Unlock className="w-4 h-4" />
-                    <span>Release Problem Statement to Contenders</span>
+                    <span>Release Problem Statement to Participants</span>
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* POST-BATTLE AI PROMPT & TOKEN EFFICIENCY CHECKER TRIGGER CARD */}
+          <div className={`p-6 rounded-2xl border transition-all ${
+            promptCheckerActive
+              ? 'bg-gradient-to-r from-purple-950/40 via-dark-900 to-dark-950 border-purple-500/50 shadow-[0_0_30px_rgba(168,85,247,0.25)]'
+              : 'bg-dark-900/80 border-white/15'
+          }`}>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Zap className={`w-5 h-5 ${promptCheckerActive ? 'text-purple-400 animate-pulse' : 'text-slate-400'}`} />
+                  <h2 className="text-xl font-bold font-sans text-white uppercase tracking-tight">
+                    Post-Battle AI Prompt & Token Economy Checker
+                  </h2>
+                  <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full border ${
+                    promptCheckerActive
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                      : 'bg-slate-800 text-slate-400 border-white/10'
+                  }`}>
+                    {promptCheckerActive ? '● UNLOCKED FOR PARTICIPANTS' : 'LOCKED (HIDDEN DURING BATTLE)'}
+                  </span>
+                </div>
+                <p className="text-xs font-mono text-slate-300">
+                  {promptCheckerActive
+                    ? 'Active: Participants can now audit their prompt engineering efficiency, Chain-of-Thought (CoT) reasoning depth, schema adherence, and Antigravity daily limit token consumption.'
+                    : 'Keep this locked during the battle. Trigger/activate this after the competition ends so participants can inspect their AI efficiency score out of 100.'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => togglePromptChecker(!promptCheckerActive)}
+                className={`px-6 py-3.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${
+                  promptCheckerActive
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-[0_0_20px_rgba(225,29,72,0.4)]'
+                    : 'bg-gradient-to-r from-purple-600 to-fest-pink text-white hover:opacity-95 shadow-[0_0_25px_rgba(168,85,247,0.4)]'
+                }`}
+              >
+                <Zap className="w-4 h-4 fill-current" />
+                <span>{promptCheckerActive ? 'Deactivate Prompt Checker' : 'Trigger Prompt Checker for Participants'}</span>
+              </button>
             </div>
           </div>
 

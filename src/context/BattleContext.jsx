@@ -177,6 +177,9 @@ export const DEFAULT_STATE = {
     submissions: {},
   },
 
+  // Post-Battle AI Prompt & Token Efficiency Checker (triggered by Admin after battle)
+  promptCheckerActive: false,
+
   lastUpdated: Date.now(),
 };
 
@@ -239,6 +242,7 @@ export function sanitizeState(raw) {
     judges: toSafeArray(raw.judges, []),
     tokenBudget: Number(raw.tokenBudget) || DEFAULT_TOKEN_BUDGET,
     published: Boolean(raw.published),
+    promptCheckerActive: Boolean(raw.promptCheckerActive),
     lastUpdated: raw.lastUpdated || Date.now(),
   };
 }
@@ -249,7 +253,7 @@ export function getBasePath() {
 }
 
 export function resolveViewFromUrl() {
-  if (typeof window === 'undefined') return 'presentation';
+  if (typeof window === 'undefined') return 'submit';
 
   const validViews = ['presentation', 'admin', 'submit', 'judge'];
 
@@ -260,6 +264,9 @@ export function resolveViewFromUrl() {
     if (validViews.includes(lastPart)) {
       return lastPart;
     }
+    if (lastPart === 'login' || lastPart === 'participant') {
+      return 'submit';
+    }
   } catch (e) {}
 
   // 2. Check search parameter: ?view=admin or ?v=admin
@@ -269,6 +276,9 @@ export function resolveViewFromUrl() {
     if (viewParam && validViews.includes(viewParam.toLowerCase())) {
       return viewParam.toLowerCase();
     }
+    if (viewParam && (viewParam.toLowerCase() === 'login' || viewParam.toLowerCase() === 'participant')) {
+      return 'submit';
+    }
   } catch (e) {}
 
   // 3. Fallback for legacy hash bookmarks (strip # and convert)
@@ -277,9 +287,13 @@ export function resolveViewFromUrl() {
     if (validViews.includes(cleanHash)) {
       return cleanHash;
     }
+    if (cleanHash === 'login' || cleanHash === 'participant') {
+      return 'submit';
+    }
   }
 
-  return 'presentation';
+  // DEFAULT HOME PAGE: Login Page (Participant Portal /submit)
+  return 'submit';
 }
 
 export function BattleProvider({ children }) {
@@ -858,6 +872,23 @@ export function BattleProvider({ children }) {
     };
     syncState(updated);
   }, [battleState, syncState]);
+
+  // --- POST-BATTLE AI PROMPT CHECKER ACTIONS (Admin Triggered) ---
+  const togglePromptChecker = useCallback((active) => {
+    setBattleState((prev) => {
+      const nextActive = typeof active === 'boolean' ? active : !prev.promptCheckerActive;
+      const updated = {
+        ...prev,
+        promptCheckerActive: nextActive,
+        lastUpdated: Date.now(),
+      };
+      syncState(updated, true);
+      return updated;
+    });
+  }, [syncState]);
+
+  const enablePromptChecker = useCallback(() => togglePromptChecker(true), [togglePromptChecker]);
+  const disablePromptChecker = useCallback(() => togglePromptChecker(false), [togglePromptChecker]);
 
   // --- LIVE POLL ACTIONS ---
   // When Admin creates a poll, it automatically switches ALL screens to Poll view!
@@ -1760,6 +1791,12 @@ export function BattleProvider({ children }) {
     hideProblemStatement,
     updateProblemStatement,
     resetProblemStatement,
+
+    // Post-Battle Prompt & Token Checker Actions
+    promptCheckerActive: Boolean(battleState.promptCheckerActive),
+    togglePromptChecker,
+    enablePromptChecker,
+    disablePromptChecker,
 
     // Poll
     createPoll,

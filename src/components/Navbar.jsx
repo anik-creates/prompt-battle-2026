@@ -46,7 +46,7 @@ export default function Navbar() {
           
           {/* Left: IEEE PES DIU SBC Logo (BIG) & EEE Fest 2026 Logo */}
           <div className="flex items-center space-x-2.5 sm:space-x-5">
-            <div className="flex items-center cursor-pointer" onClick={() => switchView('presentation')} title="Return to Main Arena">
+            <div className="flex items-center cursor-pointer" onClick={() => switchView('submit')} title="Return to Home (Participant Portal)">
               <img 
                 src="./assets/ieee-pes-diu-logo.png" 
                 alt="IEEE PES DIU Student Branch Chapter" 
@@ -56,7 +56,7 @@ export default function Navbar() {
 
             <div className="h-6 sm:h-8 md:h-12 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent"></div>
 
-            <div className="flex items-center cursor-pointer" onClick={() => switchView('presentation')} title="Return to Main Arena">
+            <div className="flex items-center cursor-pointer" onClick={() => switchView('submit')} title="Return to Home (Participant Portal)">
               <img 
                 src="./assets/eee-fest-logo.png" 
                 alt="EEE Fest 2026" 
@@ -100,7 +100,7 @@ export default function Navbar() {
                 <span className="hidden sm:inline">Projector</span>
               </button>
 
-              {/* 2. Contender Portal View */}
+              {/* 2. Participant Portal View */}
               <button
                 onClick={() => switchView('submit')}
                 className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-mono text-xs transition-all ${
@@ -108,10 +108,10 @@ export default function Navbar() {
                     ? 'bg-fest-pink/15 text-fest-pink border border-fest-pink/40 shadow-[0_0_12px_rgba(255,0,128,0.2)] font-semibold'
                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`}
-                title="Participant Contender Portal (/submit)"
+                title="Participant Portal (/submit)"
               >
                 <Smartphone className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Contender</span>
+                <span className="hidden sm:inline">Participant</span>
               </button>
 
               {/* 3. Judge Adjudication Portal */}
