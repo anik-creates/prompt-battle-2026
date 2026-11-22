@@ -114,6 +114,33 @@ export const DEFAULT_POLL = {
   votes: {},
 };
 
+export const DEFAULT_PROBLEM_STATEMENT = {
+  id: 'problem-pb-2026',
+  title: 'Autonomous Smart Grid Load Forecasting & Dispatch Optimizer',
+  track: 'Production Prompt Engineering & Chain-of-Thought (CoT)',
+  status: 'hidden', // 'hidden' | 'released'
+  releasedAt: null,
+  scenario: `You are the lead AI Prompt Engineer for an intelligent Smart Microgrid operated under IEEE Power & Energy Society (PES) guidelines for EEE FEST 2026.
+
+Your challenge is to architect a production-ready System Prompt and structured Chain-of-Thought (CoT) reasoning pipeline in Google Antigravity. The AI system ingests real-time intermittent solar, wind generation telemetry, fluctuating industrial/domestic load curves, and battery storage levels. 
+
+The model must synthesize a 24-hour predictive dispatch plan that eliminates blackouts, respects voltage stability margins, and outputs strict, machine-readable JSON without explanatory chat filler or conversational preambles.`,
+  objective: `Develop a comprehensive system prompt and instruction framework that forces the AI model to:
+1. Deconstruct multi-variable dispatch constraints step-by-step using explicit Chain-of-Thought (CoT).
+2. Calculate exact megawatt (MW) allocation commands across Solar PV, Wind Turbines, Battery Storage, and Grid Reserves.
+3. Strictly validate output structure against the required JSON schema.
+4. Maximize token efficiency under Google Antigravity daily limit quotas (scored out of 15 pts).`,
+  constraints: [
+    'Zero Output Hallucination: The model must return ONLY valid, parsable JSON matching the required schema.',
+    'Token Budget Efficiency: Optimize prompt brevity to conserve daily Antigravity limit (15 pts).',
+    'Adversarial Injection Defense: Prompt must resist conflicting user inputs attempting to bypass grid safety thresholds.',
+    'Deterministic Output: Pin system persona and formatting anchors to eliminate variance across consecutive runs.',
+    'Self-Correction Guardrails: Include explicit failure-handling protocols if input data has missing sensory telemetry.'
+  ],
+  outputSchemaExample: `{\n  "gridStatus": "OPTIMAL",\n  "totalDemandMW": 120.5,\n  "dispatch": [\n    { "time": "00:00 - 06:00", "source": "Wind + Battery Discharge", "outputMW": 35.0, "status": "Stable" },\n    { "time": "06:00 - 12:00", "source": "Solar PV + Wind", "outputMW": 78.5, "status": "Optimal" },\n    { "time": "12:00 - 18:00", "source": "Solar Peak + Grid Support", "outputMW": 110.0, "status": "Peak Operation" },\n    { "time": "18:00 - 24:00", "source": "Battery Storage + Reserve", "outputMW": 45.0, "status": "Stable" }\n  ],\n  "efficiencyScore": 98.7,\n  "blackoutRisk": "NONE"\n}`,
+  submissionRequirements: `1. Keep your Google Antigravity project active.\n2. Note your daily token limit consumption % in Antigravity.\n3. Paste your public prompt share link or project URL.\n4. Submit before the timer expires.`
+};
+
 export const DEFAULT_CONTENDERS = INITIAL_ROSTER;
 
 export const DEFAULT_STATE = {
@@ -131,6 +158,9 @@ export const DEFAULT_STATE = {
   registeredContenders: INITIAL_ROSTER,
   judges: [], // 4 judges: [{ id, name, email, password, judgeNumber, registeredAt }]
   tokenBudget: DEFAULT_TOKEN_BUDGET,
+
+  // Live Problem Statement State
+  problemStatement: DEFAULT_PROBLEM_STATEMENT,
 
   // Live Poll State
   poll: DEFAULT_POLL,
@@ -198,6 +228,11 @@ export function sanitizeState(raw) {
       questions: quizQuestions.length > 0 ? quizQuestions : DEFAULT_QUIZ_QUESTIONS,
       submissions: rawQuiz.submissions || {},
       status: rawQuiz.status || 'idle',
+    },
+    problemStatement: {
+      ...DEFAULT_PROBLEM_STATEMENT,
+      ...(raw.problemStatement || {}),
+      constraints: toSafeArray(raw.problemStatement?.constraints, DEFAULT_PROBLEM_STATEMENT.constraints),
     },
     participants: toSafeArray(raw.participants, []),
     registeredContenders: effectiveRoster,
@@ -765,6 +800,63 @@ export function BattleProvider({ children }) {
       published: shouldPublish,
       lastUpdated: now,
     });
+  }, [battleState, syncState]);
+
+  // --- PROBLEM STATEMENT ACTIONS ---
+  const releaseProblemStatement = useCallback(() => {
+    const now = Date.now();
+    const updated = {
+      ...battleState,
+      problemStatement: {
+        ...(battleState.problemStatement || DEFAULT_PROBLEM_STATEMENT),
+        status: 'released',
+        releasedAt: now,
+      },
+      lastUpdated: now,
+    };
+    syncState(updated);
+    playStartHorn();
+  }, [battleState, syncState]);
+
+  const hideProblemStatement = useCallback(() => {
+    const now = Date.now();
+    const updated = {
+      ...battleState,
+      problemStatement: {
+        ...(battleState.problemStatement || DEFAULT_PROBLEM_STATEMENT),
+        status: 'hidden',
+        releasedAt: null,
+      },
+      lastUpdated: now,
+    };
+    syncState(updated);
+  }, [battleState, syncState]);
+
+  const updateProblemStatement = useCallback((updates) => {
+    const now = Date.now();
+    const updated = {
+      ...battleState,
+      problemStatement: {
+        ...(battleState.problemStatement || DEFAULT_PROBLEM_STATEMENT),
+        ...updates,
+      },
+      lastUpdated: now,
+    };
+    syncState(updated);
+  }, [battleState, syncState]);
+
+  const resetProblemStatement = useCallback(() => {
+    const now = Date.now();
+    const updated = {
+      ...battleState,
+      problemStatement: {
+        ...DEFAULT_PROBLEM_STATEMENT,
+        status: 'hidden',
+        releasedAt: null,
+      },
+      lastUpdated: now,
+    };
+    syncState(updated);
   }, [battleState, syncState]);
 
   // --- LIVE POLL ACTIONS ---
@@ -1661,6 +1753,13 @@ export function BattleProvider({ children }) {
     addManualParticipant,
     removeParticipant,
     togglePublishLeaderboard,
+
+    // Problem Statement Actions
+    problemStatement: battleState.problemStatement || DEFAULT_PROBLEM_STATEMENT,
+    releaseProblemStatement,
+    hideProblemStatement,
+    updateProblemStatement,
+    resetProblemStatement,
 
     // Poll
     createPoll,

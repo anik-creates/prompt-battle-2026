@@ -3,6 +3,7 @@ import { useBattle } from '../context/BattleContext';
 import ParticipantPollView from './ParticipantPollView';
 import ParticipantQuizView from './ParticipantQuizView';
 import ContenderAuthGate from './ContenderAuthGate';
+import LockedProblemStatementWindow from './LockedProblemStatementWindow';
 import { setupTabSwitchGuard } from '../lib/focusGuard';
 import { 
   Send, 
@@ -174,6 +175,9 @@ export default function ParticipantSubmitView({ isSimulator = false }) {
                     IEEE PES DIU SBC • EEE FEST 2026
                   </p>
                 </div>
+
+                {/* LOCKED / RELEASED PROBLEM STATEMENT WINDOW */}
+                <LockedProblemStatementWindow activeSession={activeSession} isSimulator={isSimulator} />
 
                 {submittedData ? (
                   /* SUBMISSION SUCCESSFUL CONFIRMATION CARD */

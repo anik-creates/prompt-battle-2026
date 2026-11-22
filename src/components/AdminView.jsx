@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useBattle } from '../context/BattleContext';
 import TimerDisplay from './TimerDisplay';
 import FirebaseModal from './FirebaseModal';
 import ParticipantSubmitView from './ParticipantSubmitView';
 import ContenderRosterManager from './ContenderRosterManager';
+import LockedProblemStatementWindow from './LockedProblemStatementWindow';
 import { 
   ShieldCheck, 
   Lock, 
+  Unlock,
   Key, 
   Clock, 
   Play, 
@@ -42,6 +44,7 @@ import {
   List,
   BarChart3,
   FileCode,
+  FileText,
   MapPin,
   Scale,
   Mail
@@ -72,6 +75,11 @@ export default function AdminView() {
     addManualParticipant,
     removeParticipant,
     togglePublishLeaderboard,
+    problemStatement = {},
+    releaseProblemStatement,
+    hideProblemStatement,
+    updateProblemStatement,
+    resetProblemStatement,
     createPoll,
     setPollStatus,
     publishPollResults,
@@ -93,10 +101,58 @@ export default function AdminView() {
     registeredContenders = []
   } = useBattle();
 
-  // Admin Section Tab: 'battle' | 'roster' | 'judges' | 'poll' | 'quiz'
+  // Admin Section Tab: 'battle' | 'problem' | 'roster' | 'judges' | 'poll' | 'quiz'
   const [adminTab, setAdminTab] = useState('battle');
   const [showMobileSimulator, setShowMobileSimulator] = useState(false);
   const [evaluationViewMode, setEvaluationViewMode] = useState('table'); // 'table' | 'cards'
+
+  // Problem Statement Editor State
+  const [editingProblem, setEditingProblem] = useState(() => ({
+    title: problemStatement.title || '',
+    track: problemStatement.track || '',
+    scenario: problemStatement.scenario || '',
+    objective: problemStatement.objective || '',
+    constraintsText: Array.isArray(problemStatement.constraints) ? problemStatement.constraints.join('\n') : '',
+    outputSchemaExample: problemStatement.outputSchemaExample || '',
+    submissionRequirements: problemStatement.submissionRequirements || '',
+  }));
+  const [problemSavedMsg, setProblemSavedMsg] = useState(false);
+
+  // Sync editor when problemStatement updates
+  useEffect(() => {
+    if (problemStatement && problemStatement.id) {
+      setEditingProblem({
+        title: problemStatement.title || '',
+        track: problemStatement.track || '',
+        scenario: problemStatement.scenario || '',
+        objective: problemStatement.objective || '',
+        constraintsText: Array.isArray(problemStatement.constraints) ? problemStatement.constraints.join('\n') : '',
+        outputSchemaExample: problemStatement.outputSchemaExample || '',
+        submissionRequirements: problemStatement.submissionRequirements || '',
+      });
+    }
+  }, [problemStatement.id, problemStatement.releasedAt]);
+
+  const handleSaveProblem = (e) => {
+    e.preventDefault();
+    const cleanConstraints = editingProblem.constraintsText
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    updateProblemStatement({
+      title: editingProblem.title.trim(),
+      track: editingProblem.track.trim(),
+      scenario: editingProblem.scenario.trim(),
+      objective: editingProblem.objective.trim(),
+      constraints: cleanConstraints,
+      outputSchemaExample: editingProblem.outputSchemaExample.trim(),
+      submissionRequirements: editingProblem.submissionRequirements.trim(),
+    });
+
+    setProblemSavedMsg(true);
+    setTimeout(() => setProblemSavedMsg(false), 2500);
+  };
 
   // Edit Quiz Question Modal State
   const [editingQuizQ, setEditingQuizQ] = useState(null);
@@ -644,6 +700,21 @@ export default function AdminView() {
             </button>
 
             <button
+              onClick={() => setAdminTab('problem')}
+              className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
+                adminTab === 'problem'
+                  ? 'border-fest-cyan text-fest-cyan'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>Problem Statement ({problemStatement.status === 'released' ? 'Released' : 'Locked'})</span>
+              {problemStatement.status === 'released' && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              )}
+            </button>
+
+            <button
               onClick={() => setAdminTab('roster')}
               className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
                 adminTab === 'roster'
@@ -729,6 +800,71 @@ export default function AdminView() {
                 <Trophy className="w-4 h-4 fill-current" />
                 <span>{published ? 'Unpublish • Show Battle Clock' : 'Publish Leaderboard to Arena'}</span>
               </button>
+            </div>
+          </div>
+
+          {/* PROBLEM STATEMENT BROADCAST & RELEASE CONTROL CARD */}
+          <div className={`p-6 rounded-2xl border transition-all ${
+            problemStatement.status === 'released'
+              ? 'bg-gradient-to-r from-emerald-950/40 via-dark-900 to-dark-950 border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.2)]'
+              : 'bg-dark-900/80 border-fest-amber/30 shadow-[0_0_20px_rgba(255,183,0,0.1)]'
+          }`}>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  {problemStatement.status === 'released' ? (
+                    <Unlock className="w-5 h-5 text-emerald-400 animate-bounce" />
+                  ) : (
+                    <Lock className="w-5 h-5 text-fest-amber" />
+                  )}
+                  <h2 className="text-xl font-bold font-sans text-white uppercase tracking-tight">
+                    Contender Problem Statement Window
+                  </h2>
+                  <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full border ${
+                    problemStatement.status === 'released'
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                      : 'bg-fest-amber/20 text-fest-amber border-fest-amber/40'
+                  }`}>
+                    {problemStatement.status === 'released' ? '● RELEASED (LIVE ON 65 SCREENS)' : 'LOCKED (HIDDEN FROM CONTENDERS)'}
+                  </span>
+                </div>
+                <p className="text-xs font-mono text-slate-300">
+                  {problemStatement.status === 'released'
+                    ? `Active Challenge: "${problemStatement.title}". All contenders have this window unlocked with anti-copy and inspect protection.`
+                    : 'Contenders currently see: "Problem Statement Not Released Yet / Waiting for Admin Broadcast". Click below to trigger release.'}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAdminTab('problem')}
+                  className="px-4 py-3 rounded-xl bg-dark-950 border border-white/15 text-slate-300 hover:text-white text-xs font-mono flex items-center gap-1.5 transition-colors"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-fest-cyan" />
+                  <span>Edit Statement</span>
+                </button>
+
+                {problemStatement.status === 'released' ? (
+                  <button
+                    type="button"
+                    onClick={hideProblemStatement}
+                    className="px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(225,29,72,0.4)] flex items-center gap-2"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>Lock Problem Statement</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={releaseProblemStatement}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-fest-cyan text-dark-950 font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_30px_rgba(16,185,129,0.5)] flex items-center gap-2 hover:opacity-95"
+                  >
+                    <Unlock className="w-4 h-4" />
+                    <span>Release Problem Statement to Contenders</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1198,6 +1334,218 @@ export default function AdminView() {
                 </table>
               </div>
             )}
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB: PROBLEM STATEMENT CONTROLS & EDITOR */}
+      {adminTab === 'problem' && (
+        <div className="space-y-8 font-mono text-xs">
+          
+          {/* Top Control & Status Banner */}
+          <div className={`p-6 rounded-2xl border transition-all ${
+            problemStatement.status === 'released'
+              ? 'bg-gradient-to-r from-emerald-950/40 via-dark-900 to-dark-950 border-emerald-500/50 shadow-[0_0_35px_rgba(16,185,129,0.25)]'
+              : 'bg-dark-900 border-fest-amber/40 shadow-[0_0_25px_rgba(255,183,0,0.15)]'
+          }`}>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <FileText className={`w-5 h-5 ${problemStatement.status === 'released' ? 'text-emerald-400' : 'text-fest-amber'}`} />
+                  <h3 className="text-xl font-bold font-sans text-white uppercase tracking-tight">
+                    Problem Statement Broadcast Control
+                  </h3>
+                  <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
+                    problemStatement.status === 'released'
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                      : 'bg-fest-amber/20 text-fest-amber border-fest-amber/40'
+                  }`}>
+                    {problemStatement.status === 'released' ? '● RELEASED (LIVE ON 65 SCREENS)' : 'LOCKED (HIDDEN FROM CONTENDERS)'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  {problemStatement.status === 'released'
+                    ? `Contenders currently have this challenge unlocked at their desk stations with anti-tamper copy and inspect locks.`
+                    : 'Contender screens currently display: "Problem Statement Not Released Yet / Waiting for Admin Broadcast". Click below to release.'}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Reset problem statement to the official IEEE PES Smart Grid challenge?')) {
+                      resetProblemStatement();
+                    }
+                  }}
+                  className="px-3.5 py-2.5 rounded-lg bg-dark-950 border border-white/10 hover:border-white/20 text-slate-400 hover:text-white text-xs transition-colors flex items-center gap-1.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset to PES Default</span>
+                </button>
+
+                {problemStatement.status === 'released' ? (
+                  <button
+                    type="button"
+                    onClick={hideProblemStatement}
+                    className="px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(225,29,72,0.4)] flex items-center gap-2"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>Lock & Hide Problem Statement</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={releaseProblemStatement}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-fest-cyan text-dark-950 font-bold uppercase tracking-wider transition-all shadow-[0_0_30px_rgba(16,185,129,0.5)] flex items-center gap-2 hover:opacity-95"
+                  >
+                    <Unlock className="w-4 h-4" />
+                    <span>Release Problem Statement to Contenders</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Form and Preview Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            
+            {/* Left: Editor Form */}
+            <form onSubmit={handleSaveProblem} className="p-6 rounded-2xl bg-dark-900 border border-white/15 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <Edit3 className="w-4 h-4 text-fest-cyan" />
+                  <h4 className="font-sans font-bold text-base text-white uppercase tracking-tight">
+                    Edit Challenge Details
+                  </h4>
+                </div>
+                {problemSavedMsg && (
+                  <span className="text-emerald-400 text-xs font-bold flex items-center gap-1 animate-in fade-in">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Saved & Synced!</span>
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Challenge Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={editingProblem.title}
+                  onChange={(e) => setEditingProblem({ ...editingProblem, title: e.target.value })}
+                  placeholder="e.g. Autonomous Smart Grid Load Forecasting & Dispatch Optimizer"
+                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white text-xs focus:border-fest-cyan"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Track / Category</label>
+                <input
+                  type="text"
+                  value={editingProblem.track}
+                  onChange={(e) => setEditingProblem({ ...editingProblem, track: e.target.value })}
+                  placeholder="e.g. Production Prompt Engineering & Chain-of-Thought (CoT)"
+                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white text-xs focus:border-fest-cyan"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">1. Challenge Scenario & Narrative *</label>
+                <textarea
+                  rows={4}
+                  required
+                  value={editingProblem.scenario}
+                  onChange={(e) => setEditingProblem({ ...editingProblem, scenario: e.target.value })}
+                  placeholder="Describe the context and background for the problem..."
+                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white text-xs focus:border-fest-cyan resize-none leading-relaxed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">2. Core Objectives & Tasks *</label>
+                <textarea
+                  rows={4}
+                  required
+                  value={editingProblem.objective}
+                  onChange={(e) => setEditingProblem({ ...editingProblem, objective: e.target.value })}
+                  placeholder="List the clear tasks and objectives..."
+                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white text-xs focus:border-fest-cyan resize-none leading-relaxed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">3. Strict Rules & Constraints (1 per line)</label>
+                <textarea
+                  rows={4}
+                  value={editingProblem.constraintsText}
+                  onChange={(e) => setEditingProblem({ ...editingProblem, constraintsText: e.target.value })}
+                  placeholder="Zero Output Hallucination: The model must return ONLY valid JSON.\nToken Budget Efficiency: Optimize brevity under daily limit."
+                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white text-xs focus:border-fest-cyan resize-none leading-relaxed font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">4. Expected Output JSON Schema Example</label>
+                <textarea
+                  rows={4}
+                  value={editingProblem.outputSchemaExample}
+                  onChange={(e) => setEditingProblem({ ...editingProblem, outputSchemaExample: e.target.value })}
+                  placeholder={`{\n  "status": "OPTIMAL",\n  "dispatch": [...]\n}`}
+                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-emerald-300 text-xs focus:border-fest-cyan resize-none font-mono leading-relaxed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">5. Submission Guidelines</label>
+                <textarea
+                  rows={3}
+                  value={editingProblem.submissionRequirements}
+                  onChange={(e) => setEditingProblem({ ...editingProblem, submissionRequirements: e.target.value })}
+                  placeholder="Submit your Antigravity project link and record daily token limit %..."
+                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white text-xs focus:border-fest-cyan resize-none leading-relaxed"
+                />
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-fest-cyan text-dark-950 font-bold uppercase tracking-wider hover:opacity-90 transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,229,255,0.3)]"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Problem Statement</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Right: Live Contender Screen Preview */}
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-dark-900 border border-white/15 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-fest-cyan" />
+                  <h4 className="font-sans font-bold text-sm text-white uppercase tracking-tight">
+                    Live Contender Screen Mirror
+                  </h4>
+                </div>
+                <span className="text-[10px] text-slate-400">
+                  Exact view on participant phones & desks
+                </span>
+              </div>
+
+              <div className="border border-white/15 rounded-2xl bg-dark-950/80 p-3 sm:p-4 shadow-2xl">
+                <LockedProblemStatementWindow 
+                  activeSession={{
+                    name: 'Sample Contender',
+                    participantId: '232-33-213',
+                    studentId: '232-33-213',
+                    deskNumber: 'Desk 01',
+                  }} 
+                  isSimulator={true} 
+                />
+              </div>
+            </div>
+
           </div>
 
         </div>

@@ -26,7 +26,8 @@ export default function PresentationView() {
     timer, 
     participants, 
     published,
-    totalJoinedCount 
+    totalJoinedCount,
+    problemStatement = {}
   } = useBattle();
 
   // If active arena is Live Poll or Kahoot Quiz, render those arenas
@@ -43,10 +44,11 @@ export default function PresentationView() {
     return <LeaderboardView />;
   }
 
-  // Compute submission portal URL
+  // Compute clean submission portal URL
+  const basePath = typeof window !== 'undefined' && window.location.pathname.startsWith('/prompt-battle-2026') ? '/prompt-battle-2026' : '';
   const submissionUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}${window.location.pathname}#submit`
-    : 'https://anik-creates.github.io/prompt-battle-2026/#submit';
+    ? `${window.location.origin}${basePath}/submit`
+    : 'https://anik-creates.github.io/prompt-battle-2026/submit';
 
   return (
     <div className="w-full max-w-7xl mx-auto py-6 sm:py-8 space-y-12">
@@ -127,6 +129,59 @@ export default function PresentationView() {
         </div>
 
       </div>
+
+      {/* Official Challenge Spotlight (when released by Admin) */}
+      {problemStatement.status === 'released' && (
+        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-dark-900 via-dark-950 to-dark-900 border-2 border-fest-cyan/40 shadow-[0_0_50px_rgba(0,229,255,0.2)] space-y-4 font-mono">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+              <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30">
+                Official Challenge Broadcast Active
+              </span>
+            </div>
+            {problemStatement.track && (
+              <span className="text-xs text-fest-cyan font-bold px-3 py-1 rounded-full bg-fest-cyan/15 border border-fest-cyan/30">
+                {problemStatement.track}
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <h2 className="text-2xl sm:text-3xl font-extrabold font-sans text-white">
+              {problemStatement.title}
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans max-w-4xl">
+              {problemStatement.scenario}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 text-xs">
+            <div className="p-4 rounded-xl bg-dark-950 border border-white/10 space-y-1.5">
+              <span className="text-[11px] font-bold uppercase text-fest-cyan tracking-wider block">
+                Core Objective
+              </span>
+              <p className="text-slate-300 whitespace-pre-line leading-relaxed">
+                {problemStatement.objective}
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-dark-950 border border-fest-pink/30 space-y-1.5">
+              <span className="text-[11px] font-bold uppercase text-fest-pink tracking-wider block">
+                Key Constraint Highlights
+              </span>
+              <ul className="space-y-1 text-slate-300">
+                {(problemStatement.constraints || []).slice(0, 3).map((c, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="text-fest-pink">•</span>
+                    <span>{c}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Submitted Participants Live Stream */}
       <div className="space-y-4">
