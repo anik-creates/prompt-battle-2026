@@ -14,6 +14,7 @@ import {
   calculateTokenScore,
   calculateTimeScore
 } from '../lib/scoringCalculator';
+import { INITIAL_ROSTER } from '../data/initialParticipants';
 
 const BattleContext = createContext(null);
 
@@ -113,7 +114,7 @@ export const DEFAULT_POLL = {
   votes: {},
 };
 
-export const DEFAULT_CONTENDERS = [];
+export const DEFAULT_CONTENDERS = INITIAL_ROSTER;
 
 export const DEFAULT_STATE = {
   activeArena: 'battle', // 'battle' | 'poll' | 'quiz'
@@ -127,7 +128,7 @@ export const DEFAULT_STATE = {
   published: false,
   participants: [],
   joinedParticipants: {}, // [participantId]: { id, name, teamName, arena, lastSeen, tabSwitches }
-  registeredContenders: [],
+  registeredContenders: INITIAL_ROSTER,
   judges: [], // 4 judges: [{ id, name, email, password, judgeNumber, registeredAt }]
   tokenBudget: DEFAULT_TOKEN_BUDGET,
 
@@ -169,6 +170,10 @@ export function sanitizeState(raw) {
     }
   });
 
+  const rawRoster = toSafeArray(raw.registeredContenders, []);
+  const hasOfficialRoster = rawRoster.some(c => c.couponCode && String(c.couponCode).toUpperCase().startsWith('PBC'));
+  const effectiveRoster = (rawRoster.length > 0 && hasOfficialRoster) ? rawRoster : INITIAL_ROSTER;
+
   return {
     ...DEFAULT_STATE,
     ...raw,
@@ -195,7 +200,7 @@ export function sanitizeState(raw) {
       status: rawQuiz.status || 'idle',
     },
     participants: toSafeArray(raw.participants, []),
-    registeredContenders: toSafeArray(raw.registeredContenders, []),
+    registeredContenders: effectiveRoster,
     judges: toSafeArray(raw.judges, []),
     tokenBudget: Number(raw.tokenBudget) || DEFAULT_TOKEN_BUDGET,
     published: Boolean(raw.published),
@@ -1344,20 +1349,40 @@ export function BattleProvider({ children }) {
     sessionStorage.removeItem('pb_admin_email');
   }, []);
 
-  // Contender (User) Authentication: Email + Passcode
+  // Contender (User) Authentication: Email (Student or Personal) + Coupon Code (Passcode/Password)
   const authenticateContender = useCallback((enteredEmail, enteredPasscode) => {
     const cleanEmail = (enteredEmail || '').trim().toLowerCase();
     const cleanPass = (enteredPasscode || '').trim();
 
     if (!cleanEmail || !cleanPass) {
-      return { success: false, error: 'Please enter both your Email address and your unique Passcode.' };
+      return { success: false, error: 'Please enter both your registered Email address and your Coupon Code password.' };
     }
 
-    const currentList = toSafeArray(battleState.registeredContenders, []);
+    const currentList = toSafeArray(battleState.registeredContenders, INITIAL_ROSTER);
     const match = currentList.find((c) => {
+      const cStudentMail = (c.studentMail || '').trim().toLowerCase();
+      const cPersonalMail = (c.personalMail || '').trim().toLowerCase();
       const cEmail = (c.email || c.mail || '').trim().toLowerCase();
-      const cPass = String(c.passcode || c.password || '').trim();
-      return cEmail === cleanEmail && cPass === cleanPass;
+      const cId = (c.participantId || c.studentId || '').trim().toLowerCase();
+
+      // Check if entered identifier matches Student Mail, Personal Mail, Email, or Student ID
+      const identifierMatches = (
+        (cStudentMail && cStudentMail === cleanEmail) ||
+        (cPersonalMail && cPersonalMail === cleanEmail) ||
+        (cEmail && cEmail === cleanEmail) ||
+        (cId && cId === cleanEmail)
+      );
+
+      if (!identifierMatches) return false;
+
+      // Check if password matches Coupon Code, Passcode, or Password (case-insensitive for PBC codes)
+      const cCoupon = String(c.couponCode || c.passcode || c.password || '').trim();
+      const passMatches = (
+        cCoupon.toUpperCase() === cleanPass.toUpperCase() ||
+        cCoupon === cleanPass
+      );
+
+      return passMatches;
     });
 
     if (match) {
@@ -1366,7 +1391,7 @@ export function BattleProvider({ children }) {
 
     return { 
       success: false, 
-      error: 'Invalid Email or Passcode. Please check the unique passcode sent to your mail by the organizers.' 
+      error: 'Invalid Email or Coupon Code. Please verify your registered email and the unique coupon code (e.g. PBC001) from IEEE PES DIU SBC.' 
     };
   }, [battleState.registeredContenders]);
 

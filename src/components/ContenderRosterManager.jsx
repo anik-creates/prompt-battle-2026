@@ -277,7 +277,14 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
     const term = searchTerm.trim().toLowerCase();
     const matchesSearch = !term || (
       c.participantId?.toLowerCase().includes(term) ||
+      c.studentId?.toLowerCase().includes(term) ||
       c.name?.toLowerCase().includes(term) ||
+      c.couponCode?.toLowerCase().includes(term) ||
+      c.studentMail?.toLowerCase().includes(term) ||
+      c.personalMail?.toLowerCase().includes(term) ||
+      c.email?.toLowerCase().includes(term) ||
+      c.phone?.toLowerCase().includes(term) ||
+      c.semester?.toLowerCase().includes(term) ||
       c.teamName?.toLowerCase().includes(term) ||
       c.deskNumber?.toLowerCase().includes(term)
     );
@@ -853,18 +860,26 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                         <div className="font-bold text-white text-sm">
                           {c.name}
                         </div>
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                          <span>{c.email || `${c.participantId?.toLowerCase()}@diu.edu.bd`}</span>
-                          {c.passcode && (
-                            <span className="ml-1.5 text-fest-pink">
-                              Pass: <code className="bg-black/40 px-1 py-0.5 rounded border border-white/10 text-fest-pink">{c.passcode}</code>
-                            </span>
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5 space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span>{c.studentMail || c.email}</span>
+                            {(c.couponCode || c.passcode) && (
+                              <span className="text-fest-pink font-bold">
+                                Coupon/Pass: <code className="bg-black/50 px-1 py-0.5 rounded border border-fest-pink/30 text-fest-pink">{c.couponCode || c.passcode}</code>
+                              </span>
+                            )}
+                          </div>
+                          {(c.semester || c.phone) && (
+                            <div className="text-[9px] text-slate-400 flex items-center gap-2">
+                              {c.semester && <span>Sem: <strong className="text-fest-cyan">{c.semester}</strong></span>}
+                              {c.phone && <span>Ph: <strong className="text-white">{c.phone}</strong></span>}
+                            </div>
                           )}
                         </div>
                       </td>
 
                       {/* Team */}
-                      <td className="py-3 px-3 text-fest-pink">{c.teamName || 'Solo'}</td>
+                      <td className="py-3 px-3 text-fest-pink">{c.teamName || 'Solo Contender'}</td>
 
                       {/* Attendance Status */}
                       <td className="py-3 px-3">

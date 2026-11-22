@@ -72,13 +72,20 @@ export default function JudgeView() {
 
     // 1. Registered Contenders
     (registeredContenders || []).forEach((rc) => {
-      const id = (rc.participantId || '').toUpperCase();
+      const id = (rc.participantId || rc.studentId || '').toUpperCase();
       if (!id) return;
       map.set(id, {
+        ...rc,
         id,
         participantId: id,
+        studentId: rc.studentId || id,
         name: rc.name,
-        email: rc.email || '',
+        email: rc.email || rc.studentMail || '',
+        studentMail: rc.studentMail || '',
+        personalMail: rc.personalMail || '',
+        semester: rc.semester || '',
+        phone: rc.phone || '',
+        couponCode: rc.couponCode || rc.passcode || '',
         teamName: rc.teamName || 'Solo Contender',
         deskNumber: rc.deskNumber || 'Desk 01',
         submittedUrl: '',

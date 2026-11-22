@@ -30,27 +30,42 @@ export async function parseContenderFile(file) {
         const normalized = [];
 
         rawRows.forEach((row, index) => {
-          // Normalize object keys to lowercase without spaces/underscores
+          // Normalize object keys to lowercase without spaces/underscores/colons
           const keys = Object.keys(row);
           let idVal = '';
           let nameVal = '';
           let emailVal = '';
+          let studentMailVal = '';
+          let personalMailVal = '';
           let passcodeVal = '';
+          let couponVal = '';
+          let semesterVal = '';
+          let phoneVal = '';
           let teamVal = '';
           let deskVal = '';
 
           for (const key of keys) {
-            const cleanKey = key.trim().toLowerCase().replace(/[\s_\-#]/g, '');
+            const cleanKey = key.trim().toLowerCase().replace(/[\s_\-#:]/g, '');
             const val = String(row[key] || '').trim();
 
-            if (!idVal && (cleanKey === 'id' || cleanKey.includes('participantid') || cleanKey.includes('roll') || cleanKey.includes('contenderid'))) {
+            if (!idVal && (cleanKey === 'id' || cleanKey.includes('studentid') || cleanKey.includes('participantid') || cleanKey.includes('roll') || cleanKey.includes('contenderid'))) {
               idVal = val;
+            } else if (!nameVal && (cleanKey.includes('fullname') || cleanKey.includes('enteryourfullname') || cleanKey.includes('name') || cleanKey.includes('student'))) {
+              nameVal = val;
+            } else if (!studentMailVal && (cleanKey.includes('studentmail') || cleanKey.includes('diuemail') || cleanKey.includes('diumail'))) {
+              studentMailVal = val;
+            } else if (!personalMailVal && (cleanKey.includes('personalmail') || cleanKey.includes('gmail') || cleanKey.includes('personalemail'))) {
+              personalMailVal = val;
             } else if (!emailVal && (cleanKey.includes('email') || cleanKey.includes('mail'))) {
               emailVal = val;
+            } else if (!couponVal && (cleanKey.includes('coupon') || cleanKey.includes('voucher') || cleanKey.includes('cupo'))) {
+              couponVal = val;
             } else if (!passcodeVal && (cleanKey.includes('passcode') || cleanKey.includes('password') || cleanKey.includes('pass') || cleanKey.includes('secret') || cleanKey.includes('code'))) {
               passcodeVal = val;
-            } else if (!nameVal && (cleanKey.includes('name') || cleanKey.includes('participant') || cleanKey.includes('student'))) {
-              nameVal = val;
+            } else if (!semesterVal && (cleanKey.includes('semester') || cleanKey.includes('currentsemester'))) {
+              semesterVal = val;
+            } else if (!phoneVal && (cleanKey.includes('phone') || cleanKey.includes('contact') || cleanKey.includes('mobile') || cleanKey.includes('number'))) {
+              phoneVal = val;
             } else if (!teamVal && (cleanKey.includes('team') || cleanKey.includes('group') || cleanKey.includes('dept') || cleanKey.includes('club'))) {
               teamVal = val;
             } else if (!deskVal && (cleanKey.includes('desk') || cleanKey.includes('seat') || cleanKey.includes('station') || cleanKey.includes('table'))) {
@@ -58,36 +73,32 @@ export async function parseContenderFile(file) {
             }
           }
 
-          // Fallbacks if columns weren't matched by name
-          if (!nameVal && keys[0] && !keys[0].toLowerCase().includes('id')) nameVal = String(row[keys[0]] || '').trim();
-          if (!emailVal) {
-            for (const k of keys) {
-              const v = String(row[k] || '').trim();
-              if (v.includes('@') && v.includes('.')) {
-                emailVal = v;
-                break;
-              }
-            }
+          // Fallbacks
+          if (!studentMailVal && emailVal && emailVal.includes('@diu.edu.bd')) {
+            studentMailVal = emailVal;
           }
-
-          // Auto-generate ID if missing
-          if (!idVal && nameVal) {
-            idVal = `PB-${100 + index + 1}`;
+          if (!personalMailVal && emailVal && !emailVal.includes('@diu.edu.bd')) {
+            personalMailVal = emailVal;
           }
+          const primaryMail = studentMailVal || emailVal || personalMailVal;
+          const finalCoupon = couponVal || passcodeVal;
 
-          // Auto-generate passcode if missing
-          if (!passcodeVal) {
-            passcodeVal = `PB${Math.floor(1000 + Math.random() * 9000)}`;
-          }
+          const deskNumStr = String(index + 1).padStart(2, '0');
 
-          if (idVal || nameVal || emailVal) {
+          if (idVal || nameVal || primaryMail || finalCoupon) {
             normalized.push({
-              participantId: (idVal || `PB-${100 + index + 1}`).toUpperCase(),
-              name: nameVal || `Contender ${idVal}`,
-              email: (emailVal || `${(idVal || 'user').toLowerCase()}@diu.edu.bd`).toLowerCase(),
-              passcode: passcodeVal,
-              teamName: teamVal || 'IEEE PES SBC Contender',
-              deskNumber: deskVal || `Desk ${index + 1}`
+              participantId: (idVal || `PB-${100 + index + 1}`).trim(),
+              studentId: (idVal || `PB-${100 + index + 1}`).trim(),
+              name: nameVal || `Contender ${idVal || index + 1}`,
+              studentMail: studentMailVal || '',
+              personalMail: personalMailVal || '',
+              email: (primaryMail || `${(idVal || 'user').toLowerCase()}@diu.edu.bd`).toLowerCase(),
+              semester: semesterVal || '',
+              phone: phoneVal || '',
+              couponCode: (finalCoupon || `PBC${String(index + 1).padStart(3, '0')}`).trim(),
+              passcode: (finalCoupon || `PBC${String(index + 1).padStart(3, '0')}`).trim(),
+              teamName: teamVal || 'Solo Contender',
+              deskNumber: deskVal || `Desk ${deskNumStr}`
             });
           }
         });
