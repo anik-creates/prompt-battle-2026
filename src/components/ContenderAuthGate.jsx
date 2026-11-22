@@ -47,10 +47,6 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
   const [error, setError] = useState('');
   const [copiedField, setCopiedField] = useState(null);
 
-  // Quick picker search modal
-  const [showQuickPicker, setShowQuickPicker] = useState(false);
-  const [quickSearch, setQuickSearch] = useState('');
-
   // Enriched session with full profile attributes from registered roster
   const activeContender = useMemo(() => {
     if (!session) return null;
@@ -167,14 +163,6 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
     }
   };
 
-  const handleQuickFill = (c) => {
-    if (!c) return;
-    setEmailInput(c.studentMail || c.email || c.personalMail || c.participantId);
-    setPasscodeInput(c.couponCode || c.passcode || '');
-    setError('');
-    setShowQuickPicker(false);
-  };
-
   const handleLogout = () => {
     if (window.confirm('Switch Contender Account? Any in-progress answers on this device will reset.')) {
       localStorage.removeItem('pb_contender_session');
@@ -191,23 +179,6 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
     setCopiedField(fieldName);
     setTimeout(() => setCopiedField(null), 2000);
   };
-
-  // Filtered contenders for the quick-picker search
-  const filteredQuickContenders = useMemo(() => {
-    const term = quickSearch.trim().toLowerCase();
-    if (!term) return (registeredContenders || []).slice(0, 15);
-    return (registeredContenders || []).filter((c) => {
-      return (
-        c.name?.toLowerCase().includes(term) ||
-        c.studentId?.toLowerCase().includes(term) ||
-        c.participantId?.toLowerCase().includes(term) ||
-        c.studentMail?.toLowerCase().includes(term) ||
-        c.personalMail?.toLowerCase().includes(term) ||
-        c.couponCode?.toLowerCase().includes(term) ||
-        c.deskNumber?.toLowerCase().includes(term)
-      );
-    }).slice(0, 20);
-  }, [registeredContenders, quickSearch]);
 
   // If user is not authenticated yet, show Login Screen
   if (!activeContender) {
@@ -238,14 +209,14 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
             <div>
               <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-fest-cyan" />
-                <span>Email Address / Student ID *</span>
+                <span>Registered Email / Student ID *</span>
               </label>
               <input
                 type="text"
                 required
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="e.g. sifat2305131213@diu.edu.bd or 232-33-213"
+                placeholder="Enter your registered email address"
                 className="w-full px-3 py-2.5 rounded-lg bg-dark-950 border border-white/15 text-white font-mono text-xs focus:border-fest-cyan"
               />
               <p className="text-[10px] text-slate-400 mt-1">
@@ -255,20 +226,17 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
 
             {/* Coupon Code / Password Field */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-slate-300 font-bold flex items-center gap-1.5">
-                  <Ticket className="w-3.5 h-3.5 text-fest-pink" />
-                  <span>Coupon Code (Password) *</span>
-                </label>
-                <span className="text-[10px] text-fest-pink font-semibold">e.g. PBC001</span>
-              </div>
+              <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1.5">
+                <Ticket className="w-3.5 h-3.5 text-fest-pink" />
+                <span>Coupon Code (Password) *</span>
+              </label>
               <div className="relative">
                 <input
                   type={showPasscode ? 'text' : 'password'}
                   required
                   value={passcodeInput}
                   onChange={(e) => setPasscodeInput(e.target.value)}
-                  placeholder="Enter your Coupon Code..."
+                  placeholder="Enter your password..."
                   className="w-full px-3 py-2.5 rounded-lg bg-dark-950 border border-white/15 text-fest-pink font-bold font-mono text-sm uppercase tracking-wider focus:border-fest-pink"
                 />
                 <button
@@ -292,60 +260,6 @@ export default function ContenderAuthGate({ children, onAuthenticated, isSimulat
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Quick Contender Finder / Roster Helper */}
-          {registeredContenders.length > 0 && (
-            <div className="pt-3 border-t border-white/10 text-left space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-fest-amber" />
-                  <span>Registered Contenders ({registeredContenders.length}):</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowQuickPicker(!showQuickPicker)}
-                  className="text-[10px] text-fest-cyan hover:underline font-bold"
-                >
-                  {showQuickPicker ? 'Hide List' : 'Find My Credentials'}
-                </button>
-              </div>
-
-              {showQuickPicker && (
-                <div className="space-y-2 p-3 rounded-xl bg-dark-950 border border-white/10 animate-in fade-in duration-150">
-                  <div className="relative">
-                    <Search className="w-3 h-3 text-slate-400 absolute left-2.5 top-2.5" />
-                    <input
-                      type="text"
-                      value={quickSearch}
-                      onChange={(e) => setQuickSearch(e.target.value)}
-                      placeholder="Search your name, student ID, or coupon..."
-                      className="w-full pl-7 pr-3 py-1.5 rounded bg-dark-900 border border-white/10 text-[11px] text-white focus:border-fest-cyan"
-                    />
-                  </div>
-
-                  <div className="max-h-40 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                    {filteredQuickContenders.map((c, i) => (
-                      <button
-                        key={c.participantId || i}
-                        type="button"
-                        onClick={() => handleQuickFill(c)}
-                        className="w-full text-left p-2 rounded bg-dark-900/80 hover:bg-white/5 border border-white/5 hover:border-fest-cyan/40 text-[11px] flex items-center justify-between transition-colors"
-                      >
-                        <div className="truncate mr-2">
-                          <span className="font-bold text-white block">{c.name}</span>
-                          <span className="text-[10px] text-slate-400">{c.studentId || c.participantId} • {c.studentMail || c.email}</span>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className="text-fest-pink font-bold font-mono text-[10px] block">{c.couponCode || 'PBC'}</span>
-                          <span className="text-fest-amber text-[10px]">{c.deskNumber || 'Desk'}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     );

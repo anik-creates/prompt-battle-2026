@@ -402,32 +402,6 @@ export default function JudgeView() {
             </button>
           </form>
 
-          {/* Quick Access to Existing Registered Judges */}
-          {judges.length > 0 && (
-            <div className="pt-3 border-t border-white/10 space-y-2">
-              <span className="text-[11px] text-slate-400 block font-bold">
-                Registered Judges ({judges.length}/4):
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {judges.map((j) => (
-                  <button
-                    key={j.id}
-                    onClick={() => handleQuickLoginJudge(j)}
-                    className="p-2 rounded bg-dark-950 border border-white/10 hover:border-fest-amber/40 text-left text-[11px] flex items-center justify-between text-slate-300 hover:text-white transition-colors"
-                  >
-                    <div>
-                      <span className="font-bold text-fest-amber block">Judge #{j.judgeNumber}</span>
-                      <span className="text-white text-[10px] truncate max-w-[120px] block">{j.name}</span>
-                    </div>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-fest-cyan font-mono">
-                      Log In ↗
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="text-center pt-2">
             <button
               type="button"
