@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="./assets/eee-fest-logo-YEKQZPxW.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prompt Battle • EEE FEST 2026 | IEEE PES DIU SBC</title>
+    <meta name="description" content="AI Prompt Competition organized by IEEE PES DIU SBC for EEE FEST 2026" />
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Clean Path Route Initializer (removes # and maintains clean /submit, /admin, etc.) -->
+    <script>
+      (function() {
+        if (window.location.hash) {
+          var clean = window.location.hash.replace(/^[#/]+/, '').replace(/\/+$/, '').toLowerCase();
+          if (['admin', 'submit', 'presentation', 'judge'].indexOf(clean) !== -1) {
+            var isGh = window.location.pathname.indexOf('/prompt-battle-2026') !== -1;
+            var basePath = isGh ? '/prompt-battle-2026' : '';
+            var target = clean === 'presentation' ? basePath + '/' : basePath + '/' + clean;
+            window.history.replaceState(null, '', target + window.location.search);
+          }
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-U9tk5jKD.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-kSFQBqyu.css">
+  </head>
+  <body class="bg-dark-950 text-slate-100 min-h-screen antialiased selection:bg-fest-pink selection:text-white">
+    <div id="root"></div>
+  </body>
+</html>
