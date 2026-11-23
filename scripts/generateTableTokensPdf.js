@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 const outputPath = path.resolve(__dirname, '../Table_Tokens_All_64_Desks.pdf');
 const publicOutputPath = path.resolve(__dirname, '../public/Table_Tokens_All_64_Desks.pdf');
 
-const pesLogoPath = path.resolve(__dirname, '../public/assets/ieee-pes-diu-logo.png');
+const pesLogoPath = path.resolve(__dirname, '../public/assets/pes-table-logo.png');
 const eeeFestLogoPath = path.resolve(__dirname, '../public/assets/eee-fest-logo.png');
 
 const hasPesLogo = fs.existsSync(pesLogoPath);
@@ -101,16 +101,20 @@ function renderTableToken(doc, participant, quad, index) {
      .lineWidth(0.5)
      .stroke('#cbd5e1');
 
-  // 2. Official Header Banner (Navy Blue #0a192f) with Official Logos
+  // 2. Official Header (Pure White Background - No Colored Bar)
   const headerH = 50;
-  doc.rect(cardX + 4, cardY + 4, cardW - 8, headerH)
-     .fill('#0a192f');
 
-  // Draw PES Logo on Left of Header
+  // Thin clean dividing line between header and content
+  doc.moveTo(cardX + 4, cardY + headerH + 4)
+     .lineTo(cardX + cardW - 4, cardY + headerH + 4)
+     .lineWidth(0.5)
+     .stroke('#e2e8f0');
+
+  // Draw PES Circular Logo on Left of Header
   if (hasPesLogo) {
     try {
-      doc.image(pesLogoPath, cardX + 8, cardY + 8, {
-        fit: [40, 40],
+      doc.image(pesLogoPath, cardX + 8, cardY + 7, {
+        fit: [42, 42],
         align: 'center',
         valign: 'center'
       });
@@ -132,30 +136,30 @@ function renderTableToken(doc, participant, quad, index) {
     }
   }
 
-  // Header IEEE PES branding text (Center)
-  const centerTextX = cardX + 50;
-  const centerTextW = cardW - 126;
+  // Header IEEE PES branding text (Center - high contrast dark colors on white)
+  const centerTextX = cardX + 52;
+  const centerTextW = cardW - 130;
 
-  doc.fillColor('#fbbf24')
+  doc.fillColor('#15803d')
      .font('Helvetica-Bold')
-     .fontSize(7.5)
-     .text('IEEE PES DIU SBC', centerTextX, cardY + 10, {
+     .fontSize(8.5)
+     .text('IEEE PES DIU SBC', centerTextX, cardY + 9, {
        width: centerTextW,
        align: 'center'
      });
 
-  doc.fillColor('#ffffff')
+  doc.fillColor('#0f172a')
      .font('Helvetica-Bold')
-     .fontSize(10.5)
+     .fontSize(12)
      .text('PROMPT BATTLE', centerTextX, cardY + 21, {
        width: centerTextW,
        align: 'center'
      });
 
-  doc.fillColor('#38bdf8')
+  doc.fillColor('#0284c7')
      .font('Helvetica-Bold')
-     .fontSize(7.5)
-     .text('EEE FEST 2026', centerTextX, cardY + 35, {
+     .fontSize(8)
+     .text('EEE FEST 2026', centerTextX, cardY + 36, {
        width: centerTextW,
        align: 'center'
      });
@@ -326,8 +330,8 @@ function renderTableToken(doc, participant, quad, index) {
 
   doc.fillColor('#15803d')
      .font('Helvetica-Bold')
-     .fontSize(6.2)
-     .text('Organized & Sponsored by IEEE PES DIU Student Branch Chapter', cardX + 10, footerY + 23, {
+     .fontSize(6.5)
+     .text('Powered by PES Web Development team • IEEE PES DIU SBC', cardX + 10, footerY + 23, {
        width: cardW - 20,
        align: 'center'
      });

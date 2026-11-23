@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useBattle, toSafeArray, DEFAULT_POLL } from '../context/BattleContext';
-import { setupTabSwitchGuard } from '../lib/focusGuard';
 import { 
   Vote, 
   CheckCircle2, 
@@ -13,7 +12,7 @@ import {
 } from 'lucide-react';
 
 export default function ParticipantPollView({ isSimulator = false }) {
-  const { poll, submitVote, registerPresence, reportTabSwitch } = useBattle();
+  const { poll, submitVote, registerPresence } = useBattle();
 
   const safePoll = poll || DEFAULT_POLL;
   const optionsList = toSafeArray(safePoll.options, DEFAULT_POLL.options);
@@ -33,10 +32,6 @@ export default function ParticipantPollView({ isSimulator = false }) {
   const [selectedOptId, setSelectedOptId] = useState(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-
-  // Anti-Cheat / App-Switching Lock State
-  const [focusViolated, setFocusViolated] = useState(false);
-  const [violationCount, setViolationCount] = useState(0);
 
   const questionStartTimeRef = useRef(Date.now());
 
@@ -74,29 +69,6 @@ export default function ParticipantPollView({ isSimulator = false }) {
     return () => clearInterval(interval);
   }, [isSimulator, participantId, registerPresence, voterName]);
 
-  // Anti-Switching Focus Protection (with Smart Screen Lock bypass on phones)
-  useEffect(() => {
-    if (isSimulator) return;
-
-    const cleanup = setupTabSwitchGuard({
-      isSimulator,
-      onTabSwitch: () => {
-        if (!hasVoted) {
-          setFocusViolated(true);
-          setViolationCount((prev) => prev + 1);
-          reportTabSwitch({
-            participantId,
-            name: voterName || 'Contender',
-            teamName: 'Solo',
-            arena: 'poll',
-          });
-        }
-      },
-    });
-
-    return cleanup;
-  }, [hasVoted, isSimulator, participantId, voterName, reportTabSwitch]);
-
   const handleCastVote = (optId) => {
     if (hasVoted) return;
     if (safePoll?.status === 'closed') {
@@ -129,32 +101,6 @@ export default function ParticipantPollView({ isSimulator = false }) {
   return (
     <div className="w-full max-w-xl mx-auto py-6 px-4 space-y-6">
       
-      {/* Anti-Switching Security Violation Warning Overlay */}
-      {focusViolated && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
-          <div className="p-6 rounded-xl border border-rose-500/50 bg-dark-900 text-center space-y-4 max-w-sm shadow-[0_0_40px_rgba(244,63,94,0.3)]">
-            <div className="w-14 h-14 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/40">
-              <ShieldAlert className="w-8 h-8" />
-            </div>
-            <h3 className="font-sans font-bold text-white text-lg">
-              App Switching Detected!
-            </h3>
-            <p className="text-xs font-mono text-slate-300 leading-relaxed">
-              In accordance with competition rules, switching away from the active poll window is strictly restricted.
-            </p>
-            <div className="text-[11px] font-mono text-rose-400">
-              Violation Count: #{violationCount}
-            </div>
-            <button
-              onClick={() => setFocusViolated(false)}
-              className="w-full py-2.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs font-bold uppercase tracking-wider"
-            >
-              I Understand • Return to Poll
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="text-center">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fest-pink/15 border border-fest-pink/30 text-fest-pink text-xs font-mono uppercase tracking-wider mb-2">

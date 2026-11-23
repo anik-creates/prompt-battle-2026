@@ -751,7 +751,7 @@ export default function AdminView() {
                 {problemStatement.status === 'released' ? (
                   <button
                     type="button"
-                    onClick={hideProblemStatement}
+                    onClick={() => hideProblemStatement()}
                     className="px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(225,29,72,0.4)] flex items-center gap-2"
                   >
                     <Lock className="w-4 h-4" />
@@ -760,7 +760,7 @@ export default function AdminView() {
                 ) : (
                   <button
                     type="button"
-                    onClick={releaseProblemStatement}
+                    onClick={() => releaseProblemStatement()}
                     className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-fest-cyan text-dark-950 font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_30px_rgba(16,185,129,0.5)] flex items-center gap-2 hover:opacity-95"
                   >
                     <Unlock className="w-4 h-4" />
@@ -1317,7 +1317,7 @@ export default function AdminView() {
                 {problemStatement.status === 'released' ? (
                   <button
                     type="button"
-                    onClick={hideProblemStatement}
+                    onClick={() => hideProblemStatement()}
                     className="px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(225,29,72,0.4)] flex items-center gap-2"
                   >
                     <Lock className="w-4 h-4" />
@@ -1326,7 +1326,7 @@ export default function AdminView() {
                 ) : (
                   <button
                     type="button"
-                    onClick={releaseProblemStatement}
+                    onClick={() => releaseProblemStatement()}
                     className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-fest-cyan text-dark-950 font-bold uppercase tracking-wider transition-all shadow-[0_0_30px_rgba(16,185,129,0.5)] flex items-center gap-2 hover:opacity-95"
                   >
                     <Unlock className="w-4 h-4" />

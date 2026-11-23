@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useBattle } from '../context/BattleContext';
 import { 
   Clock, 
@@ -12,15 +12,30 @@ import {
 
 export default function TimerDisplay({ size = 'large', showControls = false }) {
   const { 
-    timer, 
+    timer = {}, 
     startTimer, 
     pauseTimer, 
     resumeTimer, 
     resetTimer 
   } = useBattle();
 
-  const total = timer.duration || 1200;
-  const remaining = timer.remaining !== undefined ? timer.remaining : total;
+  const [now, setNow] = useState(Date.now());
+
+  // Real-time smooth local clock tick that guarantees instantaneous countdown
+  useEffect(() => {
+    if (timer.status === 'running' && timer.endsAt) {
+      const interval = setInterval(() => {
+        setNow(Date.now());
+      }, 250);
+      return () => clearInterval(interval);
+    }
+  }, [timer.status, timer.endsAt]);
+
+  const total = Number(timer.duration) || 1200;
+  let remaining = timer.remaining !== undefined ? Number(timer.remaining) : total;
+  if (timer.status === 'running' && timer.endsAt) {
+    remaining = Math.max(0, Math.ceil((timer.endsAt - now) / 1000));
+  }
   const progressPercent = Math.max(0, Math.min(100, (remaining / total) * 100));
 
   const hours = Math.floor(remaining / 3600);

@@ -26,9 +26,7 @@ export default function SecureProblemCanvas({
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   
-  // Security States
-  const [isWindowBlurred, setIsWindowBlurred] = useState(false);
-  const [isDevToolsDetected, setIsDevToolsDetected] = useState(false);
+  // Security States (Anti-Copy & Integrity Protected)
   const [screenshotFlash, setScreenshotFlash] = useState(false);
   const [securityToast, setSecurityToast] = useState('');
   const toastTimeoutRef = useRef(null);
@@ -41,24 +39,8 @@ export default function SecureProblemCanvas({
     }, 2500);
   };
 
-  // 1. Anti-Screenshot Focus Guard (Window Blur & Tab Visibility)
+  // Keyboard Shortcuts & Anti-Copy Protection (Tab switching allowed freely for Antigravity)
   useEffect(() => {
-    const handleBlur = () => {
-      setIsWindowBlurred(true);
-    };
-
-    const handleFocus = () => {
-      setIsWindowBlurred(false);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden || document.visibilityState !== 'visible') {
-        setIsWindowBlurred(true);
-      } else {
-        setIsWindowBlurred(false);
-      }
-    };
-
     // PrintScreen Key Capture
     const handleKeyUp = (e) => {
       if (e.key === 'PrintScreen' || e.keyCode === 44) {
@@ -137,29 +119,12 @@ export default function SecureProblemCanvas({
       }
     };
 
-    // DevTools Open Detector (Docked & Undocked)
-    const devToolsCheckInterval = setInterval(() => {
-      const threshold = 160;
-      const widthDiff = window.outerWidth - window.innerWidth;
-      const heightDiff = window.outerHeight - window.innerHeight;
-      
-      const isOpen = (widthDiff > threshold) || (heightDiff > threshold);
-      setIsDevToolsDetected(isOpen);
-    }, 600);
-
-    window.addEventListener('blur', handleBlur);
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('keyup', handleKeyUp, true);
     window.addEventListener('keydown', handleKeyDown, true);
 
     return () => {
-      window.removeEventListener('blur', handleBlur);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('keyup', handleKeyUp, true);
       window.removeEventListener('keydown', handleKeyDown, true);
-      clearInterval(devToolsCheckInterval);
     };
   }, []);
 
@@ -365,14 +330,22 @@ export default function SecureProblemCanvas({
 
   }, [problemStatement, activeSession, mode]);
 
-  // Re-render canvas whenever content changes or window resizes
+  // Re-render canvas whenever content changes, fonts ready, or window resizes
   useEffect(() => {
     renderCanvas();
+    const raf = requestAnimationFrame(() => renderCanvas());
+    if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => renderCanvas()).catch(() => {});
+    }
+
     const handleResize = () => {
       renderCanvas();
     };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', handleResize);
+    };
   }, [renderCanvas]);
 
   return (
@@ -420,44 +393,6 @@ export default function SecureProblemCanvas({
         ref={canvasRef}
         className="w-full block bg-dark-950"
       />
-
-      {/* SCREEN CAPTURE & FOCUS SHIELD: TRIGGERS ON WIN+SHIFT+S / BLUR / TAB SWITCH */}
-      {isWindowBlurred && (
-        <div className="absolute inset-0 z-40 bg-dark-950/95 backdrop-blur-2xl flex flex-col items-center justify-center p-6 text-center space-y-3 font-mono">
-          <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border-2 border-rose-500/40 text-rose-400 flex items-center justify-center shadow-[0_0_30px_rgba(244,63,94,0.3)] animate-pulse">
-            <CameraOff className="w-8 h-8" />
-          </div>
-          <div className="space-y-1">
-            <h4 className="text-base font-bold text-white uppercase tracking-wider flex items-center justify-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-rose-400" />
-              <span>Screen Capture Shield Active</span>
-            </h4>
-            <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-              Problem statement content is hidden while this window is not in focus. Return to this browser tab to resume viewing.
-            </p>
-          </div>
-          <span className="px-3 py-1 rounded-full bg-dark-900 border border-white/10 text-slate-500 text-[10px]">
-            Protected by IEEE PES DIU SBC Anti-Cheat Protocol
-          </span>
-        </div>
-      )}
-
-      {/* DEVTOOLS INSPECTOR SHIELD: TRIGGERS IF DEVTOOLS IS OPENED */}
-      {isDevToolsDetected && (
-        <div className="absolute inset-0 z-40 bg-dark-950/98 backdrop-blur-3xl flex flex-col items-center justify-center p-6 text-center space-y-3 font-mono">
-          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border-2 border-amber-500/40 text-amber-400 flex items-center justify-center shadow-[0_0_30px_rgba(245,158,11,0.3)] animate-bounce">
-            <EyeOff className="w-8 h-8" />
-          </div>
-          <div className="space-y-1">
-            <h4 className="text-base font-bold text-amber-300 uppercase tracking-wider">
-              DevTools Inspection Restricted
-            </h4>
-            <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-              Developer tools inspection is strictly prohibited during the competition. Please close DevTools to unlock the problem statement.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* INSTANT PRINTSCREEN FLASH SHIELD */}
       {screenshotFlash && (

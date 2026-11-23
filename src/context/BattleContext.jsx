@@ -302,6 +302,10 @@ export function BattleProvider({ children }) {
   const [firebaseError, setFirebaseError] = useState(null);
 
   const broadcastRef = useRef(null);
+  const battleStateRef = useRef(battleState);
+  battleStateRef.current = battleState;
+
+  const syncStateRef = useRef(null);
 
   // Sync state to local storage and broadcast to other tabs & cloud
   const syncState = useCallback((newState, shouldPushCloud = true) => {
@@ -325,6 +329,8 @@ export function BattleProvider({ children }) {
       pushStateToCloud(cleanState).catch((err) => console.warn('Cloud sync error:', err));
     }
   }, []);
+
+  syncStateRef.current = syncState;
 
   // Initialize BroadcastChannel & Storage Event Listeners
   useEffect(() => {
@@ -403,7 +409,7 @@ export function BattleProvider({ children }) {
     };
   }, []);
 
-  // Active Timer Tick Loop for Battle
+  // Active Timer Tick Loop for Battle (Stable interval that does not thash dependencies)
   useEffect(() => {
     let intervalId = null;
 
@@ -416,17 +422,19 @@ export function BattleProvider({ children }) {
         if (remainingSec <= 0) {
           clearInterval(intervalId);
           playTimesUpAlert();
-          syncState({
-            ...battleState,
-            timer: {
-              ...battleState.timer,
-              remaining: 0,
-              status: 'finished',
-            },
-            lastUpdated: Date.now(),
-          });
+          if (syncStateRef.current) {
+            syncStateRef.current({
+              ...battleStateRef.current,
+              timer: {
+                ...battleStateRef.current.timer,
+                remaining: 0,
+                status: 'finished',
+              },
+              lastUpdated: Date.now(),
+            });
+          }
         } else {
-          if (remainingSec <= 10 && remainingSec !== battleState.timer.remaining) {
+          if (remainingSec <= 10) {
             playCountdownTick();
           }
 
@@ -447,7 +455,7 @@ export function BattleProvider({ children }) {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [battleState.timer.status, battleState.timer.endsAt, battleState, syncState]);
+  }, [battleState.timer.status, battleState.timer.endsAt]);
 
   const switchView = useCallback((newView) => {
     if (!['presentation', 'admin', 'submit', 'judge'].includes(newView)) return;
@@ -528,12 +536,16 @@ export function BattleProvider({ children }) {
 
   // --- BATTLE ACTIONS ---
   const startTimer = useCallback((customDurationSec = null) => {
-    const duration = customDurationSec !== null ? customDurationSec : battleState.timer.duration;
+    const currentState = battleStateRef.current;
+    const rawDuration = (typeof customDurationSec === 'number' && !isNaN(customDurationSec) && customDurationSec > 0)
+      ? customDurationSec
+      : (Number(currentState.timer?.duration) || 1200);
+    const duration = Math.max(10, Math.round(rawDuration));
     const now = Date.now();
     const endsAt = now + duration * 1000;
     playStartHorn();
     syncState({
-      ...battleState,
+      ...currentState,
       activeArena: 'battle',
       timer: {
         duration,
@@ -544,49 +556,61 @@ export function BattleProvider({ children }) {
       },
       lastUpdated: now,
     });
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const pauseTimer = useCallback(() => {
     const now = Date.now();
-    let currentRemaining = battleState.timer.remaining;
-    if (battleState.timer.endsAt) {
-      currentRemaining = Math.max(0, Math.ceil((battleState.timer.endsAt - now) / 1000));
+    const currentState = battleStateRef.current;
+    const currentTimer = currentState.timer || {};
+    let currentRemaining = Number(currentTimer.remaining) || Number(currentTimer.duration) || 1200;
+    if (currentTimer.endsAt) {
+      currentRemaining = Math.max(0, Math.ceil((currentTimer.endsAt - now) / 1000));
     }
     syncState({
-      ...battleState,
+      ...currentState,
       timer: {
-        ...battleState.timer,
+        ...currentTimer,
         remaining: currentRemaining,
         status: 'paused',
         endsAt: null,
       },
       lastUpdated: now,
     });
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const resumeTimer = useCallback(() => {
     const now = Date.now();
-    const remaining = battleState.timer.remaining > 0 ? battleState.timer.remaining : battleState.timer.duration;
+    const currentState = battleStateRef.current;
+    const currentTimer = currentState.timer || {};
+    const totalDuration = Number(currentTimer.duration) || 1200;
+    let remaining = Number(currentTimer.remaining);
+    if (isNaN(remaining) || remaining <= 0) {
+      remaining = totalDuration;
+    }
     const endsAt = now + remaining * 1000;
     playStartHorn();
     syncState({
-      ...battleState,
+      ...currentState,
       timer: {
-        ...battleState.timer,
+        ...currentTimer,
         remaining,
         status: 'running',
-        startedAt: battleState.timer.startedAt || now,
+        startedAt: currentTimer.startedAt || now,
         endsAt,
       },
       lastUpdated: now,
     });
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const resetTimer = useCallback((newDurationSec = null) => {
-    const duration = newDurationSec !== null ? newDurationSec : battleState.timer.duration;
+    const currentState = battleStateRef.current;
+    const raw = (typeof newDurationSec === 'number' && !isNaN(newDurationSec) && newDurationSec > 0)
+      ? newDurationSec
+      : (Number(currentState.timer?.duration) || 1200);
+    const duration = Math.max(10, Math.round(raw));
     const now = Date.now();
     syncState({
-      ...battleState,
+      ...currentState,
       timer: {
         duration,
         remaining: duration,
@@ -596,7 +620,7 @@ export function BattleProvider({ children }) {
       },
       lastUpdated: now,
     });
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const submitParticipantWork = useCallback(({ participantId = '', name, teamName = '', deskNumber = '', notes = '', tokensUsed = 0, workUrl = '' }) => {
     const now = Date.now();
@@ -777,32 +801,36 @@ export function BattleProvider({ children }) {
   // --- PROBLEM STATEMENT ACTIONS ---
   const releaseProblemStatement = useCallback(() => {
     const now = Date.now();
+    const currentState = battleStateRef.current;
+    const currentPS = currentState.problemStatement || DEFAULT_PROBLEM_STATEMENT;
     const updated = {
-      ...battleState,
+      ...currentState,
       problemStatement: {
-        ...(battleState.problemStatement || DEFAULT_PROBLEM_STATEMENT),
+        ...currentPS,
         status: 'released',
         releasedAt: now,
       },
       lastUpdated: now,
     };
-    syncState(updated);
+    syncState(updated, true);
     playStartHorn();
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const hideProblemStatement = useCallback(() => {
     const now = Date.now();
+    const currentState = battleStateRef.current;
+    const currentPS = currentState.problemStatement || DEFAULT_PROBLEM_STATEMENT;
     const updated = {
-      ...battleState,
+      ...currentState,
       problemStatement: {
-        ...(battleState.problemStatement || DEFAULT_PROBLEM_STATEMENT),
+        ...currentPS,
         status: 'hidden',
         releasedAt: null,
       },
       lastUpdated: now,
     };
-    syncState(updated);
-  }, [battleState, syncState]);
+    syncState(updated, true);
+  }, [syncState]);
 
   const updateProblemStatement = useCallback((updates) => {
     const now = Date.now();

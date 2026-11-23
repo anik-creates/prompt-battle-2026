@@ -3,7 +3,6 @@ import { useBattle } from '../context/BattleContext';
 import ParticipantPollView from './ParticipantPollView';
 import ContenderAuthGate from './ContenderAuthGate';
 import LockedProblemStatementWindow from './LockedProblemStatementWindow';
-import { setupTabSwitchGuard } from '../lib/focusGuard';
 import { 
   Send, 
   CheckCircle2, 
@@ -77,26 +76,7 @@ export default function ParticipantSubmitView({ isSimulator = false }) {
     }
   }, [isSimulator, session, activeArena, registerPresence]);
 
-  // Anti-Cheat Tab Switch Protection
-  useEffect(() => {
-    if (isSimulator || activeArena !== 'battle' || !session) return;
-
-    const cleanup = setupTabSwitchGuard({
-      isSimulator,
-      onTabSwitch: () => {
-        if (!activeContenderSubmission) {
-          reportTabSwitch({
-            participantId: session.participantId,
-            name: session.name,
-            teamName: session.teamName,
-            arena: 'battle',
-          });
-        }
-      },
-    });
-
-    return cleanup;
-  }, [isSimulator, activeArena, activeContenderSubmission, session, reportTabSwitch]);
+  // Contenders can freely switch tabs and apps to use Google Antigravity / ChatGPT
 
   const handleSubmit = (e) => {
     e.preventDefault();
