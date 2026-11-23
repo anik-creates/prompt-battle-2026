@@ -134,11 +134,6 @@ export default function PollArenaView() {
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                 <span className="font-semibold text-white">{v.name}</span>
-                {v.tabSwitches > 0 && (
-                  <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 font-bold border border-rose-500/40 text-[10px]">
-                    ⚠️ {v.tabSwitches} sw
-                  </span>
-                )}
               </span>
             ))}
           </div>
@@ -212,7 +207,6 @@ export default function PollArenaView() {
                   <th className="py-3 px-4 font-sans font-bold">Contender</th>
                   <th className="py-3 px-4 text-center">Outcome</th>
                   <th className="py-3 px-4 text-center">Time Taken</th>
-                  <th className="py-3 px-4 text-center">Tab Switches</th>
                   <th className="py-3 px-4 text-right">Points</th>
                 </tr>
               </thead>
@@ -234,15 +228,6 @@ export default function PollArenaView() {
                     </td>
                     <td className="py-3 px-4 text-center text-slate-300">
                       {p.timeTakenSec}s
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      {p.tabSwitches > 0 ? (
-                        <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold border border-rose-500/40">
-                          ⚠️ {p.tabSwitches} switches
-                        </span>
-                      ) : (
-                        <span className="text-emerald-400">✓ Clean</span>
-                      )}
                     </td>
                     <td className="py-3 px-4 text-right text-base font-extrabold text-white">
                       {p.score}

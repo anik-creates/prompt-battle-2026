@@ -361,6 +361,7 @@ export default function JudgeView() {
 
     submitJudgeEvaluation({
       participantId: contender.participantId,
+      deskNumber: contender.deskNumber,
       judgeId: currentJudge.id,
       marks: {
         promptScore: prompt,
@@ -412,6 +413,7 @@ export default function JudgeView() {
 
     expelParticipant({
       participantId: contender.participantId,
+      deskNumber: contender.deskNumber,
       reason: 'Caught cheating / academic dishonesty in Prompt Battle',
       judgeName: currentJudge.name || `Judge #${currentJudge.judgeNumber}`,
     });
@@ -425,7 +427,7 @@ export default function JudgeView() {
     );
     if (!confirmReinstate) return;
 
-    reinstateParticipant(contender.participantId);
+    reinstateParticipant(contender.participantId, contender.deskNumber);
   };
 
   // ==========================================

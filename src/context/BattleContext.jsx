@@ -526,13 +526,14 @@ export function BattleProvider({ children }) {
   // When Admin switches arena, it broadcasts to all phones & presentation screens
   const switchArena = useCallback((arena) => {
     const now = Date.now();
+    const currentState = battleStateRef.current;
     const newState = {
-      ...battleState,
+      ...currentState,
       activeArena: arena,
       lastUpdated: now,
     };
     syncState(newState);
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   // --- BATTLE ACTIONS ---
   const startTimer = useCallback((customDurationSec = null) => {
@@ -624,36 +625,37 @@ export function BattleProvider({ children }) {
 
   const submitParticipantWork = useCallback(({ participantId = '', name, teamName = '', deskNumber = '', notes = '', tokensUsed = 0, workUrl = '' }) => {
     const now = Date.now();
+    const currentState = battleStateRef.current;
     let elapsedSec = 0;
-    if (battleState.timer.startedAt) {
-      elapsedSec = Math.max(1, Math.floor((now - battleState.timer.startedAt) / 1000));
+    if (currentState.timer?.startedAt) {
+      elapsedSec = Math.max(1, Math.floor((now - currentState.timer.startedAt) / 1000));
     }
     const minutes = Math.floor(elapsedSec / 60);
     const seconds = elapsedSec % 60;
     const finishTimeFormatted = `${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
 
-    const duration = Number(battleState.timer.duration) || DEFAULT_BATTLE_DURATION;
+    const duration = Number(currentState.timer?.duration) || DEFAULT_BATTLE_DURATION;
     const tokens = Number(tokensUsed) || 0;
 
     // Automated time management score calculation (10 pts max):
     // <= half duration -> 10/10 pts full marks.
     // > half duration -> linear scale down to 0.
     // Late submission past duration -> 0 pts & automatic disqualification.
-    const isLate = (elapsedSec > duration) || (battleState.timer.status === 'finished');
+    const isLate = (elapsedSec > duration) || (currentState.timer?.status === 'finished');
     const autoTime = calculateAutomatedTimeScore(elapsedSec, duration, true);
     const isDisqualified = isLate || autoTime.isDisqualified;
 
     const cleanParticipantId = (participantId || '').trim().toUpperCase() || `PB-${Math.floor(100 + Math.random() * 900)}`;
-    const matchedRoster = (battleState.registeredContenders || []).find(
-      (c) => c.participantId?.toUpperCase() === cleanParticipantId
+    const matchedRoster = (currentState.registeredContenders || []).find(
+      (c) => (deskNumber && c.deskNumber === deskNumber) || (c.participantId?.toUpperCase() === cleanParticipantId)
     );
-    const resolvedDesk = (deskNumber || matchedRoster?.deskNumber || 'Main Floor').trim();
+    const resolvedDesk = (deskNumber || matchedRoster?.deskNumber || 'Desk 01').trim();
 
     const newParticipant = {
       id: `p-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       participantId: cleanParticipantId,
       name: name.trim(),
-      teamName: teamName.trim() || matchedRoster?.teamName || 'Independent Contender',
+      teamName: teamName.trim() || matchedRoster?.teamName || 'Solo Contender',
       deskNumber: resolvedDesk,
       submittedAt: now,
       finishSeconds: elapsedSec,
@@ -667,6 +669,7 @@ export function BattleProvider({ children }) {
       timeScore: isDisqualified ? 0 : autoTime.score,
       timeScoreDetails: autoTime.reason,
       promptScore: 0,
+      objectiveScore: 0,
       projectAccuracy: 0,
       projectSimulation: 0,
       projectMonitoring: 0,
@@ -686,117 +689,134 @@ export function BattleProvider({ children }) {
     if (!isDisqualified) {
       playFinishFanfare();
     }
-    const currentList = toSafeArray(battleState.participants, []);
+    const currentList = toSafeArray(currentState.participants, []);
+    const isSameContender = (p) => (resolvedDesk && p.deskNumber?.trim().toUpperCase() === resolvedDesk.toUpperCase()) ||
+      (cleanParticipantId && p.participantId?.toUpperCase() === cleanParticipantId);
+
     syncState({
-      ...battleState,
-      participants: [newParticipant, ...currentList.filter(p => p.participantId?.toUpperCase() !== cleanParticipantId)],
+      ...currentState,
+      participants: [newParticipant, ...currentList.filter(p => !isSameContender(p))],
       lastUpdated: now,
     });
     return newParticipant;
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const updateParticipantMarks = useCallback((id, updates) => {
     const now = Date.now();
-    const currentList = toSafeArray(battleState.participants, []);
-    const budget = Number(battleState.tokenBudget) || DEFAULT_TOKEN_BUDGET;
-    const duration = Number(battleState.timer.duration) || DEFAULT_BATTLE_DURATION;
+    const currentState = battleStateRef.current;
+    const currentList = toSafeArray(currentState.participants, []);
 
     const updated = currentList.map((p) => {
-      if (p.id !== id && p.participantId !== id) return p;
+      if (p.id !== id && p.participantId !== id && p.deskNumber !== id) return p;
       const merged = { ...p, ...updates };
 
-      const scoring = evaluateTotalScore({
-        tokensUsed: Number(merged.tokensUsed) || 0,
-        tokenBudget: budget,
-        finishSeconds: Number(merged.finishSeconds) || 0,
-        totalDurationSec: duration,
-        objectiveScore: Number(merged.objectiveScore) || 0,
-        finishStatus: merged.finishStatus || 'Partially Fulfilled',
-        presentationScore: Number(merged.presentationScore) || 0,
-        noveltyScore: Number(merged.noveltyScore) || 0,
+      const evaluated = calculateOfficialJudgeTotal({
+        promptScore: merged.promptScore ?? merged.objectiveScore ?? 0,
+        projectAccuracy: merged.projectAccuracy ?? 0,
+        projectSimulation: merged.projectSimulation ?? 0,
+        projectMonitoring: merged.projectMonitoring ?? 0,
+        projectUsability: merged.projectUsability ?? 0,
+        projectComponents: merged.projectComponents ?? 0,
+        timeScore: merged.timeScore ?? 0,
+        presentationScore: merged.presentationScore ?? 0,
+        tokenScore: merged.tokenScore ?? 0,
       });
 
-      merged.tokenScore = updates.tokenScore !== undefined ? Number(updates.tokenScore) : scoring.tokenScore;
-      merged.tokenPercentageUsed = scoring.tokenPercentageUsed;
-      merged.timeScore = updates.timeScore !== undefined ? Number(updates.timeScore) : scoring.timeScore;
-      merged.timePercentageUsed = scoring.timePercentageUsed;
-      merged.totalScore = updates.totalScore !== undefined ? Number(updates.totalScore) : scoring.totalScore;
-      return merged;
+      return {
+        ...merged,
+        promptScore: evaluated.promptScore,
+        objectiveScore: evaluated.promptScore,
+        projectAccuracy: evaluated.projectAccuracy,
+        projectSimulation: evaluated.projectSimulation,
+        projectMonitoring: evaluated.projectMonitoring,
+        projectUsability: evaluated.projectUsability,
+        projectComponents: evaluated.projectComponents,
+        projectWorkingTotal: evaluated.projectWorkingTotal,
+        timeScore: evaluated.timeScore,
+        presentationScore: evaluated.presentationScore,
+        tokenScore: evaluated.tokenScore,
+        totalScore: (merged.isExpelled || merged.isDisqualified) ? 0 : evaluated.totalScore,
+      };
     });
 
     syncState({
-      ...battleState,
+      ...currentState,
       participants: updated,
       lastUpdated: now,
     });
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const addManualParticipant = useCallback((participantData) => {
     const now = Date.now();
-    const budget = Number(battleState.tokenBudget) || DEFAULT_TOKEN_BUDGET;
-    const duration = Number(battleState.timer.duration) || DEFAULT_BATTLE_DURATION;
+    const currentState = battleStateRef.current;
     const cleanId = (participantData.participantId || '').trim().toUpperCase() || `PB-${Math.floor(100 + Math.random() * 900)}`;
 
-    const scoring = evaluateTotalScore({
-      tokensUsed: Number(participantData.tokensUsed) || 0,
-      tokenBudget: budget,
-      finishSeconds: Number(participantData.finishSeconds) || 0,
-      totalDurationSec: duration,
-      objectiveScore: Number(participantData.objectiveScore) || 0,
-      finishStatus: participantData.finishStatus || 'Fully Completed',
-      presentationScore: Number(participantData.presentationScore) || 0,
-      noveltyScore: Number(participantData.noveltyScore) || 0,
+    const evaluated = calculateOfficialJudgeTotal({
+      promptScore: participantData.promptScore ?? participantData.objectiveScore ?? 0,
+      projectAccuracy: participantData.projectAccuracy ?? 0,
+      projectSimulation: participantData.projectSimulation ?? 0,
+      projectMonitoring: participantData.projectMonitoring ?? 0,
+      projectUsability: participantData.projectUsability ?? 0,
+      projectComponents: participantData.projectComponents ?? 0,
+      timeScore: participantData.timeScore ?? 10,
+      presentationScore: participantData.presentationScore ?? 0,
+      tokenScore: participantData.tokenScore ?? 0,
     });
 
     const newParticipant = {
       id: `p-manual-${Date.now()}`,
       participantId: cleanId,
       name: participantData.name || 'New Participant',
-      teamName: participantData.teamName || 'Solo',
+      teamName: participantData.teamName || 'Solo Contender',
+      deskNumber: participantData.deskNumber || 'Desk 01',
       submittedAt: now,
       finishSeconds: Number(participantData.finishSeconds) || 0,
       finishTimeFormatted: participantData.finishTimeFormatted || 'Manual Entry',
       notes: participantData.notes || '',
       workUrl: participantData.workUrl || '',
       tokensUsed: Number(participantData.tokensUsed) || 0,
-      tokenScore: scoring.tokenScore,
-      tokenPercentageUsed: scoring.tokenPercentageUsed,
-      timeScore: scoring.timeScore,
-      timePercentageUsed: scoring.timePercentageUsed,
-      objectiveScore: Number(participantData.objectiveScore) || 0,
-      finishStatus: participantData.finishStatus || 'Fully Completed',
-      finishStatusNotes: participantData.finishStatusNotes || '',
-      presentationScore: Number(participantData.presentationScore) || 0,
-      noveltyScore: Number(participantData.noveltyScore) || 0,
-      totalScore: participantData.totalScore !== undefined ? Number(participantData.totalScore) : scoring.totalScore,
+      tokenScore: evaluated.tokenScore,
+      timeScore: evaluated.timeScore,
+      promptScore: evaluated.promptScore,
+      objectiveScore: evaluated.promptScore,
+      projectAccuracy: evaluated.projectAccuracy,
+      projectSimulation: evaluated.projectSimulation,
+      projectMonitoring: evaluated.projectMonitoring,
+      projectUsability: evaluated.projectUsability,
+      projectComponents: evaluated.projectComponents,
+      projectWorkingTotal: evaluated.projectWorkingTotal,
+      presentationScore: evaluated.presentationScore,
+      totalScore: evaluated.totalScore,
       tabSwitches: 0,
     };
-    const currentList = toSafeArray(battleState.participants, []);
+    const currentList = toSafeArray(currentState.participants, []);
     syncState({
-      ...battleState,
+      ...currentState,
       participants: [newParticipant, ...currentList.filter(p => p.participantId !== cleanId)],
       lastUpdated: now,
     });
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const removeParticipant = useCallback((id) => {
     const now = Date.now();
-    const currentList = toSafeArray(battleState.participants, []);
+    const currentState = battleStateRef.current;
+    const currentList = toSafeArray(currentState.participants, []);
     syncState({
-      ...battleState,
+      ...currentState,
       participants: currentList.filter((p) => p.id !== id),
       lastUpdated: now,
     });
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const togglePublishLeaderboard = useCallback((shouldPublish) => {
     const now = Date.now();
+    const currentState = battleStateRef.current;
     syncState({
-      ...battleState,
+      ...currentState,
       published: shouldPublish,
       lastUpdated: now,
     });
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   // --- PROBLEM STATEMENT ACTIONS ---
   const releaseProblemStatement = useCallback(() => {
@@ -842,21 +862,23 @@ export function BattleProvider({ children }) {
 
   const updateProblemStatement = useCallback((updates) => {
     const now = Date.now();
+    const currentState = battleStateRef.current;
     const updated = {
-      ...battleState,
+      ...currentState,
       problemStatement: {
-        ...(battleState.problemStatement || DEFAULT_PROBLEM_STATEMENT),
+        ...(currentState.problemStatement || DEFAULT_PROBLEM_STATEMENT),
         ...updates,
       },
       lastUpdated: now,
     };
     syncState(updated);
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const resetProblemStatement = useCallback(() => {
     const now = Date.now();
+    const currentState = battleStateRef.current;
     const updated = {
-      ...battleState,
+      ...currentState,
       problemStatement: {
         ...DEFAULT_PROBLEM_STATEMENT,
         status: 'hidden',
@@ -865,16 +887,17 @@ export function BattleProvider({ children }) {
       lastUpdated: now,
     };
     syncState(updated);
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   // --- SECRET JUDGE VERIFICATION PROMPT ACTIONS ---
   // Judge or Admin can unlock this standardized directive customly for an individual participant desk
   const unlockVerificationPromptForParticipant = useCallback((participantId) => {
     const cleanId = (participantId || '').trim().toUpperCase();
     if (!cleanId) return;
-    const currentVP = battleState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
+    const currentState = battleStateRef.current;
+    const currentVP = currentState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
     const updated = {
-      ...battleState,
+      ...currentState,
       verificationPrompt: {
         ...currentVP,
         unlockedParticipants: {
@@ -886,14 +909,15 @@ export function BattleProvider({ children }) {
       lastUpdated: Date.now(),
     };
     syncState(updated, true);
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const lockVerificationPromptForParticipant = useCallback((participantId) => {
     const cleanId = (participantId || '').trim().toUpperCase();
     if (!cleanId) return;
-    const currentVP = battleState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
+    const currentState = battleStateRef.current;
+    const currentVP = currentState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
     const updated = {
-      ...battleState,
+      ...currentState,
       verificationPrompt: {
         ...currentVP,
         unlockedParticipants: {
@@ -905,15 +929,16 @@ export function BattleProvider({ children }) {
       lastUpdated: Date.now(),
     };
     syncState(updated, true);
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const toggleVerificationPromptForParticipant = useCallback((participantId) => {
     const cleanId = (participantId || '').trim().toUpperCase();
     if (!cleanId) return;
-    const currentVP = battleState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
+    const currentState = battleStateRef.current;
+    const currentVP = currentState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
     const isUnlocked = Boolean(currentVP.unlockedParticipants?.[cleanId]);
     const updated = {
-      ...battleState,
+      ...currentState,
       verificationPrompt: {
         ...currentVP,
         unlockedParticipants: {
@@ -925,15 +950,16 @@ export function BattleProvider({ children }) {
       lastUpdated: Date.now(),
     };
     syncState(updated, true);
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const updateVerificationPromptDirective = useCallback((newDirectiveOrObj) => {
-    const currentVP = battleState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
+    const currentState = battleStateRef.current;
+    const currentVP = currentState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
     const updates = typeof newDirectiveOrObj === 'object' && newDirectiveOrObj !== null
       ? newDirectiveOrObj
       : { directive: (newDirectiveOrObj || '').trim() };
     const updated = {
-      ...battleState,
+      ...currentState,
       verificationPrompt: {
         ...currentVP,
         ...updates,
@@ -942,13 +968,14 @@ export function BattleProvider({ children }) {
       lastUpdated: Date.now(),
     };
     syncState(updated, true);
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const toggleGlobalVerificationPrompt = useCallback((shouldUnlock) => {
-    const currentVP = battleState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
+    const currentState = battleStateRef.current;
+    const currentVP = currentState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
     const nextVal = typeof shouldUnlock === 'boolean' ? shouldUnlock : !currentVP.globalUnlocked;
     const updated = {
-      ...battleState,
+      ...currentState,
       verificationPrompt: {
         ...currentVP,
         globalUnlocked: nextVal,
@@ -957,7 +984,7 @@ export function BattleProvider({ children }) {
       lastUpdated: Date.now(),
     };
     syncState(updated, true);
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const resetVerificationPrompt = useCallback(() => {
     const updated = {
@@ -1505,21 +1532,29 @@ export function BattleProvider({ children }) {
 
   // Judge Evaluation Submission: Calculates per-judge marks and aggregate average score
   // Rubric: Prompt (50), Project Working (25: 5+5+5+5+5), Time Management (10 auto), Presentation (10), Token Consumption (5) = 100 Pts
-  const submitJudgeEvaluation = useCallback(({ participantId, judgeId, marks }) => {
+  const submitJudgeEvaluation = useCallback(({ participantId, deskNumber = '', judgeId, marks }) => {
     const now = Date.now();
+    const currentState = battleStateRef.current;
     const cleanId = (participantId || '').trim().toUpperCase();
-    const currentParticipants = toSafeArray(battleState.participants, []);
+    const cleanDesk = (deskNumber || '').trim().toUpperCase();
+    const currentParticipants = toSafeArray(currentState.participants, []);
 
-    let existing = currentParticipants.find(p => (p.participantId?.toUpperCase() === cleanId || p.id === cleanId));
+    const isMatch = (p) => (cleanDesk && p.deskNumber?.trim().toUpperCase() === cleanDesk) ||
+      (cleanId && (p.participantId?.toUpperCase() === cleanId || p.id === cleanId));
+
+    let existing = currentParticipants.find(isMatch);
 
     if (!existing) {
-      const reg = (battleState.registeredContenders || []).find(c => c.participantId?.toUpperCase() === cleanId);
+      const reg = (currentState.registeredContenders || []).find(c =>
+        (cleanDesk && c.deskNumber?.trim().toUpperCase() === cleanDesk) ||
+        (cleanId && c.participantId?.toUpperCase() === cleanId)
+      );
       existing = {
-        id: cleanId,
-        participantId: cleanId,
-        name: reg?.name || `Contender ${cleanId}`,
+        id: cleanId || `p-${Date.now()}`,
+        participantId: cleanId || reg?.participantId || '',
+        name: reg?.name || `Contender ${cleanDesk || cleanId}`,
         teamName: reg?.teamName || 'Solo Contender',
-        deskNumber: reg?.deskNumber || 'Desk 01',
+        deskNumber: reg?.deskNumber || cleanDesk || 'Desk 01',
         email: reg?.email || '',
         finishTimeFormatted: 'Not submitted',
         finishSeconds: 0,
@@ -1544,7 +1579,7 @@ export function BattleProvider({ children }) {
       };
     }
 
-    const judgeInfo = (battleState.judges || []).find(j => j.id === judgeId) || currentJudge;
+    const judgeInfo = (currentState.judges || []).find(j => j.id === judgeId) || currentJudge;
 
     // Calculate official total score
     const evaluatedTotal = calculateOfficialJudgeTotal({
@@ -1612,35 +1647,44 @@ export function BattleProvider({ children }) {
       lastEvaluatedAt: now,
     };
 
-    const existsInList = currentParticipants.some(p => (p.participantId?.toUpperCase() === cleanId || p.id === cleanId));
+    const existsInList = currentParticipants.some(isMatch);
     const updatedList = existsInList
-      ? currentParticipants.map(p => (p.participantId?.toUpperCase() === cleanId || p.id === cleanId) ? updatedParticipant : p)
+      ? currentParticipants.map(p => isMatch(p) ? updatedParticipant : p)
       : [...currentParticipants, updatedParticipant];
 
     syncState({
-      ...battleState,
+      ...currentState,
       participants: updatedList,
       lastUpdated: now,
     });
 
     return { success: true, participant: updatedParticipant };
-  }, [battleState, currentJudge, syncState]);
+  }, [currentJudge, syncState]);
 
   // Expel Participant for Cheating / Academic Dishonesty
-  const expelParticipant = useCallback(({ participantId, reason = 'Academic Dishonesty / Cheating', judgeName = 'Judge' }) => {
+  const expelParticipant = useCallback(({ participantId, deskNumber = '', reason = 'Academic Dishonesty / Cheating', judgeName = 'Judge' }) => {
     const now = Date.now();
+    const currentState = battleStateRef.current;
     const cleanId = (participantId || '').trim().toUpperCase();
-    const currentParticipants = toSafeArray(battleState.participants, []);
-    let existing = currentParticipants.find(p => p.participantId?.toUpperCase() === cleanId || p.id === cleanId);
+    const cleanDesk = (deskNumber || '').trim().toUpperCase();
+    const currentParticipants = toSafeArray(currentState.participants, []);
+
+    const isMatch = (p) => (cleanDesk && p.deskNumber?.trim().toUpperCase() === cleanDesk) ||
+      (cleanId && (p.participantId?.toUpperCase() === cleanId || p.id === cleanId));
+
+    let existing = currentParticipants.find(isMatch);
 
     if (!existing) {
-      const reg = (battleState.registeredContenders || []).find(c => c.participantId?.toUpperCase() === cleanId);
+      const reg = (currentState.registeredContenders || []).find(c =>
+        (cleanDesk && c.deskNumber?.trim().toUpperCase() === cleanDesk) ||
+        (cleanId && c.participantId?.toUpperCase() === cleanId)
+      );
       existing = {
-        id: cleanId,
-        participantId: cleanId,
-        name: reg?.name || `Contender ${cleanId}`,
+        id: cleanId || `p-${Date.now()}`,
+        participantId: cleanId || reg?.participantId || '',
+        name: reg?.name || `Contender ${cleanDesk || cleanId}`,
         teamName: reg?.teamName || 'Solo Contender',
-        deskNumber: reg?.deskNumber || 'Desk 01',
+        deskNumber: reg?.deskNumber || cleanDesk || 'Desk 01',
         email: reg?.email || '',
         finishTimeFormatted: 'N/A',
         finishSeconds: 0,
@@ -1661,25 +1705,31 @@ export function BattleProvider({ children }) {
       lastEvaluatedAt: now,
     };
 
-    const exists = currentParticipants.some(p => p.participantId?.toUpperCase() === cleanId || p.id === cleanId);
+    const exists = currentParticipants.some(isMatch);
     const updatedList = exists
-      ? currentParticipants.map(p => (p.participantId?.toUpperCase() === cleanId || p.id === cleanId) ? updatedRecord : p)
+      ? currentParticipants.map(p => isMatch(p) ? updatedRecord : p)
       : [...currentParticipants, updatedRecord];
 
     syncState({
-      ...battleState,
+      ...currentState,
       participants: updatedList,
       lastUpdated: now,
     });
     return { success: true, participant: updatedRecord };
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   // Reinstate Participant in case of accidental expel
-  const reinstateParticipant = useCallback((participantId) => {
+  const reinstateParticipant = useCallback((participantId, deskNumber = '') => {
     const now = Date.now();
+    const currentState = battleStateRef.current;
     const cleanId = (participantId || '').trim().toUpperCase();
-    const currentParticipants = toSafeArray(battleState.participants, []);
-    const existing = currentParticipants.find(p => p.participantId?.toUpperCase() === cleanId || p.id === cleanId);
+    const cleanDesk = (deskNumber || '').trim().toUpperCase();
+    const currentParticipants = toSafeArray(currentState.participants, []);
+
+    const isMatch = (p) => (cleanDesk && p.deskNumber?.trim().toUpperCase() === cleanDesk) ||
+      (cleanId && (p.participantId?.toUpperCase() === cleanId || p.id === cleanId));
+
+    const existing = currentParticipants.find(isMatch);
     if (!existing) return;
 
     const marksList = Object.values(existing.judgeMarks || {});
@@ -1697,13 +1747,13 @@ export function BattleProvider({ children }) {
       reinstatedAt: now,
     };
 
-    const updatedList = currentParticipants.map(p => (p.participantId?.toUpperCase() === cleanId || p.id === cleanId) ? reinstated : p);
+    const updatedList = currentParticipants.map(p => isMatch(p) ? reinstated : p);
     syncState({
-      ...battleState,
+      ...currentState,
       participants: updatedList,
       lastUpdated: now,
     });
-  }, [battleState, syncState]);
+  }, [syncState]);
 
   const configureFirebase = useCallback((configObj) => {
     saveStoredFirebaseConfig(configObj);
@@ -1711,24 +1761,25 @@ export function BattleProvider({ children }) {
     if (res.success) {
       setFirebaseStatus('connected');
       setFirebaseError(null);
-      pushStateToCloud(battleState);
+      pushStateToCloud(battleStateRef.current);
       return { success: true };
     } else {
       setFirebaseStatus('error');
       setFirebaseError(res.error);
       return { success: false, error: res.error };
     }
-  }, [battleState]);
+  }, []);
 
   const resetAllData = useCallback(() => {
     const now = Date.now();
+    const currentState = battleStateRef.current;
     syncState({
-      ...battleState,
+      ...currentState,
       participants: [],
       joinedParticipants: {},
       // Strictly preserve all 64 official registered contenders and their assigned desks
       registeredContenders: INITIAL_ROSTER,
-      judges: battleState.judges && battleState.judges.length > 0 ? battleState.judges : DEFAULT_OFFICIAL_JUDGES,
+      judges: currentState.judges && currentState.judges.length > 0 ? currentState.judges : DEFAULT_OFFICIAL_JUDGES,
       timer: {
         duration: INITIAL_DURATION,
         remaining: INITIAL_DURATION,

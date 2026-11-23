@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useBattle } from '../context/BattleContext';
 import { parseContenderFile, downloadContenderTemplate } from '../lib/excelParser';
 import { parseContenderJSON, downloadSampleContenderJSON } from '../lib/jsonParser';
-import { getFinishStatusScore, evaluateTotalScore, calculateTokenScore } from '../lib/scoringCalculator';
+import { getFinishStatusScore, evaluateTotalScore, calculateTokenScore, calculateOfficialJudgeTotal } from '../lib/scoringCalculator';
 import { 
   Users, 
   Upload, 
@@ -213,44 +213,38 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
 
   // Open Evaluation Modal for a Contender
   const handleOpenEvaluation = (battleSub, contender) => {
-    const rawTokens = Number(battleSub.tokensUsed) || 0;
-    const computedTokenScore = calculateTokenScore(rawTokens).score;
-
     setEvaluatingSubmission({
       ...battleSub,
       deskNumber: battleSub.deskNumber || contender?.deskNumber || 'Desk Station'
     });
     setEvaluatingMarks({
-      tokensUsed: rawTokens, // Antigravity daily limit % used
-      tokenScore: battleSub.tokenScore !== undefined ? battleSub.tokenScore : computedTokenScore,
-      objectiveScore: battleSub.objectiveScore || 0,
-      finishStatus: battleSub.finishStatus || 'Partially Fulfilled',
-      presentationScore: battleSub.presentationScore || 0,
-      noveltyScore: battleSub.noveltyScore || 0,
-      timeScore: battleSub.timeScore !== undefined ? battleSub.timeScore : 15,
+      promptScore: battleSub.promptScore ?? battleSub.objectiveScore ?? 0,
+      projectAccuracy: battleSub.projectAccuracy ?? 0,
+      projectSimulation: battleSub.projectSimulation ?? 0,
+      projectMonitoring: battleSub.projectMonitoring ?? 0,
+      projectUsability: battleSub.projectUsability ?? 0,
+      projectComponents: battleSub.projectComponents ?? 0,
+      presentationScore: battleSub.presentationScore ?? 0,
+      tokenScore: battleSub.tokenScore ?? 0,
+      timeScore: battleSub.timeScore !== undefined ? battleSub.timeScore : 10,
     });
-  };
-
-  const handleTokenPercentChange = (val) => {
-    const percent = Math.min(100, Math.max(0, Number(val) || 0));
-    const newScore = calculateTokenScore(percent).score;
-    setEvaluatingMarks((prev) => ({
-      ...prev,
-      tokensUsed: percent,
-      tokenScore: newScore
-    }));
   };
 
   // Live Composite Score in Evaluation Modal
   const currentCompositeTotal = useMemo(() => {
     if (!evaluatingSubmission) return 0;
-    const statusScore = getFinishStatusScore(evaluatingMarks.finishStatus);
-    const obj = Math.min(25, Math.max(0, Number(evaluatingMarks.objectiveScore) || 0));
-    const pres = Math.min(15, Math.max(0, Number(evaluatingMarks.presentationScore) || 0));
-    const nov = Math.min(15, Math.max(0, Number(evaluatingMarks.noveltyScore) || 0));
-    const tScore = Number(evaluatingMarks.timeScore) || 0;
-    const tokScore = Number(evaluatingMarks.tokenScore) || 0;
-    return Math.min(100, Math.max(0, tScore + tokScore + obj + statusScore + pres + nov));
+    const evaluated = calculateOfficialJudgeTotal({
+      promptScore: evaluatingMarks.promptScore ?? 0,
+      projectAccuracy: evaluatingMarks.projectAccuracy ?? 0,
+      projectSimulation: evaluatingMarks.projectSimulation ?? 0,
+      projectMonitoring: evaluatingMarks.projectMonitoring ?? 0,
+      projectUsability: evaluatingMarks.projectUsability ?? 0,
+      projectComponents: evaluatingMarks.projectComponents ?? 0,
+      timeScore: evaluatingMarks.timeScore ?? 0,
+      presentationScore: evaluatingMarks.presentationScore ?? 0,
+      tokenScore: evaluatingMarks.tokenScore ?? 0,
+    });
+    return evaluated.totalScore;
   }, [evaluatingSubmission, evaluatingMarks]);
 
   // Save Marks from Modal
@@ -259,12 +253,23 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
     if (!evaluatingSubmission) return;
 
     updateParticipantMarks(evaluatingSubmission.id, {
-      tokensUsed: Number(evaluatingMarks.tokensUsed) || 0,
-      tokenScore: Number(evaluatingMarks.tokenScore) || 0,
-      objectiveScore: Number(evaluatingMarks.objectiveScore) || 0,
-      finishStatus: evaluatingMarks.finishStatus,
+      promptScore: Number(evaluatingMarks.promptScore) || 0,
+      objectiveScore: Number(evaluatingMarks.promptScore) || 0,
+      projectAccuracy: Number(evaluatingMarks.projectAccuracy) || 0,
+      projectSimulation: Number(evaluatingMarks.projectSimulation) || 0,
+      projectMonitoring: Number(evaluatingMarks.projectMonitoring) || 0,
+      projectUsability: Number(evaluatingMarks.projectUsability) || 0,
+      projectComponents: Number(evaluatingMarks.projectComponents) || 0,
+      projectWorkingTotal: (
+        (Number(evaluatingMarks.projectAccuracy) || 0) +
+        (Number(evaluatingMarks.projectSimulation) || 0) +
+        (Number(evaluatingMarks.projectMonitoring) || 0) +
+        (Number(evaluatingMarks.projectUsability) || 0) +
+        (Number(evaluatingMarks.projectComponents) || 0)
+      ),
       presentationScore: Number(evaluatingMarks.presentationScore) || 0,
-      noveltyScore: Number(evaluatingMarks.noveltyScore) || 0,
+      tokenScore: Number(evaluatingMarks.tokenScore) || 0,
+      timeScore: Number(evaluatingMarks.timeScore) || 0,
       totalScore: currentCompositeTotal
     });
 
@@ -815,14 +820,13 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                 <th className="py-3 px-3 min-w-[220px]">Battle Work & Evaluation</th>
                 <th className="py-3 px-3 text-center">Inspection Directive</th>
                 <th className="py-3 px-3 text-center">Live Poll</th>
-                <th className="py-3 px-3 text-center">Tab Switches</th>
                 <th className="py-3 px-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 bg-dark-900/40">
               {filteredContenders.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     <p className="font-bold text-white text-sm">No contenders match this filter.</p>
                     <p className="text-[11px] text-slate-400 mt-1">
                       Upload JSON/Excel or change filter above.
@@ -850,9 +854,6 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                   const presence = joinedParticipants[c.participantId] || joinedParticipants[c.name];
                   const isOnline = Boolean(presence && presence.lastSeen && (Date.now() - presence.lastSeen < 60000));
                   const isCheckedIn = Boolean(presence && presence.lastSeen);
-
-                  // Tab switches
-                  const switches = battleSub?.tabSwitches || pollVote?.tabSwitches || 0;
 
                   return (
                     <tr key={c.participantId} className="hover:bg-white/[0.02] transition-colors">
@@ -982,18 +983,6 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                           </span>
                         ) : (
                           <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-
-                      {/* Tab Switches */}
-                      <td className="py-3 px-3 text-center">
-                        {switches > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold text-[10px]">
-                            <AlertCircle className="w-3 h-3 text-rose-400" />
-                            <span>{switches}</span>
-                          </span>
-                        ) : (
-                          <span className="text-emerald-400 text-[11px]">0</span>
                         )}
                       </td>
 
@@ -1158,101 +1147,140 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
               )}
             </div>
 
-            {/* Rubric Inputs Form */}
+            {/* Rubric Inputs Form - Official 100-Mark Rubric */}
             <form onSubmit={handleSaveMarks} className="space-y-4 text-xs">
               
-              {/* Automated Penalties (Preview & Token Percentage Adjustment) */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-dark-950 border border-white/10">
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-400 font-bold">Time Score</span>
-                    <span className="text-emerald-400 font-bold">{evaluatingMarks.timeScore}/15 pts</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Automated time elapsed penalty</p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-dark-950 border border-fest-pink/30 space-y-1">
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-300 font-bold">Antigravity Token Score</span>
-                    <span className="text-fest-pink font-bold">{evaluatingMarks.tokenScore}/15 pts</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 pt-0.5">
-                    <span className="text-[10px] text-slate-400">Daily Limit:</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={evaluatingMarks.tokensUsed}
-                      onChange={(e) => handleTokenPercentChange(e.target.value)}
-                      className="w-16 px-1.5 py-0.5 rounded bg-dark-900 border border-white/20 text-white font-mono text-[11px] font-bold text-center"
-                    />
-                    <span className="text-[10px] text-fest-pink font-bold">%</span>
-                  </div>
-                  <p className="text-[9px] text-slate-400">(100% - {evaluatingMarks.tokensUsed}%) × 15 = {evaluatingMarks.tokenScore} pts</p>
-                </div>
-              </div>
-
-              {/* Judge Criteria 1: Objective Fulfillment */}
+              {/* Criteria 1: Prompt Efficiency (0-50 pts) */}
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-slate-200 font-bold">1. Objective Fulfillment (0 - 25 pts) *</label>
-                  <span className="text-fest-cyan font-bold text-sm">{evaluatingMarks.objectiveScore} / 25</span>
+                  <label className="text-slate-200 font-bold">1. Prompt Efficiency & Craft (0 - 50 pts) *</label>
+                  <span className="text-fest-cyan font-bold text-sm">{evaluatingMarks.promptScore} / 50</span>
                 </div>
                 <input
                   type="range"
                   min="0"
-                  max="25"
-                  value={evaluatingMarks.objectiveScore}
-                  onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, objectiveScore: Number(e.target.value) })}
+                  max="50"
+                  value={evaluatingMarks.promptScore}
+                  onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, promptScore: Number(e.target.value) })}
                   className="w-full accent-fest-cyan"
                 />
               </div>
 
-              {/* Judge Criteria 2: Finish Status */}
-              <div>
-                <label className="block text-slate-200 font-bold mb-1">2. Finish Status (0 - 15 pts) *</label>
-                <select
-                  value={evaluatingMarks.finishStatus}
-                  onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, finishStatus: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white"
-                >
-                  <option value="Fully Completed">Fully Completed (15 pts)</option>
-                  <option value="Substantially Completed">Substantially Completed (12 pts)</option>
-                  <option value="Partially Fulfilled">Partially Fulfilled (8 pts)</option>
-                  <option value="Minimal Fulfillment">Minimal Fulfillment (4 pts)</option>
-                </select>
+              {/* Criteria 2: Project Working (25 pts max: 5 sections x 5 pts) */}
+              <div className="p-3 rounded-xl bg-dark-950 border border-fest-pink/30 space-y-2">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-fest-pink font-bold">2. Project Working (0 - 25 pts)</span>
+                  <span className="text-fest-pink font-bold">
+                    {(Number(evaluatingMarks.projectAccuracy) || 0) +
+                     (Number(evaluatingMarks.projectSimulation) || 0) +
+                     (Number(evaluatingMarks.projectMonitoring) || 0) +
+                     (Number(evaluatingMarks.projectUsability) || 0) +
+                     (Number(evaluatingMarks.projectComponents) || 0)} / 25 pts
+                  </span>
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">Accuracy (/5)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="5"
+                      value={evaluatingMarks.projectAccuracy}
+                      onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, projectAccuracy: Number(e.target.value) })}
+                      className="w-full px-2 py-1 rounded bg-dark-900 border border-white/20 text-white font-mono text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">Simulation (/5)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="5"
+                      value={evaluatingMarks.projectSimulation}
+                      onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, projectSimulation: Number(e.target.value) })}
+                      className="w-full px-2 py-1 rounded bg-dark-900 border border-white/20 text-white font-mono text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">Monitoring (/5)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="5"
+                      value={evaluatingMarks.projectMonitoring}
+                      onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, projectMonitoring: Number(e.target.value) })}
+                      className="w-full px-2 py-1 rounded bg-dark-900 border border-white/20 text-white font-mono text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">Usability (/5)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="5"
+                      value={evaluatingMarks.projectUsability}
+                      onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, projectUsability: Number(e.target.value) })}
+                      className="w-full px-2 py-1 rounded bg-dark-900 border border-white/20 text-white font-mono text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">Components (/5)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="5"
+                      value={evaluatingMarks.projectComponents}
+                      onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, projectComponents: Number(e.target.value) })}
+                      className="w-full px-2 py-1 rounded bg-dark-900 border border-white/20 text-white font-mono text-center"
+                    />
+                  </div>
+                </div>
               </div>
 
-              {/* Judge Criteria 3 & 4: Presentation & Novelty */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-slate-200 font-bold">3. Presentation Skill (0 - 15) *</label>
-                    <span className="text-fest-amber font-bold">{evaluatingMarks.presentationScore}/15</span>
+              {/* Criteria 3, 4, 5: Time, Presentation & Token */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-3 rounded-xl bg-dark-950 border border-emerald-500/30">
+                  <div className="flex justify-between items-center text-[11px] mb-1">
+                    <span className="text-emerald-400 font-bold">3. Time Auto</span>
+                    <span className="text-emerald-400 font-bold">{evaluatingMarks.timeScore}/10</span>
                   </div>
                   <input
                     type="number"
                     min="0"
-                    max="15"
-                    value={evaluatingMarks.presentationScore}
-                    onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, presentationScore: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white"
+                    max="10"
+                    value={evaluatingMarks.timeScore}
+                    onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, timeScore: Number(e.target.value) })}
+                    className="w-full px-2 py-1 rounded bg-dark-900 border border-emerald-500/40 text-emerald-400 font-mono text-center"
                   />
                 </div>
 
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-slate-200 font-bold">4. Novelty & Prompt Craft (0 - 15) *</label>
-                    <span className="text-fest-pink font-bold">{evaluatingMarks.noveltyScore}/15</span>
+                <div className="p-3 rounded-xl bg-dark-950 border border-fest-amber/30">
+                  <div className="flex justify-between items-center text-[11px] mb-1">
+                    <span className="text-fest-amber font-bold">4. Presentation</span>
+                    <span className="text-fest-amber font-bold">{evaluatingMarks.presentationScore}/10</span>
                   </div>
                   <input
                     type="number"
                     min="0"
-                    max="15"
-                    value={evaluatingMarks.noveltyScore}
-                    onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, noveltyScore: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white"
+                    max="10"
+                    value={evaluatingMarks.presentationScore}
+                    onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, presentationScore: Number(e.target.value) })}
+                    className="w-full px-2 py-1 rounded bg-dark-900 border border-fest-amber/40 text-fest-amber font-mono text-center"
+                  />
+                </div>
+
+                <div className="p-3 rounded-xl bg-dark-950 border border-purple-500/30">
+                  <div className="flex justify-between items-center text-[11px] mb-1">
+                    <span className="text-purple-400 font-bold">5. Token Consump.</span>
+                    <span className="text-purple-400 font-bold">{evaluatingMarks.tokenScore}/5</span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max="5"
+                    value={evaluatingMarks.tokenScore}
+                    onChange={(e) => setEvaluatingMarks({ ...evaluatingMarks, tokenScore: Number(e.target.value) })}
+                    className="w-full px-2 py-1 rounded bg-dark-900 border border-purple-500/40 text-purple-400 font-mono text-center"
                   />
                 </div>
               </div>
@@ -1261,10 +1289,10 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
               <div className="p-4 rounded-2xl bg-gradient-to-r from-fest-cyan/15 via-fest-pes/15 to-fest-pink/15 border border-white/15 flex items-center justify-between">
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase tracking-widest block font-bold">
-                    Composite Battle Score
+                    Official Total Score
                   </span>
                   <span className="text-xs text-slate-300">
-                    Automatic Penalties + Judge Rubrics
+                    Prompt (50) + Project (25) + Time (10) + Pres (10) + Token (5)
                   </span>
                 </div>
                 <div className="text-3xl font-extrabold text-white font-mono flex items-baseline gap-1">

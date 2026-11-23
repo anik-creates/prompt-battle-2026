@@ -219,11 +219,6 @@ export default function PresentationView() {
                       ) : (
                         <CheckCircle className="w-4 h-4 text-emerald-400" />
                       )}
-                      {p.tabSwitches > 0 && (
-                        <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-mono text-[10px] font-bold border border-rose-500/40">
-                          ⚠️ {p.tabSwitches} switches
-                        </span>
-                      )}
                     </div>
                     <div className="text-xs text-fest-pink font-mono">
                       {p.teamName}

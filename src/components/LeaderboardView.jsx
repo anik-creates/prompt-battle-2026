@@ -150,22 +150,29 @@ export default function LeaderboardView() {
                   {/* Factor Breakdown */}
                   <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-white/10 text-xs font-mono">
                     <div className="text-slate-400">
-                      Finish Time: <span className="text-white font-semibold">{p.finishTimeFormatted || 'N/A'}</span>
+                      Prompt Eff: <span className="text-fest-cyan font-semibold">{p.promptScore ?? p.objectiveScore ?? 0}/50</span>
                     </div>
                     <div className="text-slate-400">
-                      Antigravity Limit: <span className="text-white font-semibold">{p.tokensUsed || 0}% ({p.tokenScore !== undefined ? p.tokenScore : 15} pts)</span>
+                      Project Work: <span className="text-fest-pink font-semibold">{p.projectWorkingTotal ?? (
+                        (Number(p.projectAccuracy) || 0) +
+                        (Number(p.projectSimulation) || 0) +
+                        (Number(p.projectMonitoring) || 0) +
+                        (Number(p.projectUsability) || 0) +
+                        (Number(p.projectComponents) || 0)
+                      )}/25</span>
                     </div>
                     <div className="text-slate-400">
-                      Objective: <span className="text-fest-cyan font-semibold">{p.objectiveScore || 0}/30</span>
+                      Time Auto: <span className="text-emerald-400 font-semibold">{p.timeScore ?? 0}/10</span>
                     </div>
                     <div className="text-slate-400">
-                      Novelty: <span className="text-fest-pink font-semibold">{p.noveltyScore || 0}/25</span>
+                      Presentation: <span className="text-fest-amber font-semibold">{p.presentationScore ?? 0}/10</span>
                     </div>
                   </div>
 
                   {/* Status Indicator */}
-                  <div className="mt-3 text-[11px] font-mono text-slate-400 truncate">
-                    Status: <span className="text-emerald-400 font-semibold">{p.finishStatus}</span>
+                  <div className="mt-3 text-[11px] font-mono text-slate-400 truncate flex items-center justify-between">
+                    <span>Judge: <strong className="text-white">{p.markedByJudgeName || 'Pending'}</strong></span>
+                    <span className="text-purple-400">Token: <strong>{p.tokenScore ?? 0}/5</strong></span>
                   </div>
                 </div>
               );
@@ -180,17 +187,25 @@ export default function LeaderboardView() {
                   <th className="py-4 px-4">Rank</th>
                   <th className="py-4 px-4 font-sans font-bold">Contender / Team</th>
                   <th className="py-4 px-4">Finish Time</th>
-                  <th className="py-4 px-4">Antigravity Limit %</th>
-                  <th className="py-4 px-4">Objective (30)</th>
-                  <th className="py-4 px-4">Status</th>
-                  <th className="py-4 px-4">Presentation (25)</th>
-                  <th className="py-4 px-4">Novelty (25)</th>
+                  <th className="py-4 px-4">Prompt Eff. (50)</th>
+                  <th className="py-4 px-4">Project (25)</th>
+                  <th className="py-4 px-4">Time (10)</th>
+                  <th className="py-4 px-4">Presentation (10)</th>
+                  <th className="py-4 px-4">Token (5)</th>
+                  <th className="py-4 px-4 text-center">Faculty Judge</th>
                   <th className="py-4 px-4 text-right font-bold text-slate-200">Total (100)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {sorted.map((p, idx) => {
                   const rank = idx + 1;
+                  const projTotal = p.projectWorkingTotal ?? (
+                    (Number(p.projectAccuracy) || 0) +
+                    (Number(p.projectSimulation) || 0) +
+                    (Number(p.projectMonitoring) || 0) +
+                    (Number(p.projectUsability) || 0) +
+                    (Number(p.projectComponents) || 0)
+                  );
                   return (
                     <tr 
                       key={p.id}
@@ -226,9 +241,9 @@ export default function LeaderboardView() {
                             </span>
                           )}
                           <span className="font-bold text-white text-sm">{p.name}</span>
-                          {p.tabSwitches > 0 && (
-                            <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-mono text-[10px] font-bold border border-rose-500/40">
-                              ⚠️ {p.tabSwitches} switches
+                          {p.isExpelled && (
+                            <span className="px-1.5 py-0.5 rounded bg-rose-500 text-white font-mono text-[10px] font-bold">
+                              EXPELLED
                             </span>
                           )}
                         </div>
@@ -239,45 +254,40 @@ export default function LeaderboardView() {
                         {p.finishTimeFormatted || 'N/A'}
                       </td>
 
-                      <td className="py-4 px-4 text-slate-300 font-mono">
-                        {p.tokensUsed || 0}% ({p.tokenScore !== undefined ? p.tokenScore : 15} pts)
-                      </td>
-
                       <td className="py-4 px-4 text-fest-cyan font-semibold">
-                        {p.objectiveScore || 0}
-                      </td>
-
-                      <td className="py-4 px-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${
-                          p.finishStatus === 'Fully Completed'
-                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                            : p.finishStatus === 'Substantially Completed'
-                            ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
-                            : p.finishStatus === 'Partially Fulfilled'
-                            ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-                            : 'bg-slate-800 text-slate-400 border-slate-700'
-                        }`}>
-                          {p.finishStatus}
-                        </span>
-                      </td>
-
-                      <td className="py-4 px-4 text-slate-300">
-                        {p.presentationScore || 0}
+                        {p.promptScore ?? p.objectiveScore ?? 0}
                       </td>
 
                       <td className="py-4 px-4 text-fest-pink font-semibold">
-                        {p.noveltyScore || 0}
+                        {projTotal}
+                      </td>
+
+                      <td className="py-4 px-4 text-emerald-400 font-semibold">
+                        {p.timeScore ?? 0}
+                      </td>
+
+                      <td className="py-4 px-4 text-fest-amber font-semibold">
+                        {p.presentationScore ?? 0}
+                      </td>
+
+                      <td className="py-4 px-4 text-purple-400 font-semibold">
+                        {p.tokenScore ?? 0}
+                      </td>
+
+                      <td className="py-4 px-4 text-center">
+                        {p.markedByJudgeName ? (
+                          <span className="px-2 py-0.5 rounded bg-fest-amber/15 text-fest-amber font-mono text-[10px] font-bold border border-fest-amber/30">
+                            ⚖️ {p.markedByJudgeName}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-500 font-mono">Pending</span>
+                        )}
                       </td>
 
                       <td className="py-4 px-4 text-right">
                         <span className="text-base font-bold text-white font-mono block">
                           {p.totalScore || 0}
                         </span>
-                        {p.evaluatedByJudgesCount > 0 && (
-                          <span className="text-[9px] text-fest-amber font-mono font-bold block">
-                            ⚖️ {p.evaluatedByJudgesCount}/4 Judges
-                          </span>
-                        )}
                       </td>
                     </tr>
                   );

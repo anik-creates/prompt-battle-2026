@@ -287,24 +287,35 @@ export default function AdminView() {
     }
 
     const headers = [
-      'Rank', 'Name', 'Team', 'Finish Time', 'Tokens Used',
-      'Objective Score (30)', 'Finish Status', 'Presentation Score (25)',
-      'Novelty Score (25)', 'Total Score (100)'
+      'Rank', 'Desk', 'Participant ID', 'Name', 'Team', 'Finish Time',
+      'Prompt Efficiency (50)', 'Project Working (25)', 'Time Management (10)',
+      'Presentation (10)', 'Token Consumption (5)', 'Total Score (100)',
+      'Marked By Judge', 'Status'
     ];
 
     const sorted = [...participants].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
 
     const rows = sorted.map((p, idx) => [
       idx + 1,
-      `"${p.name.replace(/"/g, '""')}"`,
-      `"${p.teamName.replace(/"/g, '""')}"`,
-      `"${p.finishTimeFormatted || ''}"`,
-      p.tokensUsed || 0,
-      p.objectiveScore || 0,
-      `"${p.finishStatus || ''}"`,
-      p.presentationScore || 0,
-      p.noveltyScore || 0,
-      p.totalScore || 0
+      `"${(p.deskNumber || '').replace(/"/g, '""')}"`,
+      `"${(p.participantId || '').replace(/"/g, '""')}"`,
+      `"${(p.name || '').replace(/"/g, '""')}"`,
+      `"${(p.teamName || '').replace(/"/g, '""')}"`,
+      `"${(p.finishTimeFormatted || 'N/A').replace(/"/g, '""')}"`,
+      p.promptScore ?? p.objectiveScore ?? 0,
+      p.projectWorkingTotal ?? (
+        (Number(p.projectAccuracy) || 0) +
+        (Number(p.projectSimulation) || 0) +
+        (Number(p.projectMonitoring) || 0) +
+        (Number(p.projectUsability) || 0) +
+        (Number(p.projectComponents) || 0)
+      ),
+      p.timeScore ?? 0,
+      p.presentationScore ?? 0,
+      p.tokenScore ?? 0,
+      p.totalScore || 0,
+      `"${(p.markedByJudgeName || 'Pending').replace(/"/g, '""')}"`,
+      `"${(p.isExpelled ? 'Expelled' : p.isDisqualified ? 'Disqualified' : 'Active').replace(/"/g, '""')}"`
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
@@ -968,27 +979,30 @@ export default function AdminView() {
                         </div>
                         <span className="text-xs text-fest-pink font-mono block mt-0.5 truncate">{p.teamName}</span>
                         
-                        {/* Time & Token Score Badges */}
+                        {/* Time & Judge Status Badges */}
                         <div className="flex items-center gap-2 text-[10px] font-mono mt-1">
                           <span className="text-emerald-400">
-                            Time: <strong>{p.timeScore !== undefined ? p.timeScore : 15}/15</strong>
+                            Finish: <strong>{p.finishTimeFormatted || 'N/A'}</strong>
                           </span>
                           <span className="text-white/20">•</span>
-                          <span className="text-fest-pink">
-                            Antigravity: <strong>{p.tokensUsed || 0}% ({p.tokenScore !== undefined ? p.tokenScore : 15}/15 pts)</strong>
+                          <span className="text-fest-cyan">
+                            Time Auto: <strong>{p.timeScore !== undefined ? p.timeScore : 10}/10 pts</strong>
                           </span>
                         </div>
 
                         <div className="mt-1 flex items-center gap-2">
-                          {p.tabSwitches > 0 ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold text-[10px]">
-                              <AlertCircle className="w-3 h-3 text-rose-400" />
-                              <span>{p.tabSwitches} tab switch{p.tabSwitches > 1 ? 'es' : ''}</span>
+                          {p.markedByJudgeName ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-fest-amber/15 text-fest-amber border border-fest-amber/30 text-[10px] font-bold">
+                              <span>⚖️ Marked by: {p.markedByJudgeName}</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px]">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>Zero tab switches</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[10px]">
+                              <span>⏳ Pending Judge</span>
+                            </span>
+                          )}
+                          {p.isExpelled && (
+                            <span className="px-1.5 py-0.5 rounded bg-rose-500 text-white font-bold text-[10px] uppercase">
+                              EXPELLED
                             </span>
                           )}
                         </div>
@@ -1003,97 +1017,143 @@ export default function AdminView() {
                       </div>
                     </div>
 
-                    {/* Inputs Grid */}
-                    <div className="grid grid-cols-2 gap-3 font-mono text-xs">
+                    {/* Inputs Grid - Official 100-mark Rubric */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 font-mono text-xs">
+                      <div>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-fest-cyan font-bold">Prompt Eff.</span>
+                          <span className="text-fest-cyan">{p.promptScore ?? p.objectiveScore ?? 0}/50</span>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          max="50"
+                          value={p.promptScore ?? p.objectiveScore ?? 0}
+                          onChange={(e) => updateParticipantMarks(p.id, { promptScore: Number(e.target.value), objectiveScore: Number(e.target.value) })}
+                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-fest-cyan/40 text-fest-cyan text-xs font-bold text-center"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-fest-pink font-bold">Project Work</span>
+                          <span className="text-fest-pink">{p.projectWorkingTotal ?? (
+                            (Number(p.projectAccuracy) || 0) +
+                            (Number(p.projectSimulation) || 0) +
+                            (Number(p.projectMonitoring) || 0) +
+                            (Number(p.projectUsability) || 0) +
+                            (Number(p.projectComponents) || 0)
+                          )}/25</span>
+                        </div>
+                        <div className="grid grid-cols-5 gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="5"
+                            title="Accuracy (5)"
+                            placeholder="Acc"
+                            value={p.projectAccuracy ?? 0}
+                            onChange={(e) => updateParticipantMarks(p.id, { projectAccuracy: Number(e.target.value) })}
+                            className="w-full px-1 py-1 rounded bg-dark-950 border border-white/10 text-white text-[11px] text-center"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            max="5"
+                            title="Simulation (5)"
+                            placeholder="Sim"
+                            value={p.projectSimulation ?? 0}
+                            onChange={(e) => updateParticipantMarks(p.id, { projectSimulation: Number(e.target.value) })}
+                            className="w-full px-1 py-1 rounded bg-dark-950 border border-white/10 text-white text-[11px] text-center"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            max="5"
+                            title="Monitoring (5)"
+                            placeholder="Mon"
+                            value={p.projectMonitoring ?? 0}
+                            onChange={(e) => updateParticipantMarks(p.id, { projectMonitoring: Number(e.target.value) })}
+                            className="w-full px-1 py-1 rounded bg-dark-950 border border-white/10 text-white text-[11px] text-center"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            max="5"
+                            title="Usability (5)"
+                            placeholder="Usa"
+                            value={p.projectUsability ?? 0}
+                            onChange={(e) => updateParticipantMarks(p.id, { projectUsability: Number(e.target.value) })}
+                            className="w-full px-1 py-1 rounded bg-dark-950 border border-white/10 text-white text-[11px] text-center"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            max="5"
+                            title="Components (5)"
+                            placeholder="Cmp"
+                            value={p.projectComponents ?? 0}
+                            onChange={(e) => updateParticipantMarks(p.id, { projectComponents: Number(e.target.value) })}
+                            className="w-full px-1 py-1 rounded bg-dark-950 border border-white/10 text-white text-[11px] text-center"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-emerald-400 font-bold">Time (Auto)</span>
+                          <span className="text-emerald-400">{p.timeScore ?? 0}/10</span>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          max="10"
+                          value={p.timeScore ?? 0}
+                          onChange={(e) => updateParticipantMarks(p.id, { timeScore: Number(e.target.value) })}
+                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-emerald-500/40 text-emerald-400 text-xs text-center"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-fest-amber font-bold">Presentation</span>
+                          <span className="text-fest-amber">{p.presentationScore ?? 0}/10</span>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          max="10"
+                          value={p.presentationScore ?? 0}
+                          onChange={(e) => updateParticipantMarks(p.id, { presentationScore: Number(e.target.value) })}
+                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-fest-amber/40 text-fest-amber text-xs text-center"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-purple-400 font-bold">Token Consump.</span>
+                          <span className="text-purple-400">{p.tokenScore ?? 0}/5</span>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          max="5"
+                          value={p.tokenScore ?? 0}
+                          onChange={(e) => updateParticipantMarks(p.id, { tokenScore: Number(e.target.value) })}
+                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-purple-500/40 text-purple-400 text-xs text-center"
+                        />
+                      </div>
+
                       <div>
                         <div className="flex justify-between text-[11px] mb-1">
                           <span className="text-slate-400">Finish Time</span>
-                          <span className="text-emerald-400">{p.timeScore !== undefined ? p.timeScore : 15}/15 pts</span>
+                          <span className="text-slate-400">{p.finishTimeFormatted || 'N/A'}</span>
                         </div>
                         <input
                           type="text"
                           value={p.finishTimeFormatted || ''}
                           onChange={(e) => updateParticipantMarks(p.id, { finishTimeFormatted: e.target.value })}
                           className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-white/15 text-white text-xs font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-[11px] mb-1">
-                          <span className="text-slate-400">Antigravity Limit %</span>
-                          <span className="text-fest-pink">{p.tokenScore !== undefined ? p.tokenScore : 15}/15 pts</span>
-                        </div>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value={p.tokensUsed || 0}
-                            onChange={(e) => updateParticipantMarks(p.id, { tokensUsed: Number(e.target.value) })}
-                            className="w-full pl-2.5 pr-6 py-1.5 rounded bg-dark-950 border border-white/15 text-white text-xs font-mono focus:border-fest-pink"
-                            placeholder="e.g. 15%"
-                          />
-                          <span className="absolute right-2 top-1.5 text-fest-pink font-bold text-xs">%</span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-[11px] mb-1">
-                          <span className="text-fest-cyan font-semibold">Objective</span>
-                          <span className="text-fest-cyan">{p.objectiveScore || 0}/25</span>
-                        </div>
-                        <input
-                          type="number"
-                          min="0"
-                          max="25"
-                          value={p.objectiveScore || 0}
-                          onChange={(e) => updateParticipantMarks(p.id, { objectiveScore: Number(e.target.value) })}
-                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-fest-cyan/40 text-fest-cyan text-xs font-bold text-center"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Finish Status (0-15)</label>
-                        <select
-                          value={p.finishStatus || 'Partially Fulfilled'}
-                          onChange={(e) => updateParticipantMarks(p.id, { finishStatus: e.target.value })}
-                          className="w-full px-2 py-1.5 rounded bg-dark-950 border border-white/15 text-slate-200 text-xs"
-                        >
-                          <option value="Fully Completed">Fully Completed (15 pts)</option>
-                          <option value="Substantially Completed">Substantially Completed (12 pts)</option>
-                          <option value="Partially Fulfilled">Partially Fulfilled (8 pts)</option>
-                          <option value="Minimal Fulfillment">Minimal Fulfillment (4 pts)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-[11px] mb-1">
-                          <span className="text-slate-300">Presentation</span>
-                          <span className="text-slate-300">{p.presentationScore || 0}/15</span>
-                        </div>
-                        <input
-                          type="number"
-                          min="0"
-                          max="15"
-                          value={p.presentationScore || 0}
-                          onChange={(e) => updateParticipantMarks(p.id, { presentationScore: Number(e.target.value) })}
-                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-white/15 text-white text-xs text-center"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-[11px] mb-1">
-                          <span className="text-fest-pink font-semibold">Novelty</span>
-                          <span className="text-fest-pink">{p.noveltyScore || 0}/15</span>
-                        </div>
-                        <input
-                          type="number"
-                          min="0"
-                          max="15"
-                          value={p.noveltyScore || 0}
-                          onChange={(e) => updateParticipantMarks(p.id, { noveltyScore: Number(e.target.value) })}
-                          className="w-full px-2.5 py-1.5 rounded bg-dark-950 border border-fest-pink/40 text-fest-pink text-xs font-bold text-center"
                         />
                       </div>
                     </div>
@@ -1138,19 +1198,27 @@ export default function AdminView() {
                   <thead className="bg-dark-950 text-slate-400 uppercase tracking-wider text-[11px] border-b border-white/10">
                     <tr>
                       <th className="py-3 px-3">Station & Contender</th>
-                      <th className="py-3 px-3">Finish Time (15)</th>
-                      <th className="py-3 px-3">Antigravity Limit % (15)</th>
-                      <th className="py-3 px-3">Objective (0-25)</th>
-                      <th className="py-3 px-3">Finish Status (0-15)</th>
-                      <th className="py-3 px-3">Presentation (0-15)</th>
-                      <th className="py-3 px-3">Novelty (0-15)</th>
-                      <th className="py-3 px-3 text-center">Tab Switches</th>
+                      <th className="py-3 px-3">Finish Time</th>
+                      <th className="py-3 px-3">Prompt Eff. (50)</th>
+                      <th className="py-3 px-3">Project Work (25)</th>
+                      <th className="py-3 px-3">Time (10)</th>
+                      <th className="py-3 px-3">Presentation (10)</th>
+                      <th className="py-3 px-3">Token (5)</th>
+                      <th className="py-3 px-3 text-center">Faculty Judge</th>
                       <th className="py-3 px-3 text-right">Total Score</th>
                       <th className="py-3 px-3 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 bg-dark-900/40">
-                    {participants.map((p) => (
+                    {participants.map((p) => {
+                      const projTotal = p.projectWorkingTotal ?? (
+                        (Number(p.projectAccuracy) || 0) +
+                        (Number(p.projectSimulation) || 0) +
+                        (Number(p.projectMonitoring) || 0) +
+                        (Number(p.projectUsability) || 0) +
+                        (Number(p.projectComponents) || 0)
+                      );
+                      return (
                       <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
                         <td className="py-3 px-3 font-sans">
                           <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
@@ -1189,61 +1257,33 @@ export default function AdminView() {
                             onChange={(e) => updateParticipantMarks(p.id, { finishTimeFormatted: e.target.value })}
                             className="w-24 px-2 py-1 rounded bg-dark-950 border border-white/10 text-white font-mono text-xs focus:border-fest-cyan"
                           />
-                          <div className="text-[10px] text-emerald-400 font-mono mt-0.5">
-                            Time: <strong>{p.timeScore !== undefined ? p.timeScore : 15}/15</strong>
-                          </div>
-                        </td>
-
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.1"
-                              value={p.tokensUsed || 0}
-                              onChange={(e) => updateParticipantMarks(p.id, { tokensUsed: Number(e.target.value) })}
-                              className="w-16 px-2 py-1 rounded bg-dark-950 border border-white/10 text-white font-mono text-xs focus:border-fest-pink text-center"
-                            />
-                            <span className="text-[11px] text-fest-pink font-bold">%</span>
-                          </div>
-                          <div className="text-[10px] text-fest-pink font-mono mt-0.5">
-                            Score: <strong>{p.tokenScore !== undefined ? p.tokenScore : 15}/15</strong>
-                          </div>
                         </td>
 
                         <td className="py-3 px-3">
                           <input
                             type="number"
                             min="0"
-                            max="25"
-                            value={p.objectiveScore || 0}
-                            onChange={(e) => updateParticipantMarks(p.id, { objectiveScore: Number(e.target.value) })}
+                            max="50"
+                            value={p.promptScore ?? p.objectiveScore ?? 0}
+                            onChange={(e) => updateParticipantMarks(p.id, { promptScore: Number(e.target.value), objectiveScore: Number(e.target.value) })}
                             className="w-16 px-2 py-1 rounded bg-dark-950 border border-fest-cyan/40 text-fest-cyan font-mono text-xs font-bold text-center"
                           />
                         </td>
 
                         <td className="py-3 px-3">
-                          <select
-                            value={p.finishStatus || 'Partially Fulfilled'}
-                            onChange={(e) => updateParticipantMarks(p.id, { finishStatus: e.target.value })}
-                            className="px-2 py-1 rounded bg-dark-950 border border-white/15 text-slate-200 font-mono text-xs focus:border-fest-pink"
-                          >
-                            <option value="Fully Completed">Fully Completed (15 pts)</option>
-                            <option value="Substantially Completed">Substantially Completed (12 pts)</option>
-                            <option value="Partially Fulfilled">Partially Fulfilled (8 pts)</option>
-                            <option value="Minimal Fulfillment">Minimal Fulfillment (4 pts)</option>
-                          </select>
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold text-fest-pink font-mono text-xs">{projTotal}/25</span>
+                          </div>
                         </td>
 
                         <td className="py-3 px-3">
                           <input
                             type="number"
                             min="0"
-                            max="15"
-                            value={p.presentationScore || 0}
-                            onChange={(e) => updateParticipantMarks(p.id, { presentationScore: Number(e.target.value) })}
-                            className="w-16 px-2 py-1 rounded bg-dark-950 border border-white/10 text-white font-mono text-xs text-center"
+                            max="10"
+                            value={p.timeScore ?? 0}
+                            onChange={(e) => updateParticipantMarks(p.id, { timeScore: Number(e.target.value) })}
+                            className="w-14 px-2 py-1 rounded bg-dark-950 border border-emerald-500/40 text-emerald-400 font-mono text-xs font-bold text-center"
                           />
                         </td>
 
@@ -1251,24 +1291,31 @@ export default function AdminView() {
                           <input
                             type="number"
                             min="0"
-                            max="15"
-                            value={p.noveltyScore || 0}
-                            onChange={(e) => updateParticipantMarks(p.id, { noveltyScore: Number(e.target.value) })}
-                            className="w-16 px-2 py-1 rounded bg-dark-950 border border-fest-pink/40 text-fest-pink font-mono text-xs font-bold text-center"
+                            max="10"
+                            value={p.presentationScore ?? 0}
+                            onChange={(e) => updateParticipantMarks(p.id, { presentationScore: Number(e.target.value) })}
+                            className="w-14 px-2 py-1 rounded bg-dark-950 border border-fest-amber/40 text-fest-amber font-mono text-xs text-center"
+                          />
+                        </td>
+
+                        <td className="py-3 px-3">
+                          <input
+                            type="number"
+                            min="0"
+                            max="5"
+                            value={p.tokenScore ?? 0}
+                            onChange={(e) => updateParticipantMarks(p.id, { tokenScore: Number(e.target.value) })}
+                            className="w-12 px-2 py-1 rounded bg-dark-950 border border-purple-500/40 text-purple-400 font-mono text-xs text-center"
                           />
                         </td>
 
                         <td className="py-3 px-3 text-center">
-                          {p.tabSwitches > 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold text-[11px]" title="Screen/tab switch detected">
-                              <AlertCircle className="w-3 h-3 text-rose-400" />
-                              <span>{p.tabSwitches}</span>
+                          {p.markedByJudgeName ? (
+                            <span className="px-2 py-0.5 rounded bg-fest-amber/15 text-fest-amber font-mono text-[10px] font-bold border border-fest-amber/30">
+                              ⚖️ {p.markedByJudgeName}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[11px]">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>0</span>
-                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">Pending</span>
                           )}
                         </td>
 
@@ -1292,7 +1339,8 @@ export default function AdminView() {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1898,7 +1946,6 @@ export default function AdminView() {
                         {poll?.type === 'mcq' && <th className="py-2 px-3 text-center">Correctness</th>}
                         <th className="py-2 px-3 text-center">Speed</th>
                         {poll?.type === 'mcq' && <th className="py-2 px-3 text-right">Score</th>}
-                        <th className="py-2 px-3 text-center">Tab Switches</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5 bg-dark-950/60">
@@ -1922,16 +1969,6 @@ export default function AdminView() {
                             {poll?.type === 'mcq' && (
                               <td className="py-2 px-3 text-right text-fest-amber font-bold">{vote.score || 0} pts</td>
                             )}
-                            <td className="py-2 px-3 text-center">
-                              {vote.tabSwitches > 0 ? (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold">
-                                  <AlertCircle className="w-3 h-3 text-rose-400" />
-                                  <span>{vote.tabSwitches}</span>
-                                </span>
-                              ) : (
-                                <span className="text-emerald-400 text-[10px]">0</span>
-                              )}
-                            </td>
                           </tr>
                         );
                       })}
