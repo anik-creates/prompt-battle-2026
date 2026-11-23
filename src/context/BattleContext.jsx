@@ -832,6 +832,14 @@ export function BattleProvider({ children }) {
     syncState(updated, true);
   }, [syncState]);
 
+  const publishProblemStatement = useCallback(() => {
+    releaseProblemStatement();
+  }, [releaseProblemStatement]);
+
+  const unpublishProblemStatement = useCallback(() => {
+    hideProblemStatement();
+  }, [hideProblemStatement]);
+
   const updateProblemStatement = useCallback((updates) => {
     const now = Date.now();
     const updated = {
@@ -1819,6 +1827,8 @@ export function BattleProvider({ children }) {
     problemStatement: battleState.problemStatement || DEFAULT_PROBLEM_STATEMENT,
     releaseProblemStatement,
     hideProblemStatement,
+    publishProblemStatement,
+    unpublishProblemStatement,
     updateProblemStatement,
     resetProblemStatement,
 

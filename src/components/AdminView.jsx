@@ -77,6 +77,8 @@ export default function AdminView() {
     problemStatement = {},
     releaseProblemStatement,
     hideProblemStatement,
+    publishProblemStatement,
+    unpublishProblemStatement,
     updateProblemStatement,
     resetProblemStatement,
     createPoll,
@@ -507,6 +509,38 @@ export default function AdminView() {
             <span className="sm:hidden">Upload JSON</span>
           </button>
 
+          {/* Quick Problem Statement Publish/Unpublish Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (problemStatement.status === 'released') {
+                unpublishProblemStatement();
+              } else {
+                publishProblemStatement();
+              }
+            }}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded border font-bold transition-all ${
+              problemStatement.status === 'released'
+                ? 'bg-rose-500/20 border-rose-500/50 text-rose-300 hover:bg-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.3)]'
+                : 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+            }`}
+            title={problemStatement.status === 'released' ? 'Unpublish Problem Statement from all contender screens & projector' : 'Publish Problem Statement to all contender screens'}
+          >
+            {problemStatement.status === 'released' ? (
+              <>
+                <EyeOff className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden sm:inline">Unpublish Problem</span>
+                <span className="sm:hidden">Unpublish</span>
+              </>
+            ) : (
+              <>
+                <Unlock className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">Publish Problem</span>
+                <span className="sm:hidden">Publish</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={() => setIsFirebaseOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded bg-fest-cyan/10 border border-fest-cyan/40 text-fest-cyan"
@@ -751,20 +785,20 @@ export default function AdminView() {
                 {problemStatement.status === 'released' ? (
                   <button
                     type="button"
-                    onClick={() => hideProblemStatement()}
+                    onClick={() => unpublishProblemStatement()}
                     className="px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(225,29,72,0.4)] flex items-center gap-2"
                   >
-                    <Lock className="w-4 h-4" />
-                    <span>Lock Problem Statement</span>
+                    <EyeOff className="w-4 h-4" />
+                    <span>Unpublish Problem Statement</span>
                   </button>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => releaseProblemStatement()}
+                    onClick={() => publishProblemStatement()}
                     className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-fest-cyan text-dark-950 font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_30px_rgba(16,185,129,0.5)] flex items-center gap-2 hover:opacity-95"
                   >
                     <Unlock className="w-4 h-4" />
-                    <span>Release Problem Statement to Participants</span>
+                    <span>Publish Problem Statement to Participants</span>
                   </button>
                 )}
               </div>
@@ -1317,20 +1351,20 @@ export default function AdminView() {
                 {problemStatement.status === 'released' ? (
                   <button
                     type="button"
-                    onClick={() => hideProblemStatement()}
+                    onClick={() => unpublishProblemStatement()}
                     className="px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(225,29,72,0.4)] flex items-center gap-2"
                   >
-                    <Lock className="w-4 h-4" />
-                    <span>Lock & Hide Problem Statement</span>
+                    <EyeOff className="w-4 h-4" />
+                    <span>Unpublish Problem Statement</span>
                   </button>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => releaseProblemStatement()}
+                    onClick={() => publishProblemStatement()}
                     className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-fest-cyan text-dark-950 font-bold uppercase tracking-wider transition-all shadow-[0_0_30px_rgba(16,185,129,0.5)] flex items-center gap-2 hover:opacity-95"
                   >
                     <Unlock className="w-4 h-4" />
-                    <span>Release Problem Statement to Contenders</span>
+                    <span>Publish Problem Statement to Contenders</span>
                   </button>
                 )}
               </div>
