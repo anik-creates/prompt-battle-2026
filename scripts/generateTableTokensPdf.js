@@ -8,10 +8,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const outputPath = path.resolve(__dirname, '../Table_Tokens_All_64_Desks.pdf');
+const publicOutputPath = path.resolve(__dirname, '../public/Table_Tokens_All_64_Desks.pdf');
+
+const pesLogoPath = path.resolve(__dirname, '../public/assets/ieee-pes-diu-logo.png');
+const eeeFestLogoPath = path.resolve(__dirname, '../public/assets/eee-fest-logo.png');
+
+const hasPesLogo = fs.existsSync(pesLogoPath);
+const hasEeeFestLogo = fs.existsSync(eeeFestLogoPath);
 
 console.log('📄 Generating Official 64 Table Tokens PDF (4 Tokens per A4 Page)...');
 console.log(`📦 Output Path: ${outputPath}`);
 console.log(`👥 Total Participants to Generate: ${INITIAL_ROSTER.length}`);
+console.log(`🖼️ PES Logo Found: ${hasPesLogo}`);
+console.log(`🖼️ EEE FEST Logo Found: ${hasEeeFestLogo}`);
 
 // A4 dimensions in PDF points (72 points per inch)
 const PAGE_WIDTH = 595.28;
@@ -28,8 +37,8 @@ const doc = new PDFDocument({
   info: {
     Title: 'IEEE PES DIU SBC - EEE FEST 2026 Prompt Battle Table Tokens',
     Author: 'IEEE PES DIU Student Branch Chapter',
-    Subject: 'Desk & Table Tokens for 64 Participants (4 Tokens per A4)',
-    Keywords: 'IEEE PES DIU SBC, Prompt Battle 2026, Table Tokens, Desks',
+    Subject: 'Desk & Table Tokens for 64 Participants (Sponsored by IEEE PES DIU SBC)',
+    Keywords: 'IEEE PES DIU SBC, EEE FEST 2026, Prompt Battle 2026, Table Tokens, Desks',
   }
 });
 
@@ -92,38 +101,67 @@ function renderTableToken(doc, participant, quad, index) {
      .lineWidth(0.5)
      .stroke('#cbd5e1');
 
-  // 2. Official Header Banner (Navy Blue #091e3a)
-  const headerH = 46;
+  // 2. Official Header Banner (Navy Blue #0a192f) with Official Logos
+  const headerH = 50;
   doc.rect(cardX + 4, cardY + 4, cardW - 8, headerH)
      .fill('#0a192f');
 
-  // Header IEEE PES branding
+  // Draw PES Logo on Left of Header
+  if (hasPesLogo) {
+    try {
+      doc.image(pesLogoPath, cardX + 8, cardY + 8, {
+        fit: [40, 40],
+        align: 'center',
+        valign: 'center'
+      });
+    } catch (e) {
+      console.warn('Could not render PES logo:', e.message);
+    }
+  }
+
+  // Draw EEE FEST Logo on Right of Header
+  if (hasEeeFestLogo) {
+    try {
+      doc.image(eeeFestLogoPath, cardX + cardW - 74, cardY + 11, {
+        fit: [66, 32],
+        align: 'center',
+        valign: 'center'
+      });
+    } catch (e) {
+      console.warn('Could not render EEE Fest logo:', e.message);
+    }
+  }
+
+  // Header IEEE PES branding text (Center)
+  const centerTextX = cardX + 50;
+  const centerTextW = cardW - 126;
+
   doc.fillColor('#fbbf24')
      .font('Helvetica-Bold')
-     .fontSize(8.5)
-     .text('IEEE PES DIU SBC • EEE FEST 2026', cardX + 10, cardY + 11, {
-       width: cardW - 20,
+     .fontSize(7.5)
+     .text('IEEE PES DIU SBC', centerTextX, cardY + 10, {
+       width: centerTextW,
+       align: 'center'
+     });
+
+  doc.fillColor('#ffffff')
+     .font('Helvetica-Bold')
+     .fontSize(10.5)
+     .text('PROMPT BATTLE', centerTextX, cardY + 21, {
+       width: centerTextW,
        align: 'center'
      });
 
   doc.fillColor('#38bdf8')
      .font('Helvetica-Bold')
-     .fontSize(10.5)
-     .text('PROMPT BATTLE ARENA', cardX + 10, cardY + 24, {
-       width: cardW - 20,
-       align: 'center'
-     });
-
-  doc.fillColor('#94a3b8')
-     .font('Helvetica')
-     .fontSize(6.5)
-     .text('OFFICIAL COMPETITION TABLE TOKEN', cardX + 10, cardY + 38, {
-       width: cardW - 20,
+     .fontSize(7.5)
+     .text('EEE FEST 2026', centerTextX, cardY + 35, {
+       width: centerTextW,
        align: 'center'
      });
 
   // 3. Prominent Table Number Station Box
-  const tableBoxY = cardY + 56;
+  const tableBoxY = cardY + 60;
   const tableBoxH = 68;
 
   doc.roundedRect(cardX + 12, tableBoxY, cardW - 24, tableBoxH, 6)
@@ -178,7 +216,7 @@ function renderTableToken(doc, participant, quad, index) {
      .lineWidth(0.5)
      .stroke('#e2e8f0');
 
-  // Student ID & Team Row
+  // Student ID & Semester Row
   const row2Y = infoY + 34;
 
   // Student ID Box (Left)
@@ -237,20 +275,30 @@ function renderTableToken(doc, participant, quad, index) {
      .fontSize(9.5)
      .text(participant.couponCode || 'PBC000');
 
-  // Track Pill
-  const trackY = credsY + 52;
-  doc.roundedRect(cardX + 14, trackY, cardW - 28, 18, 3)
-     .fill('#f1f5f9');
+  // 5. SPONSORED BY IEEE PES DIU SBC (Track Removed as requested)
+  const sponsorY = credsY + 50;
+  doc.roundedRect(cardX + 14, sponsorY, cardW - 28, 22, 4)
+     .fillAndStroke('#f0fdf4', '#86efac');
+  doc.lineWidth(0.8).stroke('#86efac');
 
-  doc.fillColor('#0369a1')
+  // Small PES logo beside text in sponsor pill if available
+  if (hasPesLogo) {
+    try {
+      doc.image(pesLogoPath, cardX + 20, sponsorY + 3.5, {
+        fit: [15, 15]
+      });
+    } catch (e) {}
+  }
+
+  doc.fillColor('#15803d')
      .font('Helvetica-Bold')
-     .fontSize(6.8)
-     .text('TRACK: AUTONOMOUS SMART GRID PROMPT BATTLE', cardX + 14, trackY + 5, {
+     .fontSize(8.5)
+     .text('SPONSORED BY IEEE PES DIU SBC', cardX + 14, sponsorY + 6.5, {
        width: cardW - 28,
        align: 'center'
      });
 
-  // Footer / Instructions Box
+  // 6. Footer / Instructions Box
   const footerY = cardY + cardH - 38;
   doc.rect(cardX + 4, footerY, cardW - 8, 34)
      .fill('#f8fafc');
@@ -262,7 +310,7 @@ function renderTableToken(doc, participant, quad, index) {
 
   doc.fillColor('#64748b')
      .font('Helvetica')
-     .fontSize(6.2)
+     .fontSize(6.5)
      .text('⚠ Place this token upright on your table. Do not displace or swap desks.', cardX + 10, footerY + 5, {
        width: cardW - 20,
        align: 'center'
@@ -270,16 +318,16 @@ function renderTableToken(doc, participant, quad, index) {
 
   doc.fillColor('#0f172a')
      .font('Helvetica-Bold')
-     .fontSize(6.5)
+     .fontSize(6.8)
      .text('Daffodil International University • Faculty of Engineering', cardX + 10, footerY + 14, {
        width: cardW - 20,
        align: 'center'
      });
 
-  doc.fillColor('#94a3b8')
-     .font('Helvetica')
-     .fontSize(5.8)
-     .text(`Verification ID: ${participant.participantId} • IEEE PES DIU SBC`, cardX + 10, footerY + 23, {
+  doc.fillColor('#15803d')
+     .font('Helvetica-Bold')
+     .fontSize(6.2)
+     .text('Organized & Sponsored by IEEE PES DIU Student Branch Chapter', cardX + 10, footerY + 23, {
        width: cardW - 20,
        align: 'center'
      });
@@ -313,7 +361,7 @@ for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
   doc.fontSize(6.5)
      .fillColor('#94a3b8')
      .font('Helvetica')
-     .text(`Page ${pageIdx + 1} of ${totalPages} • IEEE PES DIU SBC Prompt Battle 2026 Table Tokens (Desks ${(pageIdx * 4 + 1).toString().padStart(2, '0')} - ${Math.min((pageIdx + 1) * 4, totalParticipants).toString().padStart(2, '0')})`, 
+     .text(`Page ${pageIdx + 1} of ${totalPages} • Sponsored by IEEE PES DIU SBC • EEE FEST 2026 Table Tokens (Desks ${(pageIdx * 4 + 1).toString().padStart(2, '0')} - ${Math.min((pageIdx + 1) * 4, totalParticipants).toString().padStart(2, '0')})`, 
        0, PAGE_HEIGHT - 10, { width: PAGE_WIDTH, align: 'center' });
   doc.restore();
 }
@@ -321,10 +369,19 @@ for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
 doc.end();
 
 writeStream.on('finish', () => {
+  // Also copy to public directory for direct download in browser
+  try {
+    fs.copyFileSync(outputPath, publicOutputPath);
+    console.log(`📋 Copied to public folder: ${publicOutputPath}`);
+  } catch (err) {
+    console.warn('Could not copy to public folder:', err.message);
+  }
+
   const stats = fs.statSync(outputPath);
-  console.log(`\n🎉 SUCCESS! Table Tokens PDF generated successfully.`);
+  console.log(`\n🎉 SUCCESS! Table Tokens PDF updated successfully.`);
   console.log(`📄 File: ${outputPath}`);
   console.log(`📊 Size: ${(stats.size / 1024).toFixed(1)} KB`);
   console.log(`🏷️ Total Tokens: ${totalParticipants} (Desks 01 to 64)`);
   console.log(`📑 Total A4 Pages: ${totalPages} (4 tokens per page with dashed cut guidelines)`);
+  console.log(`✨ Logos & "Sponsored by IEEE PES DIU SBC" added; Track removed.`);
 });
