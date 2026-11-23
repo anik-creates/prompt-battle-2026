@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useBattle } from '../context/BattleContext';
+import SecureProblemCanvas from './SecureProblemCanvas';
 import { 
   Lock, 
   Unlock, 
@@ -239,90 +240,13 @@ export default function LockedProblemStatementWindow({ activeSession, isSimulato
             </div>
           </div>
 
-          {/* Problem Statement Content Body */}
-          <div className="p-5 sm:p-7 space-y-6 relative z-10 text-xs font-mono leading-relaxed">
-            
-            {/* Category / Track Pill */}
-            {problemStatement.track && (
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold">Track:</span>
-                <span className="px-2.5 py-0.5 rounded-full bg-fest-cyan/15 border border-fest-cyan/30 text-fest-cyan font-bold text-[11px]">
-                  {problemStatement.track}
-                </span>
-              </div>
-            )}
-
-            {/* 1. SCENARIO / CONTEXT */}
-            <div className="space-y-2 p-4 rounded-xl bg-dark-950/80 border border-white/10">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-fest-amber flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-fest-amber" />
-                <span>1. Challenge Scenario & Context</span>
-              </span>
-              <p className="text-slate-200 whitespace-pre-line leading-relaxed text-xs">
-                {problemStatement.scenario}
-              </p>
-            </div>
-
-            {/* 2. OBJECTIVES */}
-            <div className="space-y-2 p-4 rounded-xl bg-dark-950/80 border border-white/10">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-fest-cyan flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-fest-cyan" />
-                <span>2. Core Objective & Tasks</span>
-              </span>
-              <p className="text-slate-200 whitespace-pre-line leading-relaxed text-xs">
-                {problemStatement.objective}
-              </p>
-            </div>
-
-            {/* 3. STRICT CONSTRAINTS */}
-            {Array.isArray(problemStatement.constraints) && problemStatement.constraints.length > 0 && (
-              <div className="space-y-2.5 p-4 rounded-xl bg-dark-950/80 border border-fest-pink/30">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-fest-pink flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 text-fest-pink" />
-                  <span>3. Strict Rules & Constraints</span>
-                </span>
-                <ul className="space-y-2">
-                  {problemStatement.constraints.map((c, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-slate-300 text-xs">
-                      <span className="w-4 h-4 rounded-full bg-fest-pink/20 text-fest-pink flex items-center justify-center shrink-0 font-bold text-[10px] mt-0.5">
-                        {idx + 1}
-                      </span>
-                      <span>{c}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* 4. EXPECTED OUTPUT SCHEMA EXAMPLE */}
-            {problemStatement.outputSchemaExample && (
-              <div className="space-y-2 p-4 rounded-xl bg-dark-950 border border-white/10">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-fest-pes flex items-center gap-1.5">
-                    <Terminal className="w-3.5 h-3.5 text-fest-pes" />
-                    <span>4. Required Output JSON Schema Structure</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400">Deterministic Format Required</span>
-                </div>
-                <pre className="p-3.5 rounded-lg bg-black/60 border border-white/5 text-emerald-300 font-mono text-[11px] overflow-x-auto custom-scrollbar leading-relaxed">
-                  {problemStatement.outputSchemaExample}
-                </pre>
-              </div>
-            )}
-
-            {/* 5. SUBMISSION GUIDELINES */}
-            {problemStatement.submissionRequirements && (
-              <div className="space-y-2 p-4 rounded-xl bg-fest-cyan/5 border border-fest-cyan/20 text-slate-300">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-fest-cyan flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-fest-cyan" />
-                  <span>5. Submission & Scoring Protocol</span>
-                </span>
-                <p className="whitespace-pre-line text-[11px] text-slate-300 leading-relaxed">
-                  {problemStatement.submissionRequirements}
-                </p>
-              </div>
-            )}
-
+          {/* RASTERIZED SECURE CANVAS (ZERO DOM TEXT NODES) */}
+          <div className="p-3 sm:p-5 relative z-10">
+            <SecureProblemCanvas 
+              problemStatement={problemStatement}
+              activeSession={activeSession}
+              mode="participant"
+            />
           </div>
 
           {/* Bottom Security Footer */}

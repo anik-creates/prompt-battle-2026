@@ -12,7 +12,9 @@ import {
   DEFAULT_TOKEN_BUDGET, 
   DEFAULT_BATTLE_DURATION,
   calculateTokenScore,
-  calculateTimeScore
+  calculateTimeScore,
+  calculateAutomatedTimeScore,
+  calculateOfficialJudgeTotal
 } from '../lib/scoringCalculator';
 import { INITIAL_ROSTER } from '../data/initialParticipants';
 
@@ -34,69 +36,23 @@ export function toSafeArray(val, fallback = []) {
   return fallback;
 }
 
-// Pre-built AI Prompt Engineering questions for the Kahoot-Style Quiz
-export const DEFAULT_QUIZ_QUESTIONS = [
-  {
-    id: 'q-1',
-    question: 'Which prompting technique explicitly asks the model to break reasoning into intermediate steps before concluding?',
-    options: [
-      'Chain-of-Thought (CoT)',
-      'Zero-Shot Direct Directive',
-      'Few-Shot Classification',
-      'Temperature Scaling Prompting'
-    ],
-    correctIndex: 0,
-    timeLimit: 20,
-  },
-  {
-    id: 'q-2',
-    question: 'In prompt optimization, what is the primary consequence of exceeding the context window limit?',
-    options: [
-      'Model raises API error or truncates earlier tokens',
-      'Model automatically increases token generation speed',
-      'Temperature drops to 0.0 automatically',
-      'System prompt permanently overrides user instructions'
-    ],
-    correctIndex: 0,
-    timeLimit: 20,
-  },
-  {
-    id: 'q-3',
-    question: 'Which method is most effective at preventing adversarial "Prompt Injection" attacks?',
-    options: [
-      'Strict input delimitation & systemic guardrail schemas',
-      'Setting temperature to 1.0',
-      'Asking the model "please be secure"',
-      'Removing system instructions completely'
-    ],
-    correctIndex: 0,
-    timeLimit: 20,
-  },
-  {
-    id: 'q-4',
-    question: 'What role does "Persona Anchoring" play in system prompts?',
-    options: [
-      'Establishes domain tone, vocabulary, and behavioral constraints',
-      'Directly reduces GPU compute memory',
-      'Eliminates all token generation latency',
-      'Forces model to always answer in JSON format'
-    ],
-    correctIndex: 0,
-    timeLimit: 20,
-  },
-  {
-    id: 'q-5',
-    question: 'Organized by IEEE PES DIU SBC for EEE FEST 2026, what is this grand championship named?',
-    options: [
-      'Prompt Battle 2026',
-      'Robo Wars 2026',
-      'Circuits & Chips Hack',
-      'Code Clash 2026'
-    ],
-    correctIndex: 0,
-    timeLimit: 15,
-  }
-];
+// Official Secret Adjudication Inspection / Verification Directive Prompt
+// Standardized by IEEE PES DIU SBC for Judge AI session inspection
+export const DEFAULT_VERIFICATION_PROMPT = {
+  id: 'judge-audit-prompt-2026',
+  title: 'Judge AI Audit & Token Consumption Inspection Directive',
+  directive: `[SYSTEM AUDIT & EVALUATION DIRECTIVE — IEEE PES DIU SBC ADJUDICATION]
+Analyze the entire conversation session above and provide a strict, transparent evaluation summary for the adjudication panel:
+1. Token & Context Accounting: Detail the approximate prompt tokens, completion tokens, and total context usage consumed during this task.
+2. Reasoning Decomposition: Summarize the key Chain-of-Thought (CoT) reasoning steps and architecture decisions generated.
+3. Constraint & Schema Validation: Confirm whether all mandatory constraints (zero hallucination, valid JSON output, schema keys) were strictly fulfilled.
+4. Model Efficiency: Rate the prompt frugality and economy score (out of 100).
+Output this summary concisely in clean markdown with a structured audit table.`,
+  unlockedParticipants: {}, // [participantId]: true | false
+  globalUnlocked: false,
+  status: 'ready',
+  lastUpdated: Date.now(),
+};
 
 export const DEFAULT_POLL = {
   id: 'poll-1',
@@ -136,15 +92,48 @@ The model must synthesize a 24-hour predictive dispatch plan that eliminates bla
     'Adversarial Injection Defense: Prompt must resist conflicting user inputs attempting to bypass grid safety thresholds.',
     'Deterministic Output: Pin system persona and formatting anchors to eliminate variance across consecutive runs.',
     'Self-Correction Guardrails: Include explicit failure-handling protocols if input data has missing sensory telemetry.'
-  ],
-  outputSchemaExample: `{\n  "gridStatus": "OPTIMAL",\n  "totalDemandMW": 120.5,\n  "dispatch": [\n    { "time": "00:00 - 06:00", "source": "Wind + Battery Discharge", "outputMW": 35.0, "status": "Stable" },\n    { "time": "06:00 - 12:00", "source": "Solar PV + Wind", "outputMW": 78.5, "status": "Optimal" },\n    { "time": "12:00 - 18:00", "source": "Solar Peak + Grid Support", "outputMW": 110.0, "status": "Peak Operation" },\n    { "time": "18:00 - 24:00", "source": "Battery Storage + Reserve", "outputMW": 45.0, "status": "Stable" }\n  ],\n  "efficiencyScore": 98.7,\n  "blackoutRisk": "NONE"\n}`,
-  submissionRequirements: `1. Keep your Google Antigravity project active.\n2. Note your daily token limit consumption % in Antigravity.\n3. Paste your public prompt share link or project URL.\n4. Submit before the timer expires.`
+  ]
 };
 
 export const DEFAULT_CONTENDERS = INITIAL_ROSTER;
 
+export const DEFAULT_OFFICIAL_JUDGES = [
+  {
+    id: 'judge-1',
+    name: 'Dr. Srimanti Roy Choudhury',
+    email: 'srimanti.eee@diu.edu.bd',
+    password: 'Prompt_Battle_SRC_2026',
+    judgeNumber: 1,
+    registeredAt: 1732320000000,
+  },
+  {
+    id: 'judge-2',
+    name: 'Md. Wahiduzzaman',
+    email: 'wahiduzzaman.eee@diu.edu.bd',
+    password: 'Prompt_Battle_MW_2026',
+    judgeNumber: 2,
+    registeredAt: 1732320000000,
+  },
+  {
+    id: 'judge-3',
+    name: 'Anik Biswas',
+    email: 'anik.eee@diu.edu.bd',
+    password: 'Prompt_Battle_AB_2026',
+    judgeNumber: 3,
+    registeredAt: 1732320000000,
+  },
+  {
+    id: 'judge-4',
+    name: 'Sayeed Hossain Sayor',
+    email: 'sayor.eee@diu.edu.bd',
+    password: 'Prompt_Battle_SHS_2026',
+    judgeNumber: 4,
+    registeredAt: 1732320000000,
+  },
+];
+
 export const DEFAULT_STATE = {
-  activeArena: 'battle', // 'battle' | 'poll' | 'quiz'
+  activeArena: 'battle', // 'battle' | 'poll'
   timer: {
     duration: INITIAL_DURATION,
     remaining: INITIAL_DURATION,
@@ -156,7 +145,7 @@ export const DEFAULT_STATE = {
   participants: [],
   joinedParticipants: {}, // [participantId]: { id, name, teamName, arena, lastSeen, tabSwitches }
   registeredContenders: INITIAL_ROSTER,
-  judges: [], // 4 judges: [{ id, name, email, password, judgeNumber, registeredAt }]
+  judges: DEFAULT_OFFICIAL_JUDGES, // 4 official adjudicators + chief judge
   tokenBudget: DEFAULT_TOKEN_BUDGET,
 
   // Live Problem Statement State
@@ -165,20 +154,9 @@ export const DEFAULT_STATE = {
   // Live Poll State
   poll: DEFAULT_POLL,
 
-  // Kahoot Live Quiz State
-  quiz: {
-    id: 'quiz-main',
-    title: 'Prompt Battle 2026 Kahoot Arena',
-    status: 'idle', // 'idle' | 'in_progress' | 'question_ended' | 'finished'
-    currentQuestionIndex: 0,
-    questionEndsAt: null,
-    published: false,
-    questions: DEFAULT_QUIZ_QUESTIONS,
-    submissions: {},
-  },
-
-  // Post-Battle AI Prompt & Token Efficiency Checker (triggered by Admin after battle)
-  promptCheckerActive: false,
+  // Secret Judge Inspection / Verification Directive Prompt
+  // Unlocked customly per participant when Judge visits their desk
+  verificationPrompt: DEFAULT_VERIFICATION_PROMPT,
 
   lastUpdated: Date.now(),
 };
@@ -190,8 +168,10 @@ export function sanitizeState(raw) {
   const rawPoll = raw.poll || {};
   const pollOptions = toSafeArray(rawPoll.options, DEFAULT_POLL.options);
 
-  const rawQuiz = raw.quiz || {};
-  const quizQuestions = toSafeArray(rawQuiz.questions, DEFAULT_QUIZ_QUESTIONS);
+  const rawVP = raw.verificationPrompt || {};
+  const unlockedMap = (rawVP.unlockedParticipants && typeof rawVP.unlockedParticipants === 'object')
+    ? rawVP.unlockedParticipants
+    : {};
 
   const now = Date.now();
   const rawJoined = (raw.joinedParticipants && typeof raw.joinedParticipants === 'object') ? raw.joinedParticipants : {};
@@ -204,13 +184,17 @@ export function sanitizeState(raw) {
   });
 
   const rawRoster = toSafeArray(raw.registeredContenders, []);
-  const hasOfficialRoster = rawRoster.some(c => c.couponCode && String(c.couponCode).toUpperCase().startsWith('PBC'));
-  const effectiveRoster = (rawRoster.length > 0 && hasOfficialRoster) ? rawRoster : INITIAL_ROSTER;
+  const hasOfficialRoster = rawRoster.length === 64 && rawRoster.some(c => c.couponCode && String(c.couponCode).toUpperCase().startsWith('PBC'));
+  const effectiveRoster = hasOfficialRoster ? rawRoster : INITIAL_ROSTER;
+
+  const rawJudges = toSafeArray(raw.judges, []);
+  const hasOfficialJudges = rawJudges.some(j => j.email && j.email.includes('@diu.edu.bd'));
+  const effectiveJudges = (rawJudges.length === 4 && hasOfficialJudges) ? rawJudges : DEFAULT_OFFICIAL_JUDGES;
 
   return {
     ...DEFAULT_STATE,
     ...raw,
-    activeArena: raw.activeArena || 'battle',
+    activeArena: raw.activeArena === 'poll' ? 'poll' : 'battle',
     timer: {
       ...DEFAULT_STATE.timer,
       ...(raw.timer || {}),
@@ -225,12 +209,12 @@ export function sanitizeState(raw) {
       status: rawPoll.status || 'active',
       type: rawPoll.type || 'mcq',
     },
-    quiz: {
-      ...DEFAULT_STATE.quiz,
-      ...rawQuiz,
-      questions: quizQuestions.length > 0 ? quizQuestions : DEFAULT_QUIZ_QUESTIONS,
-      submissions: rawQuiz.submissions || {},
-      status: rawQuiz.status || 'idle',
+    verificationPrompt: {
+      ...DEFAULT_VERIFICATION_PROMPT,
+      ...rawVP,
+      directive: rawVP.directive || DEFAULT_VERIFICATION_PROMPT.directive,
+      unlockedParticipants: unlockedMap,
+      globalUnlocked: Boolean(rawVP.globalUnlocked),
     },
     problemStatement: {
       ...DEFAULT_PROBLEM_STATEMENT,
@@ -239,10 +223,9 @@ export function sanitizeState(raw) {
     },
     participants: toSafeArray(raw.participants, []),
     registeredContenders: effectiveRoster,
-    judges: toSafeArray(raw.judges, []),
+    judges: effectiveJudges,
     tokenBudget: Number(raw.tokenBudget) || DEFAULT_TOKEN_BUDGET,
     published: Boolean(raw.published),
-    promptCheckerActive: Boolean(raw.promptCheckerActive),
     lastUpdated: raw.lastUpdated || Date.now(),
   };
 }
@@ -466,38 +449,6 @@ export function BattleProvider({ children }) {
     };
   }, [battleState.timer.status, battleState.timer.endsAt, battleState, syncState]);
 
-  // Active Quiz Question Countdown Tick
-  useEffect(() => {
-    let quizInterval = null;
-
-    if (battleState.quiz?.status === 'in_progress' && battleState.quiz.questionEndsAt) {
-      quizInterval = setInterval(() => {
-        const now = Date.now();
-        const diffMs = battleState.quiz.questionEndsAt - now;
-
-        if (diffMs <= 0) {
-          clearInterval(quizInterval);
-          playTimesUpAlert();
-          syncState({
-            ...battleState,
-            quiz: {
-              ...battleState.quiz,
-              status: 'question_ended',
-              questionEndsAt: null,
-            },
-            lastUpdated: Date.now(),
-          });
-        } else if (diffMs <= 5000 && Math.floor(diffMs / 1000) !== Math.floor((diffMs + 250) / 1000)) {
-          playCountdownTick();
-        }
-      }, 250);
-    }
-
-    return () => {
-      if (quizInterval) clearInterval(quizInterval);
-    };
-  }, [battleState.quiz?.status, battleState.quiz?.questionEndsAt, battleState, syncState]);
-
   const switchView = useCallback((newView) => {
     if (!['presentation', 'admin', 'submit', 'judge'].includes(newView)) return;
     setActiveView(newView);
@@ -657,20 +608,16 @@ export function BattleProvider({ children }) {
     const seconds = elapsedSec % 60;
     const finishTimeFormatted = `${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
 
-    const budget = Number(battleState.tokenBudget) || DEFAULT_TOKEN_BUDGET;
     const duration = Number(battleState.timer.duration) || DEFAULT_BATTLE_DURATION;
     const tokens = Number(tokensUsed) || 0;
 
-    const scoring = evaluateTotalScore({
-      tokensUsed: tokens,
-      tokenBudget: budget,
-      finishSeconds: elapsedSec,
-      totalDurationSec: duration,
-      objectiveScore: 0,
-      finishStatus: 'Partially Fulfilled',
-      presentationScore: 0,
-      noveltyScore: 0,
-    });
+    // Automated time management score calculation (10 pts max):
+    // <= half duration -> 10/10 pts full marks.
+    // > half duration -> linear scale down to 0.
+    // Late submission past duration -> 0 pts & automatic disqualification.
+    const isLate = (elapsedSec > duration) || (battleState.timer.status === 'finished');
+    const autoTime = calculateAutomatedTimeScore(elapsedSec, duration, true);
+    const isDisqualified = isLate || autoTime.isDisqualified;
 
     const cleanParticipantId = (participantId || '').trim().toUpperCase() || `PB-${Math.floor(100 + Math.random() * 900)}`;
     const matchedRoster = (battleState.registeredContenders || []).find(
@@ -689,21 +636,32 @@ export function BattleProvider({ children }) {
       finishTimeFormatted,
       notes: notes.trim(),
       workUrl: (workUrl || '').trim(),
+      submittedUrl: (workUrl || '').trim(),
+      hasSubmitted: true,
       tokensUsed: tokens,
-      tokenScore: scoring.tokenScore,
-      tokenPercentageUsed: scoring.tokenPercentageUsed,
-      timeScore: scoring.timeScore,
-      timePercentageUsed: scoring.timePercentageUsed,
-      objectiveScore: 0,
-      finishStatus: 'Partially Fulfilled',
-      finishStatusNotes: '',
+      dailyLimitPercentageUsed: tokens,
+      timeScore: isDisqualified ? 0 : autoTime.score,
+      timeScoreDetails: autoTime.reason,
+      promptScore: 0,
+      projectAccuracy: 0,
+      projectSimulation: 0,
+      projectMonitoring: 0,
+      projectUsability: 0,
+      projectComponents: 0,
+      projectWorkingTotal: 0,
       presentationScore: 0,
-      noveltyScore: 0,
-      totalScore: scoring.totalScore,
+      tokenScore: 0,
+      totalScore: isDisqualified ? 0 : autoTime.score,
+      isDisqualified: isDisqualified,
+      status: isDisqualified ? 'Disqualified (Time Expired)' : 'Submitted',
+      disqualificationReason: isDisqualified ? 'Failed to submit within allocated battle time limit' : null,
+      judgeMarks: {},
       tabSwitches: 0,
     };
 
-    playFinishFanfare();
+    if (!isDisqualified) {
+      playFinishFanfare();
+    }
     const currentList = toSafeArray(battleState.participants, []);
     syncState({
       ...battleState,
@@ -873,22 +831,106 @@ export function BattleProvider({ children }) {
     syncState(updated);
   }, [battleState, syncState]);
 
-  // --- POST-BATTLE AI PROMPT CHECKER ACTIONS (Admin Triggered) ---
-  const togglePromptChecker = useCallback((active) => {
-    setBattleState((prev) => {
-      const nextActive = typeof active === 'boolean' ? active : !prev.promptCheckerActive;
-      const updated = {
-        ...prev,
-        promptCheckerActive: nextActive,
+  // --- SECRET JUDGE VERIFICATION PROMPT ACTIONS ---
+  // Judge or Admin can unlock this standardized directive customly for an individual participant desk
+  const unlockVerificationPromptForParticipant = useCallback((participantId) => {
+    const cleanId = (participantId || '').trim().toUpperCase();
+    if (!cleanId) return;
+    const currentVP = battleState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
+    const updated = {
+      ...battleState,
+      verificationPrompt: {
+        ...currentVP,
+        unlockedParticipants: {
+          ...(currentVP.unlockedParticipants || {}),
+          [cleanId]: true,
+        },
         lastUpdated: Date.now(),
-      };
-      syncState(updated, true);
-      return updated;
-    });
-  }, [syncState]);
+      },
+      lastUpdated: Date.now(),
+    };
+    syncState(updated, true);
+  }, [battleState, syncState]);
 
-  const enablePromptChecker = useCallback(() => togglePromptChecker(true), [togglePromptChecker]);
-  const disablePromptChecker = useCallback(() => togglePromptChecker(false), [togglePromptChecker]);
+  const lockVerificationPromptForParticipant = useCallback((participantId) => {
+    const cleanId = (participantId || '').trim().toUpperCase();
+    if (!cleanId) return;
+    const currentVP = battleState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
+    const updated = {
+      ...battleState,
+      verificationPrompt: {
+        ...currentVP,
+        unlockedParticipants: {
+          ...(currentVP.unlockedParticipants || {}),
+          [cleanId]: false,
+        },
+        lastUpdated: Date.now(),
+      },
+      lastUpdated: Date.now(),
+    };
+    syncState(updated, true);
+  }, [battleState, syncState]);
+
+  const toggleVerificationPromptForParticipant = useCallback((participantId) => {
+    const cleanId = (participantId || '').trim().toUpperCase();
+    if (!cleanId) return;
+    const currentVP = battleState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
+    const isUnlocked = Boolean(currentVP.unlockedParticipants?.[cleanId]);
+    const updated = {
+      ...battleState,
+      verificationPrompt: {
+        ...currentVP,
+        unlockedParticipants: {
+          ...(currentVP.unlockedParticipants || {}),
+          [cleanId]: !isUnlocked,
+        },
+        lastUpdated: Date.now(),
+      },
+      lastUpdated: Date.now(),
+    };
+    syncState(updated, true);
+  }, [battleState, syncState]);
+
+  const updateVerificationPromptDirective = useCallback((newDirectiveOrObj) => {
+    const currentVP = battleState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
+    const updates = typeof newDirectiveOrObj === 'object' && newDirectiveOrObj !== null
+      ? newDirectiveOrObj
+      : { directive: (newDirectiveOrObj || '').trim() };
+    const updated = {
+      ...battleState,
+      verificationPrompt: {
+        ...currentVP,
+        ...updates,
+        lastUpdated: Date.now(),
+      },
+      lastUpdated: Date.now(),
+    };
+    syncState(updated, true);
+  }, [battleState, syncState]);
+
+  const toggleGlobalVerificationPrompt = useCallback((shouldUnlock) => {
+    const currentVP = battleState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
+    const nextVal = typeof shouldUnlock === 'boolean' ? shouldUnlock : !currentVP.globalUnlocked;
+    const updated = {
+      ...battleState,
+      verificationPrompt: {
+        ...currentVP,
+        globalUnlocked: nextVal,
+        lastUpdated: Date.now(),
+      },
+      lastUpdated: Date.now(),
+    };
+    syncState(updated, true);
+  }, [battleState, syncState]);
+
+  const resetVerificationPrompt = useCallback(() => {
+    const updated = {
+      ...battleState,
+      verificationPrompt: DEFAULT_VERIFICATION_PROMPT,
+      lastUpdated: Date.now(),
+    };
+    syncState(updated, true);
+  }, [battleState, syncState]);
 
   // --- LIVE POLL ACTIONS ---
   // When Admin creates a poll, it automatically switches ALL screens to Poll view!
@@ -1076,15 +1118,6 @@ export function BattleProvider({ children }) {
         };
       }
 
-      // Also update in quiz.submissions
-      const currentSubmissions = { ...(prev.quiz?.submissions || {}) };
-      if (currentSubmissions[participantId]) {
-        currentSubmissions[participantId] = {
-          ...currentSubmissions[participantId],
-          tabSwitches: switchCount,
-        };
-      }
-
       const newState = {
         ...prev,
         joinedParticipants: currentJoined,
@@ -1092,10 +1125,6 @@ export function BattleProvider({ children }) {
         poll: {
           ...prev.poll,
           votes: currentVotes,
-        },
-        quiz: {
-          ...prev.quiz,
-          submissions: currentSubmissions,
         },
         lastUpdated: Date.now(),
       };
@@ -1118,195 +1147,6 @@ export function BattleProvider({ children }) {
     syncState({
       ...battleState,
       poll: DEFAULT_POLL,
-      lastUpdated: now,
-    });
-  }, [battleState, syncState]);
-
-  // --- KAHOOT-STYLE LIVE QUIZ ACTIONS ---
-  // When Admin launches a quiz question, it automatically switches ALL screens to Quiz view!
-  const launchQuizQuestion = useCallback((questionIdx = 0) => {
-    const now = Date.now();
-    const quiz = battleState.quiz || { questions: DEFAULT_QUIZ_QUESTIONS };
-    const questionsList = toSafeArray(quiz.questions, DEFAULT_QUIZ_QUESTIONS);
-    const q = questionsList[questionIdx] || questionsList[0];
-    const duration = q.timeLimit || 20;
-    const questionEndsAt = now + duration * 1000;
-
-    playStartHorn();
-
-    syncState({
-      ...battleState,
-      activeArena: 'quiz', // Automatically switch auditorium and participant screens!
-      quiz: {
-        ...quiz,
-        status: 'in_progress',
-        currentQuestionIndex: questionIdx,
-        questionEndsAt,
-      },
-      lastUpdated: now,
-    });
-  }, [battleState, syncState]);
-
-  const endQuizQuestion = useCallback(() => {
-    const now = Date.now();
-    syncState({
-      ...battleState,
-      quiz: {
-        ...battleState.quiz,
-        status: 'question_ended',
-        questionEndsAt: null,
-      },
-      lastUpdated: now,
-    });
-  }, [battleState, syncState]);
-
-  const submitQuizAnswer = useCallback(({ participantId, participantName, teamName, questionIndex, selectedIndex, timeTakenSec }) => {
-    const now = Date.now();
-    const quiz = battleState.quiz || {};
-    const questionsList = toSafeArray(quiz.questions, DEFAULT_QUIZ_QUESTIONS);
-    const currentQ = questionsList[questionIndex];
-    if (!currentQ) return { success: false };
-
-    const isCorrect = selectedIndex === currentQ.correctIndex;
-    let points = 0;
-
-    if (isCorrect) {
-      const maxTime = currentQ.timeLimit || 20;
-      const ratio = Math.max(0, Math.min(1, timeTakenSec / maxTime));
-      points = Math.round((1 - ratio / 2) * 1000);
-    }
-
-    const currentSubmissions = { ...(quiz.submissions || {}) };
-    const userSubmission = currentSubmissions[participantId] || {
-      participantId,
-      name: participantName || 'Contender',
-      teamName: teamName || 'Solo',
-      answers: {},
-      totalScore: 0,
-      correctCount: 0,
-    };
-
-    userSubmission.answers[questionIndex] = {
-      selectedIndex,
-      isCorrect,
-      points,
-      timeTakenSec,
-      answeredAt: now,
-    };
-
-    const allAnswers = Object.values(userSubmission.answers);
-    userSubmission.totalScore = allAnswers.reduce((sum, a) => sum + (a.points || 0), 0);
-    userSubmission.correctCount = allAnswers.filter((a) => a.isCorrect).length;
-
-    currentSubmissions[participantId] = userSubmission;
-
-    if (isCorrect) {
-      playFinishFanfare();
-    } else {
-      playTimesUpAlert();
-    }
-
-    syncState({
-      ...battleState,
-      quiz: {
-        ...quiz,
-        submissions: currentSubmissions,
-      },
-      lastUpdated: now,
-    });
-
-    return { success: true, isCorrect, points };
-  }, [battleState, syncState]);
-
-  const publishQuizLeaderboard = useCallback((shouldPublish) => {
-    const now = Date.now();
-    syncState({
-      ...battleState,
-      quiz: {
-        ...battleState.quiz,
-        published: shouldPublish,
-        status: shouldPublish ? 'finished' : battleState.quiz?.status,
-      },
-      lastUpdated: now,
-    });
-  }, [battleState, syncState]);
-
-  const resetQuiz = useCallback(() => {
-    const now = Date.now();
-    syncState({
-      ...battleState,
-      quiz: {
-        ...battleState.quiz,
-        status: 'idle',
-        currentQuestionIndex: 0,
-        questionEndsAt: null,
-        published: false,
-        submissions: {},
-      },
-      lastUpdated: now,
-    });
-  }, [battleState, syncState]);
-
-  const addQuizQuestion = useCallback((newQ) => {
-    const now = Date.now();
-    const currentList = toSafeArray(battleState.quiz?.questions, DEFAULT_QUIZ_QUESTIONS);
-    const updatedQuestions = [...currentList, {
-      id: `q-${Date.now()}`,
-      question: newQ.question,
-      options: toSafeArray(newQ.options, ['Option A', 'Option B', 'Option C', 'Option D']),
-      correctIndex: Number(newQ.correctIndex) || 0,
-      timeLimit: Number(newQ.timeLimit) || 20,
-    }];
-
-    syncState({
-      ...battleState,
-      quiz: {
-        ...battleState.quiz,
-        questions: updatedQuestions,
-      },
-      lastUpdated: now,
-    });
-  }, [battleState, syncState]);
-
-  const updateQuizQuestion = useCallback((questionId, updatedData) => {
-    const now = Date.now();
-    const currentList = toSafeArray(battleState.quiz?.questions, DEFAULT_QUIZ_QUESTIONS);
-    const updated = currentList.map((q) => {
-      if (q.id === questionId) {
-        return {
-          ...q,
-          question: (updatedData.question !== undefined ? updatedData.question : q.question).trim(),
-          options: updatedData.options ? toSafeArray(updatedData.options, q.options) : q.options,
-          correctIndex: updatedData.correctIndex !== undefined ? Number(updatedData.correctIndex) : q.correctIndex,
-          timeLimit: updatedData.timeLimit !== undefined ? Number(updatedData.timeLimit) : q.timeLimit,
-        };
-      }
-      return q;
-    });
-
-    syncState({
-      ...battleState,
-      quiz: {
-        ...battleState.quiz,
-        questions: updated,
-      },
-      lastUpdated: now,
-    });
-  }, [battleState, syncState]);
-
-  const deleteQuizQuestion = useCallback((questionId) => {
-    const now = Date.now();
-    const currentList = toSafeArray(battleState.quiz?.questions, DEFAULT_QUIZ_QUESTIONS);
-    const filtered = currentList.filter((q) => q.id !== questionId);
-    const safeIdx = Math.max(0, Math.min(battleState.quiz?.currentQuestionIndex || 0, filtered.length - 1));
-
-    syncState({
-      ...battleState,
-      quiz: {
-        ...battleState.quiz,
-        questions: filtered.length > 0 ? filtered : DEFAULT_QUIZ_QUESTIONS,
-        currentQuestionIndex: safeIdx,
-      },
       lastUpdated: now,
     });
   }, [battleState, syncState]);
@@ -1447,24 +1287,28 @@ export function BattleProvider({ children }) {
     }
   });
 
-  // Admin Authentication: pes.ieee@diu.edu.bd / PesDiuSbc2026
+  // Admin Authentication: checks cloud admin or fallback pes.ieee@diu.edu.bd / PesDiuSbc2026
   const authenticateAdmin = useCallback((enteredEmail, enteredPassword) => {
     const cleanEmail = (enteredEmail || '').trim().toLowerCase();
     const cleanPass = (enteredPassword || '').trim();
 
+    const cloudAdminEmail = (battleState.admin?.email || ADMIN_EMAIL).toLowerCase();
+    const cloudAdminPass = battleState.admin?.password || ADMIN_PASSWORD;
+
     // Support both dual-field (email + password) and single-password fallback
     if (
+      (cleanEmail === cloudAdminEmail && cleanPass === cloudAdminPass) ||
       (cleanEmail === ADMIN_EMAIL.toLowerCase() && cleanPass === ADMIN_PASSWORD) ||
-      (cleanPass === ADMIN_PASSWORD && !cleanEmail) ||
-      (cleanEmail === ADMIN_PASSWORD && !cleanPass)
+      ((cleanPass === cloudAdminPass || cleanPass === ADMIN_PASSWORD) && !cleanEmail) ||
+      ((cleanEmail === cloudAdminPass || cleanEmail === ADMIN_PASSWORD) && !cleanPass)
     ) {
       setIsAdminAuthenticated(true);
       sessionStorage.setItem('pb_admin_auth', 'true');
-      sessionStorage.setItem('pb_admin_email', ADMIN_EMAIL);
+      sessionStorage.setItem('pb_admin_email', cleanEmail || cloudAdminEmail);
       return { success: true };
     }
-    return { success: false, error: 'Incorrect credentials. Admin Email: pes.ieee@diu.edu.bd' };
-  }, []);
+    return { success: false, error: `Incorrect credentials. Admin Email: ${cloudAdminEmail}` };
+  }, [battleState.admin]);
 
   const logoutAdmin = useCallback(() => {
     setIsAdminAuthenticated(false);
@@ -1571,6 +1415,23 @@ export function BattleProvider({ children }) {
       return { success: false, error: 'Please enter both your Gmail and password.' };
     }
 
+    // Support Master IEEE PES credential login as Chief Adjudicator
+    if (cleanEmail === ADMIN_EMAIL.toLowerCase() && cleanPass === ADMIN_PASSWORD) {
+      const masterJudge = {
+        id: 'judge-master-pes',
+        name: 'Chief Adjudicator (IEEE PES)',
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
+        judgeNumber: 1,
+        registeredAt: Date.now(),
+      };
+      setCurrentJudge(masterJudge);
+      try {
+        localStorage.setItem('pb_judge_session', JSON.stringify(masterJudge));
+      } catch (e) {}
+      return { success: true, judge: masterJudge };
+    }
+
     const currentJudges = toSafeArray(battleState.judges, []);
     const match = currentJudges.find(j => j.email?.toLowerCase() === cleanEmail && j.password === cleanPass);
 
@@ -1607,6 +1468,7 @@ export function BattleProvider({ children }) {
   }, [battleState, currentJudge, syncState, logoutJudge]);
 
   // Judge Evaluation Submission: Calculates per-judge marks and aggregate average score
+  // Rubric: Prompt (50), Project Working (25: 5+5+5+5+5), Time Management (10 auto), Presentation (10), Token Consumption (5) = 100 Pts
   const submitJudgeEvaluation = useCallback(({ participantId, judgeId, marks }) => {
     const now = Date.now();
     const cleanId = (participantId || '').trim().toUpperCase();
@@ -1623,8 +1485,8 @@ export function BattleProvider({ children }) {
         teamName: reg?.teamName || 'Solo Contender',
         deskNumber: reg?.deskNumber || 'Desk 01',
         email: reg?.email || '',
-        finishTimeFormatted: '12m 00s',
-        finishSeconds: 720,
+        finishTimeFormatted: 'Not submitted',
+        finishSeconds: 0,
         tokensUsed: 0,
         dailyLimitPercentageUsed: 0,
         judgeMarks: {},
@@ -1634,20 +1496,55 @@ export function BattleProvider({ children }) {
     }
 
     const currentJudgeMarks = existing.judgeMarks || {};
+    const existingEvaluations = Object.values(currentJudgeMarks);
+    
+    // Strict single-judge policy: only one teacher is allowed to mark per student
+    const otherJudge = existingEvaluations.find(j => j.judgeId !== judgeId);
+    if (otherJudge) {
+      console.warn(`[Evaluation Lock] Blocked duplicate evaluation. Student already marked by ${otherJudge.judgeName}`);
+      return {
+        success: false,
+        error: `This contender has already been evaluated by ${otherJudge.judgeName}. Only one teacher is allowed to mark per student.`,
+      };
+    }
+
     const judgeInfo = (battleState.judges || []).find(j => j.id === judgeId) || currentJudge;
+
+    // Calculate official total score
+    const evaluatedTotal = calculateOfficialJudgeTotal({
+      promptScore: marks.promptScore ?? marks.objectiveScore ?? 0,
+      projectAccuracy: marks.projectAccuracy ?? 0,
+      projectSimulation: marks.projectSimulation ?? 0,
+      projectMonitoring: marks.projectMonitoring ?? 0,
+      projectUsability: marks.projectUsability ?? 0,
+      projectComponents: marks.projectComponents ?? 0,
+      timeScore: marks.timeScore ?? existing.timeScore ?? 0,
+      presentationScore: marks.presentationScore ?? 0,
+      tokenScore: marks.tokenScore ?? 0,
+    });
+
+    const isParticipantExpelled = Boolean(existing.isExpelled || marks.isExpelled);
+    const isParticipantDisqualified = Boolean(existing.isDisqualified || marks.isDisqualified);
+    const finalJudgeTotal = (isParticipantExpelled || isParticipantDisqualified) ? 0 : evaluatedTotal.totalScore;
 
     const newJudgeEntry = {
       judgeId,
       judgeName: judgeInfo?.name || `Judge ${judgeInfo?.judgeNumber || 1}`,
       judgeNumber: judgeInfo?.judgeNumber || 1,
       judgeEmail: judgeInfo?.email || '',
-      objectiveScore: Number(marks.objectiveScore) || 0,
-      noveltyScore: Number(marks.noveltyScore) || 0,
-      presentationScore: Number(marks.presentationScore) || 0,
-      tokenScore: Number(marks.tokenScore) || 0,
-      timeScore: Number(marks.timeScore) || 0,
-      totalScore: Number(marks.totalScore) || 0,
-      notes: marks.notes || '',
+      promptScore: evaluatedTotal.promptScore,
+      objectiveScore: evaluatedTotal.promptScore, // backward compatibility
+      projectAccuracy: evaluatedTotal.projectAccuracy,
+      projectSimulation: evaluatedTotal.projectSimulation,
+      projectMonitoring: evaluatedTotal.projectMonitoring,
+      projectUsability: evaluatedTotal.projectUsability,
+      projectComponents: evaluatedTotal.projectComponents,
+      projectWorkingTotal: evaluatedTotal.projectWorkingTotal,
+      presentationScore: evaluatedTotal.presentationScore,
+      tokenScore: evaluatedTotal.tokenScore,
+      timeScore: evaluatedTotal.timeScore,
+      totalScore: finalJudgeTotal,
+      notes: (marks.notes || '').trim(),
       evaluatedAt: now,
     };
 
@@ -1658,16 +1555,22 @@ export function BattleProvider({ children }) {
 
     // Calculate composite / average score across all judges who marked this contender
     const judgeScoresList = Object.values(updatedJudgeMarks);
-    const avgTotalScore = judgeScoresList.length > 0
-      ? Math.round(judgeScoresList.reduce((sum, j) => sum + (Number(j.totalScore) || 0), 0) / judgeScoresList.length)
-      : newJudgeEntry.totalScore;
+    const avgTotalScore = (isParticipantExpelled || isParticipantDisqualified)
+      ? 0
+      : (judgeScoresList.length > 0
+          ? Math.round(judgeScoresList.reduce((sum, j) => sum + (Number(j.totalScore) || 0), 0) / judgeScoresList.length)
+          : finalJudgeTotal);
 
     const updatedParticipant = {
       ...existing,
       judgeMarks: updatedJudgeMarks,
+      markedByJudgeName: newJudgeEntry.judgeName,
+      markedByJudgeId: judgeId,
+      markedByJudgeEmail: newJudgeEntry.judgeEmail,
       totalScore: avgTotalScore,
-      objectiveScore: newJudgeEntry.objectiveScore,
-      noveltyScore: newJudgeEntry.noveltyScore,
+      promptScore: newJudgeEntry.promptScore,
+      objectiveScore: newJudgeEntry.promptScore,
+      projectWorkingTotal: newJudgeEntry.projectWorkingTotal,
       presentationScore: newJudgeEntry.presentationScore,
       evaluatedByJudgesCount: judgeScoresList.length,
       lastEvaluatedAt: now,
@@ -1687,6 +1590,85 @@ export function BattleProvider({ children }) {
     return { success: true, participant: updatedParticipant };
   }, [battleState, currentJudge, syncState]);
 
+  // Expel Participant for Cheating / Academic Dishonesty
+  const expelParticipant = useCallback(({ participantId, reason = 'Academic Dishonesty / Cheating', judgeName = 'Judge' }) => {
+    const now = Date.now();
+    const cleanId = (participantId || '').trim().toUpperCase();
+    const currentParticipants = toSafeArray(battleState.participants, []);
+    let existing = currentParticipants.find(p => p.participantId?.toUpperCase() === cleanId || p.id === cleanId);
+
+    if (!existing) {
+      const reg = (battleState.registeredContenders || []).find(c => c.participantId?.toUpperCase() === cleanId);
+      existing = {
+        id: cleanId,
+        participantId: cleanId,
+        name: reg?.name || `Contender ${cleanId}`,
+        teamName: reg?.teamName || 'Solo Contender',
+        deskNumber: reg?.deskNumber || 'Desk 01',
+        email: reg?.email || '',
+        finishTimeFormatted: 'N/A',
+        finishSeconds: 0,
+        tokensUsed: 0,
+        dailyLimitPercentageUsed: 0,
+        judgeMarks: {},
+      };
+    }
+
+    const updatedRecord = {
+      ...existing,
+      isDisqualified: true,
+      isExpelled: true,
+      status: 'Expelled (Cheating)',
+      disqualificationReason: `Expelled by ${judgeName}: ${reason}`,
+      totalScore: 0,
+      expelledAt: now,
+      lastEvaluatedAt: now,
+    };
+
+    const exists = currentParticipants.some(p => p.participantId?.toUpperCase() === cleanId || p.id === cleanId);
+    const updatedList = exists
+      ? currentParticipants.map(p => (p.participantId?.toUpperCase() === cleanId || p.id === cleanId) ? updatedRecord : p)
+      : [...currentParticipants, updatedRecord];
+
+    syncState({
+      ...battleState,
+      participants: updatedList,
+      lastUpdated: now,
+    });
+    return { success: true, participant: updatedRecord };
+  }, [battleState, syncState]);
+
+  // Reinstate Participant in case of accidental expel
+  const reinstateParticipant = useCallback((participantId) => {
+    const now = Date.now();
+    const cleanId = (participantId || '').trim().toUpperCase();
+    const currentParticipants = toSafeArray(battleState.participants, []);
+    const existing = currentParticipants.find(p => p.participantId?.toUpperCase() === cleanId || p.id === cleanId);
+    if (!existing) return;
+
+    const marksList = Object.values(existing.judgeMarks || {});
+    const avgScore = marksList.length > 0
+      ? Math.round(marksList.reduce((sum, j) => sum + (Number(j.totalScore) || 0), 0) / marksList.length)
+      : (existing.timeScore || 0);
+
+    const reinstated = {
+      ...existing,
+      isDisqualified: false,
+      isExpelled: false,
+      status: existing.submittedUrl ? 'Submitted' : 'Registered',
+      disqualificationReason: null,
+      totalScore: avgScore,
+      reinstatedAt: now,
+    };
+
+    const updatedList = currentParticipants.map(p => (p.participantId?.toUpperCase() === cleanId || p.id === cleanId) ? reinstated : p);
+    syncState({
+      ...battleState,
+      participants: updatedList,
+      lastUpdated: now,
+    });
+  }, [battleState, syncState]);
+
   const configureFirebase = useCallback((configObj) => {
     saveStoredFirebaseConfig(configObj);
     const res = initFirebase(configObj);
@@ -1705,10 +1687,32 @@ export function BattleProvider({ children }) {
   const resetAllData = useCallback(() => {
     const now = Date.now();
     syncState({
-      ...DEFAULT_STATE,
+      ...battleState,
+      participants: [],
+      joinedParticipants: {},
+      // Strictly preserve all 64 official registered contenders and their assigned desks
+      registeredContenders: INITIAL_ROSTER,
+      judges: battleState.judges && battleState.judges.length > 0 ? battleState.judges : DEFAULT_OFFICIAL_JUDGES,
+      timer: {
+        duration: INITIAL_DURATION,
+        remaining: INITIAL_DURATION,
+        status: 'idle',
+        startedAt: null,
+        endsAt: null,
+      },
+      published: false,
+      poll: {
+        ...(battleState.poll || DEFAULT_POLL),
+        votes: {},
+      },
+      verificationPrompt: {
+        ...(battleState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT),
+        globalUnlocked: false,
+        unlockedParticipants: {},
+      },
       lastUpdated: now,
     });
-  }, [syncState]);
+  }, [battleState, syncState]);
 
   const clearAllPresence = useCallback(() => {
     syncState({
@@ -1719,11 +1723,11 @@ export function BattleProvider({ children }) {
   }, [battleState, syncState]);
 
   const safePoll = battleState.poll || DEFAULT_POLL;
-  const safeQuiz = battleState.quiz || DEFAULT_STATE.quiz;
+  const safeVP = battleState.verificationPrompt || DEFAULT_VERIFICATION_PROMPT;
 
   const value = {
     battleState,
-    activeArena: battleState.activeArena || 'battle',
+    activeArena: battleState.activeArena === 'poll' ? 'poll' : 'battle',
     timer: battleState.timer,
     participants: toSafeArray(battleState.participants, []),
     registeredContenders: toSafeArray(battleState.registeredContenders, []),
@@ -1740,11 +1744,7 @@ export function BattleProvider({ children }) {
       options: toSafeArray(safePoll.options, DEFAULT_POLL.options),
       votes: safePoll.votes || {},
     },
-    quiz: {
-      ...safeQuiz,
-      questions: toSafeArray(safeQuiz.questions, DEFAULT_QUIZ_QUESTIONS),
-      submissions: safeQuiz.submissions || {},
-    },
+    verificationPrompt: safeVP,
     isAdminAuthenticated,
     activeView,
     firebaseStatus,
@@ -1763,6 +1763,8 @@ export function BattleProvider({ children }) {
     logoutJudge,
     deleteJudge,
     submitJudgeEvaluation,
+    expelParticipant,
+    reinstateParticipant,
 
     // Presence & Anti-Cheat
     registerPresence,
@@ -1792,11 +1794,13 @@ export function BattleProvider({ children }) {
     updateProblemStatement,
     resetProblemStatement,
 
-    // Post-Battle Prompt & Token Checker Actions
-    promptCheckerActive: Boolean(battleState.promptCheckerActive),
-    togglePromptChecker,
-    enablePromptChecker,
-    disablePromptChecker,
+    // Secret Judge Verification Prompt Actions (Customly unlocked per participant)
+    unlockVerificationPromptForParticipant,
+    lockVerificationPromptForParticipant,
+    toggleVerificationPromptForParticipant,
+    updateVerificationPromptDirective,
+    toggleGlobalVerificationPrompt,
+    resetVerificationPrompt,
 
     // Poll
     createPoll,
@@ -1807,16 +1811,6 @@ export function BattleProvider({ children }) {
     setPollDisplayMode,
     publishPollResults,
     resetPoll,
-
-    // Quiz
-    launchQuizQuestion,
-    endQuizQuestion,
-    submitQuizAnswer,
-    publishQuizLeaderboard,
-    resetQuiz,
-    addQuizQuestion,
-    updateQuizQuestion,
-    deleteQuizQuestion,
 
     // Admin & Sync
     authenticateAdmin,

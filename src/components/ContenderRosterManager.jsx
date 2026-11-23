@@ -39,7 +39,7 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
     deleteRegisteredContender,
     participants = [],
     poll,
-    quiz,
+    verificationPrompt,
     joinedParticipants = {},
     clearAllPresence,
     updateParticipantMarks
@@ -649,7 +649,19 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+              <a
+                href="/Table_Tokens_All_64_Desks.pdf"
+                download="Table_Tokens_All_64_Desks.pdf"
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-fest-amber to-fest-pes text-dark-950 font-black hover:opacity-90 text-[11px] shrink-0 flex items-center gap-1.5 shadow-[0_0_15px_rgba(255,183,0,0.3)] transition-all cursor-pointer"
+                title="Download printable PDF containing all 64 Table Tokens (4 per A4 page with dashed cut guidelines)"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>64 Table Tokens PDF (A4)</span>
+              </a>
+
               <div className="relative w-full sm:w-64">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                 <input
@@ -801,7 +813,7 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                 <th className="py-3 px-3">Team Name</th>
                 <th className="py-3 px-3">Attendance</th>
                 <th className="py-3 px-3 min-w-[220px]">Battle Work & Evaluation</th>
-                <th className="py-3 px-3 text-center">Kahoot Quiz</th>
+                <th className="py-3 px-3 text-center">Inspection Directive</th>
                 <th className="py-3 px-3 text-center">Live Poll</th>
                 <th className="py-3 px-3 text-center">Tab Switches</th>
                 <th className="py-3 px-3 text-right">Actions</th>
@@ -824,8 +836,12 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                     (p) => p.participantId?.toUpperCase() === c.participantId?.toUpperCase()
                   );
 
-                  // Find quiz submission
-                  const quizSub = quiz?.submissions?.[c.participantId] || quiz?.submissions?.[c.name];
+                  // Find directive unlock status
+                  const isPromptUnlocked = Boolean(
+                    verificationPrompt?.globalUnlocked || 
+                    verificationPrompt?.unlockedParticipants?.[c.participantId?.toUpperCase()] || 
+                    verificationPrompt?.unlockedParticipants?.[c.participantId]
+                  );
 
                   // Find poll vote
                   const pollVote = poll?.votes?.[c.participantId] || poll?.votes?.[c.name];
@@ -836,7 +852,7 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                   const isCheckedIn = Boolean(presence && presence.lastSeen);
 
                   // Tab switches
-                  const switches = battleSub?.tabSwitches || quizSub?.tabSwitches || pollVote?.tabSwitches || 0;
+                  const switches = battleSub?.tabSwitches || pollVote?.tabSwitches || 0;
 
                   return (
                     <tr key={c.participantId} className="hover:bg-white/[0.02] transition-colors">
@@ -911,6 +927,12 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                                 {battleSub.totalScore || 0}/100 pts
                               </span>
                             </div>
+                            {battleSub.markedByJudgeName && (
+                              <div className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                <span>Marked by: {battleSub.markedByJudgeName}</span>
+                              </div>
+                            )}
                             <div className="text-[10px] text-slate-400">
                               Antigravity Limit: <strong className="text-fest-pink">{battleSub.tokensUsed || 0}%</strong> • Score: <strong className="text-emerald-400">{battleSub.tokenScore || 0}/15</strong>
                             </div>
@@ -941,14 +963,14 @@ export default function ContenderRosterManager({ onSelectForEvaluation }) {
                         )}
                       </td>
 
-                      {/* Quiz */}
+                      {/* Directive Status */}
                       <td className="py-3 px-3 text-center">
-                        {quizSub ? (
-                          <span className="px-2 py-0.5 rounded bg-fest-amber/20 text-fest-amber font-bold">
-                            {quizSub.score || 0} pts
+                        {isPromptUnlocked ? (
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px] uppercase border border-emerald-500/30">
+                            Unlocked
                           </span>
                         ) : (
-                          <span className="text-slate-400">—</span>
+                          <span className="text-slate-500 text-[11px]">Locked</span>
                         )}
                       </td>
 

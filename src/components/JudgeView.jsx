@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useBattle } from '../context/BattleContext';
 import { 
   Scale, 
   UserCheck, 
   Lock, 
-  Key, 
   Mail, 
   Eye, 
   EyeOff, 
@@ -17,16 +16,21 @@ import {
   LogOut, 
   Sparkles, 
   Clock, 
-  Zap, 
   MapPin, 
   Check, 
+  UserPlus, 
+  ShieldCheck, 
+  ChevronDown, 
+  ChevronUp,
+  AlertTriangle,
+  Ban,
   RotateCcw,
-  UserPlus,
-  ShieldCheck,
-  ChevronDown,
-  ChevronUp
+  Sliders,
+  CheckCircle,
+  FileText,
+  Copy
 } from 'lucide-react';
-import { calculateTokenScore, calculateTimeScore } from '../lib/scoringCalculator';
+import { calculateAutomatedTimeScore } from '../lib/scoringCalculator';
 
 export default function JudgeView() {
   const { 
@@ -36,9 +40,14 @@ export default function JudgeView() {
     authenticateJudge, 
     logoutJudge, 
     submitJudgeEvaluation, 
+    expelParticipant,
+    reinstateParticipant,
     registeredContenders = [], 
     participants = [],
-    switchView
+    timer,
+    switchView,
+    verificationPrompt,
+    toggleVerificationPromptForParticipant
   } = useBattle();
 
   // Auth Mode: 'login' | 'signup'
@@ -49,6 +58,7 @@ export default function JudgeView() {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
   const [authSuccess, setAuthSuccess] = useState('');
+  const [copiedPromptId, setCopiedPromptId] = useState(null);
 
   // Aggressively clear authentication inputs on mount to defeat browser credential autofill
   useEffect(() => {
@@ -71,81 +81,93 @@ export default function JudgeView() {
     };
   }, []);
 
-  // Search & Filter
+  // Search & Filter: 'all' | 'submitted' | 'pending' | 'evaluated' | 'expelled'
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterMode, setFilterMode] = useState('all'); // 'all' | 'pending' | 'evaluated'
+  const [filterMode, setFilterMode] = useState('all');
 
   // Evaluation Form State for actively expanded contender
   const [expandedContenderId, setExpandedContenderId] = useState(null);
+  
+  // Official Rubric:
+  // Prompt (50), Project Working (25: 5+5+5+5+5), Time Management (10 auto), Presentation (10), Token (5) = 100
+  // Initial values are empty until entered manually by the judge
   const [scores, setScores] = useState({
-    objectiveScore: 25,
-    noveltyScore: 15,
-    presentationScore: 15,
-    tokenScore: 12,
-    timeScore: 8,
+    promptScore: '',
+    projectAccuracy: '',
+    projectSimulation: '',
+    projectMonitoring: '',
+    projectUsability: '',
+    projectComponents: '',
+    presentationScore: '',
+    tokenScore: '',
     notes: '',
   });
-  const [saveSuccessId, setSaveSuccessId] = useState(null);
 
-  // Combine registered contenders and submitted participants into unified contender list
+  const [autoSaveStatus, setAutoSaveStatus] = useState(null); // 'saving' | 'saved' | null
+  const [lastSavedTime, setLastSavedTime] = useState('');
+  const debounceTimerRef = useRef(null);
+
+  // Combine registered contenders and submitted participants into unified contender list (Strictly all 64 Desks)
   const unifiedContenders = useMemo(() => {
-    const map = new Map();
+    const roster = (registeredContenders && registeredContenders.length === 64) 
+      ? registeredContenders 
+      : INITIAL_ROSTER;
 
-    // 1. Registered Contenders
-    (registeredContenders || []).forEach((rc) => {
-      const id = (rc.participantId || rc.studentId || '').toUpperCase();
-      if (!id) return;
-      map.set(id, {
+    return roster.map((rc) => {
+      const coupon = (rc.couponCode || rc.passcode || '').trim().toUpperCase();
+      const desk = (rc.deskNumber || '').trim();
+      const studentId = (rc.studentId || rc.participantId || '').trim().toUpperCase();
+
+      // Find any live submission that matches this specific station
+      const sub = (participants || []).find((p) => {
+        const pCoupon = (p.couponCode || '').trim().toUpperCase();
+        const pDesk = (p.deskNumber || '').trim().toLowerCase();
+        const pId = (p.participantId || p.id || '').trim().toUpperCase();
+
+        if (coupon && pCoupon && coupon === pCoupon) return true;
+        if (desk && pDesk && desk.toLowerCase() === pDesk.toLowerCase()) return true;
+        if (studentId && pId && studentId === pId) return true;
+        return false;
+      });
+
+      const hasSub = Boolean(sub && (sub.submittedUrl || sub.workUrl || sub.hasSubmitted || (sub.finishSeconds && sub.finishSeconds > 0)));
+
+      // Primary judge evaluator (if any)
+      const judgeMarks = sub?.judgeMarks || {};
+      const evalList = Object.values(judgeMarks);
+      const primaryEval = evalList[0] || null;
+
+      return {
         ...rc,
-        id,
-        participantId: id,
-        studentId: rc.studentId || id,
-        name: rc.name,
+        ...(sub || {}),
+        id: coupon || desk || rc.participantId,
+        stationKey: coupon || desk,
+        participantId: rc.participantId || studentId,
+        studentId: rc.studentId || studentId,
+        couponCode: coupon,
+        deskNumber: desk,
+        name: sub?.name || rc.name,
+        teamName: sub?.teamName || rc.teamName || 'Solo Contender',
         email: rc.email || rc.studentMail || '',
-        studentMail: rc.studentMail || '',
-        personalMail: rc.personalMail || '',
-        semester: rc.semester || '',
-        phone: rc.phone || '',
-        couponCode: rc.couponCode || rc.passcode || '',
-        teamName: rc.teamName || 'Solo Contender',
-        deskNumber: rc.deskNumber || 'Desk 01',
-        submittedUrl: '',
-        tokensUsed: 0,
-        dailyLimitPercentageUsed: 0,
-        finishTimeFormatted: 'Not submitted',
-        finishSeconds: 0,
-        hasSubmitted: false,
-        judgeMarks: {},
-        totalScore: 0,
-      });
+        submittedUrl: sub?.submittedUrl || sub?.workUrl || sub?.promptUrl || '',
+        tokensUsed: Number(sub?.tokensUsed) || 0,
+        dailyLimitPercentageUsed: Number(sub?.dailyLimitPercentageUsed ?? sub?.tokensUsed) || 0,
+        finishTimeFormatted: sub?.finishTimeFormatted || 'Not submitted',
+        finishSeconds: Number(sub?.finishSeconds) || 0,
+        hasSubmitted: hasSub,
+        isDisqualified: Boolean(sub?.isDisqualified),
+        isExpelled: Boolean(sub?.isExpelled),
+        disqualificationReason: sub?.disqualificationReason || null,
+        judgeMarks: judgeMarks,
+        primaryEval: primaryEval,
+        markedByJudgeName: sub?.markedByJudgeName || primaryEval?.judgeName || null,
+        totalScore: Boolean(sub?.isDisqualified || sub?.isExpelled) ? 0 : Number(sub?.totalScore) || 0,
+      };
+    }).sort((a, b) => {
+      const deskA = parseInt(String(a.deskNumber || '').replace(/\D/g, ''), 10) || 0;
+      const deskB = parseInt(String(b.deskNumber || '').replace(/\D/g, ''), 10) || 0;
+      return deskA - deskB;
     });
-
-    // 2. Overlay live submitted participants
-    (participants || []).forEach((p) => {
-      const id = (p.participantId || p.id || '').toUpperCase();
-      if (!id) return;
-      const prev = map.get(id) || {};
-      map.set(id, {
-        ...prev,
-        ...p,
-        id,
-        participantId: id,
-        name: p.name || prev.name || `Contender ${id}`,
-        teamName: p.teamName || prev.teamName || 'Solo Contender',
-        deskNumber: p.deskNumber || prev.deskNumber || 'Desk 01',
-        email: p.email || prev.email || '',
-        submittedUrl: p.submittedUrl || p.promptUrl || '',
-        tokensUsed: Number(p.tokensUsed) || 0,
-        dailyLimitPercentageUsed: Number(p.dailyLimitPercentageUsed ?? p.tokensUsed) || 0,
-        finishTimeFormatted: p.finishTimeFormatted || '12m 00s',
-        finishSeconds: Number(p.finishSeconds) || 720,
-        hasSubmitted: Boolean(p.submittedUrl || p.hasSubmitted || p.finishSeconds),
-        judgeMarks: p.judgeMarks || prev.judgeMarks || {},
-        totalScore: Number(p.totalScore) || 0,
-      });
-    });
-
-    return Array.from(map.values());
   }, [registeredContenders, participants]);
 
   // Filtered list
@@ -157,24 +179,38 @@ export default function JudgeView() {
         c.name?.toLowerCase().includes(term) ||
         c.participantId?.toLowerCase().includes(term) ||
         c.deskNumber?.toLowerCase().includes(term) ||
+        c.couponCode?.toLowerCase().includes(term) ||
         c.email?.toLowerCase().includes(term);
 
       if (!matchSearch) return false;
 
       const myEval = currentJudge && c.judgeMarks && c.judgeMarks[currentJudge.id];
-      if (filterMode === 'pending') return !myEval;
-      if (filterMode === 'evaluated') return !!myEval;
+      const hasAnyEval = Boolean(c.primaryEval || (c.judgeMarks && Object.keys(c.judgeMarks).length > 0));
+
+      if (filterMode === 'submitted') return c.hasSubmitted && !c.isExpelled;
+      if (filterMode === 'pending') return c.hasSubmitted && !hasAnyEval && !c.isExpelled;
+      if (filterMode === 'evaluated') return hasAnyEval && !c.isExpelled;
+      if (filterMode === 'expelled') return c.isExpelled || c.isDisqualified;
       return true;
     });
   }, [unifiedContenders, searchTerm, filterMode, currentJudge]);
 
-  // KPI calculations for current judge
+  // KPI calculations
   const evaluatedCount = useMemo(() => {
-    if (!currentJudge) return 0;
-    return unifiedContenders.filter((c) => c.judgeMarks && c.judgeMarks[currentJudge.id]).length;
-  }, [unifiedContenders, currentJudge]);
+    return unifiedContenders.filter((c) => c.primaryEval && !c.isExpelled).length;
+  }, [unifiedContenders]);
 
-  const pendingCount = unifiedContenders.length - evaluatedCount;
+  const submittedCount = useMemo(() => {
+    return unifiedContenders.filter((c) => c.hasSubmitted && !c.isExpelled).length;
+  }, [unifiedContenders]);
+
+  const pendingCount = useMemo(() => {
+    return unifiedContenders.filter((c) => c.hasSubmitted && !c.primaryEval && !c.isExpelled).length;
+  }, [unifiedContenders]);
+
+  const expelledCount = useMemo(() => {
+    return unifiedContenders.filter((c) => c.isExpelled || c.isDisqualified).length;
+  }, [unifiedContenders]);
 
   // Handle Judge Signup
   const handleSignUp = (e) => {
@@ -195,7 +231,7 @@ export default function JudgeView() {
     }
   };
 
-  // Handle Judge Login
+  // Handle Judge Login (strict verification - no bypass)
   const handleLogin = (e) => {
     e.preventDefault();
     setAuthError('');
@@ -206,83 +242,190 @@ export default function JudgeView() {
     if (res.success) {
       setAuthSuccess(`Welcome back, Judge #${res.judge.judgeNumber}!`);
     } else {
-      setAuthError(res.error || 'Invalid Gmail or password.');
+      setAuthError(res.error || 'Invalid Email or password. Please verify credentials.');
     }
-  };
-
-  // Quick fill for testing
-  const handleQuickLoginJudge = (judge) => {
-    setEmailInput(judge.email);
-    setPasswordInput(judge.password);
-    authenticateJudge(judge.email, judge.password);
   };
 
   // Open / Populate evaluation form for a contender
   const handleToggleExpand = (contender) => {
-    if (expandedContenderId === contender.participantId) {
+    const stationId = contender.stationKey || contender.couponCode || contender.participantId;
+    if (expandedContenderId === stationId) {
       setExpandedContenderId(null);
       return;
     }
 
-    setExpandedContenderId(contender.participantId);
+    setExpandedContenderId(stationId);
+    setAutoSaveStatus(null);
 
-    // If already evaluated by this judge, load saved values
-    const existingEval = currentJudge && contender.judgeMarks?.[currentJudge.id];
+    // If already evaluated by this judge or another judge, load saved values for inspection
+    const existingEval = (currentJudge && contender.judgeMarks?.[currentJudge.id]) || contender.primaryEval;
     if (existingEval) {
       setScores({
-        objectiveScore: existingEval.objectiveScore ?? 25,
-        noveltyScore: existingEval.noveltyScore ?? 15,
-        presentationScore: existingEval.presentationScore ?? 15,
-        tokenScore: existingEval.tokenScore ?? 12,
-        timeScore: existingEval.timeScore ?? 8,
+        promptScore: existingEval.promptScore !== undefined ? existingEval.promptScore : (existingEval.objectiveScore ?? ''),
+        projectAccuracy: existingEval.projectAccuracy !== undefined ? existingEval.projectAccuracy : '',
+        projectSimulation: existingEval.projectSimulation !== undefined ? existingEval.projectSimulation : '',
+        projectMonitoring: existingEval.projectMonitoring !== undefined ? existingEval.projectMonitoring : '',
+        projectUsability: existingEval.projectUsability !== undefined ? existingEval.projectUsability : '',
+        projectComponents: existingEval.projectComponents !== undefined ? existingEval.projectComponents : '',
+        presentationScore: existingEval.presentationScore !== undefined ? existingEval.presentationScore : '',
+        tokenScore: existingEval.tokenScore !== undefined ? existingEval.tokenScore : '',
         notes: existingEval.notes || '',
       });
+      if (existingEval.evaluatedAt) {
+        setLastSavedTime(new Date(existingEval.evaluatedAt).toLocaleTimeString());
+      }
     } else {
-      // Calculate automated starting scores from daily limit % and time
-      const autoToken = calculateTokenScore(contender.dailyLimitPercentageUsed, 100, 15).score;
-      const autoTime = calculateTimeScore(contender.finishSeconds, 1200, 10).score;
-
+      // Default to empty strings so no numbers are pre-filled
       setScores({
-        objectiveScore: 25,
-        noveltyScore: 15,
-        presentationScore: 15,
-        tokenScore: autoToken || 12,
-        timeScore: autoTime || 8,
+        promptScore: '',
+        projectAccuracy: '',
+        projectSimulation: '',
+        projectMonitoring: '',
+        projectUsability: '',
+        projectComponents: '',
+        presentationScore: '',
+        tokenScore: '',
         notes: '',
       });
+      setLastSavedTime('');
     }
   };
 
-  // Save Evaluation
-  const handleSaveEvaluation = (contender) => {
-    if (!currentJudge) {
-      alert('Please log in as an authorized judge first.');
+  // Auto-Save Handler on any input change
+  const handleScoreChange = (field, value, contender) => {
+    // Block input modifications if another judge already evaluated this student
+    const isMarkedByOther = Boolean(
+      contender.primaryEval && currentJudge && contender.primaryEval.judgeId !== currentJudge.id
+    );
+    if (isMarkedByOther) return;
+
+    let parsedVal = value;
+    if (field !== 'notes') {
+      if (value === '') {
+        parsedVal = '';
+      } else {
+        const num = Number(value);
+        parsedVal = isNaN(num) ? '' : Math.max(0, num);
+      }
+    }
+
+    const updated = {
+      ...scores,
+      [field]: parsedVal,
+    };
+    setScores(updated);
+
+    // Only auto-save if contender has submitted, not expelled, and NOT already marked by another judge
+    if (!currentJudge || !contender.hasSubmitted || contender.isExpelled) return;
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    setAutoSaveStatus('saving');
+
+    debounceTimerRef.current = setTimeout(() => {
+      saveEvaluationDirectly(updated, contender);
+    }, 400);
+  };
+
+  // Direct Save helper
+  const saveEvaluationDirectly = (scoresToSave, contender) => {
+    if (!currentJudge || !contender.hasSubmitted || contender.isExpelled) return;
+
+    // Single faculty judge enforcement: if another judge already graded this student, block overwrite
+    const isMarkedByOther = Boolean(
+      contender.primaryEval && currentJudge && contender.primaryEval.judgeId !== currentJudge.id
+    );
+    if (isMarkedByOther) {
+      console.warn('Evaluation blocked: Student already evaluated by ' + contender.primaryEval.judgeName);
       return;
     }
 
-    const obj = Math.min(35, Math.max(0, Number(scores.objectiveScore) || 0));
-    const nov = Math.min(20, Math.max(0, Number(scores.noveltyScore) || 0));
-    const pres = Math.min(20, Math.max(0, Number(scores.presentationScore) || 0));
-    const tok = Math.min(15, Math.max(0, Number(scores.tokenScore) || 0));
-    const tim = Math.min(10, Math.max(0, Number(scores.timeScore) || 0));
-    const total = obj + nov + pres + tok + tim;
+    const duration = timer?.duration || 1200;
+    const autoTime = calculateAutomatedTimeScore(contender.finishSeconds, duration, true);
+    const timeScore = autoTime.isDisqualified ? 0 : autoTime.score;
+
+    const parseNum = (v, max) => Math.min(max, Math.max(0, v === '' ? 0 : Number(v) || 0));
+
+    const prompt = parseNum(scoresToSave.promptScore, 50);
+    const acc = parseNum(scoresToSave.projectAccuracy, 5);
+    const sim = parseNum(scoresToSave.projectSimulation, 5);
+    const mon = parseNum(scoresToSave.projectMonitoring, 5);
+    const usa = parseNum(scoresToSave.projectUsability, 5);
+    const comp = parseNum(scoresToSave.projectComponents, 5);
+    const pres = parseNum(scoresToSave.presentationScore, 10);
+    const tok = parseNum(scoresToSave.tokenScore, 5);
+    
+    const projectTotal = acc + sim + mon + usa + comp; // 25 max
+    const total = prompt + projectTotal + timeScore + pres + tok; // 100 max
 
     submitJudgeEvaluation({
       participantId: contender.participantId,
       judgeId: currentJudge.id,
       marks: {
-        objectiveScore: obj,
-        noveltyScore: nov,
+        promptScore: prompt,
+        projectAccuracy: acc,
+        projectSimulation: sim,
+        projectMonitoring: mon,
+        projectUsability: usa,
+        projectComponents: comp,
         presentationScore: pres,
         tokenScore: tok,
-        timeScore: tim,
+        timeScore: timeScore,
         totalScore: total,
-        notes: scores.notes.trim(),
+        notes: (scoresToSave.notes || '').trim(),
       },
     });
 
-    setSaveSuccessId(contender.participantId);
-    setTimeout(() => setSaveSuccessId(null), 3000);
+    const timeStr = new Date().toLocaleTimeString();
+    setLastSavedTime(timeStr);
+    setAutoSaveStatus('saved');
+  };
+
+  // Manual explicit save button
+  const handleManualSave = (contender) => {
+    if (!currentJudge) {
+      alert('Please log in as an authorized judge first.');
+      return;
+    }
+    if (!contender.hasSubmitted) {
+      alert('Cannot mark a participant who has not submitted their project yet.');
+      return;
+    }
+    const isMarkedByOther = Boolean(
+      contender.primaryEval && currentJudge && contender.primaryEval.judgeId !== currentJudge.id
+    );
+    if (isMarkedByOther) {
+      alert(`⚠️ DOUBLE MARKING BLOCKED:\n\nThis student has already been evaluated by ${contender.primaryEval.judgeName} (${contender.primaryEval.totalScore}/100 pts).\n\nOnly one faculty judge is allowed to evaluate per student.`);
+      return;
+    }
+    saveEvaluationDirectly(scores, contender);
+  };
+
+  // Expel Participant for Cheating
+  const handleExpelClick = (contender) => {
+    if (!currentJudge) return;
+    const confirmExpel = window.confirm(
+      `⚠️ EXPEL PARTICIPANT WARNING:\n\nAre you sure you want to expel ${contender.name} (${contender.participantId}) for cheating / academic dishonesty?\n\nTheir score will be reduced to 0 and their status will show "EXPELLED (CHEATING)" across all leaderboards and projector screens.`
+    );
+    if (!confirmExpel) return;
+
+    expelParticipant({
+      participantId: contender.participantId,
+      reason: 'Caught cheating / academic dishonesty in Prompt Battle',
+      judgeName: currentJudge.name || `Judge #${currentJudge.judgeNumber}`,
+    });
+    setExpandedContenderId(null);
+  };
+
+  // Reinstate Expelled Participant
+  const handleReinstateClick = (contender) => {
+    const confirmReinstate = window.confirm(
+      `Reinstate ${contender.name} (${contender.participantId}) back into active competition status?`
+    );
+    if (!confirmReinstate) return;
+
+    reinstateParticipant(contender.participantId);
   };
 
   // ==========================================
@@ -329,7 +472,7 @@ export default function JudgeView() {
             </p>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fest-pes/10 border border-fest-pes/30 text-fest-pes text-[11px] font-bold">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Adjudication Panel (4 Judges Max)</span>
+              <span>Official Faculty Adjudication Panel</span>
             </div>
           </div>
 
@@ -371,7 +514,7 @@ export default function JudgeView() {
             </div>
           )}
 
-          {/* Form */}
+          {/* Form: No bypass, strict email + password authentication */}
           <form onSubmit={authMode === 'login' ? handleLogin : handleSignUp} autoComplete="off" className="space-y-4 text-xs">
             {/* Decoy hidden inputs to thwart aggressive browser credential autofill */}
             <input 
@@ -393,7 +536,7 @@ export default function JudgeView() {
               <div>
                 <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1.5">
                   <UserCheck className="w-3.5 h-3.5 text-fest-cyan" />
-                  <span>Full Name (e.g. Dr. John Doe) *</span>
+                  <span>Full Name & Academic Title *</span>
                 </label>
                 <input
                   type="text"
@@ -402,7 +545,7 @@ export default function JudgeView() {
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
                   autoComplete="off"
-                  placeholder="Enter your full name and title..."
+                  placeholder="Enter full name and title (e.g. Dr. Srimanti Roy Choudhury)..."
                   className="w-full px-3 py-2.5 rounded bg-dark-950 border border-white/15 text-white font-sans text-sm focus:border-fest-amber"
                 />
               </div>
@@ -411,7 +554,7 @@ export default function JudgeView() {
             <div>
               <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-fest-cyan" />
-                <span>Gmail / Official Email *</span>
+                <span>Official Faculty Email / Gmail *</span>
               </label>
               <input
                 type="email"
@@ -423,7 +566,7 @@ export default function JudgeView() {
                 autoCorrect="off"
                 autoCapitalize="off"
                 spellCheck="false"
-                placeholder="Enter your Gmail address"
+                placeholder="Enter your official email (e.g. srimanti.eee@diu.edu.bd)..."
                 className="w-full px-3 py-2.5 rounded bg-dark-950 border border-white/15 text-white font-mono text-sm focus:border-fest-amber"
               />
             </div>
@@ -472,32 +615,6 @@ export default function JudgeView() {
             </button>
           </form>
 
-          {/* Quick Access to Existing Registered Judges */}
-          {judges.length > 0 && (
-            <div className="pt-3 border-t border-white/10 space-y-2">
-              <span className="text-[11px] text-slate-400 block font-bold">
-                Registered Judges ({judges.length}/4):
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {judges.map((j) => (
-                  <button
-                    key={j.id}
-                    onClick={() => handleQuickLoginJudge(j)}
-                    className="p-2 rounded bg-dark-950 border border-white/10 hover:border-fest-amber/40 text-left text-[11px] flex items-center justify-between text-slate-300 hover:text-white transition-colors"
-                  >
-                    <div>
-                      <span className="font-bold text-fest-amber block">Judge #{j.judgeNumber}</span>
-                      <span className="text-white text-[10px] truncate max-w-[120px] block">{j.name}</span>
-                    </div>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-fest-cyan font-mono">
-                      Log In ↗
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="text-center pt-2">
             <button
               type="button"
@@ -535,7 +652,7 @@ export default function JudgeView() {
               </h2>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Gmail: <span className="text-fest-cyan">{currentJudge.email}</span> • Adjudicator for IEEE PES DIU SBC
+              Official Email: <span className="text-fest-cyan">{currentJudge.email}</span> • Adjudicator for IEEE PES DIU SBC
             </p>
           </div>
         </div>
@@ -558,29 +675,37 @@ export default function JudgeView() {
       </div>
 
       {/* KPI Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-xl bg-dark-900 border border-white/10 flex items-center justify-between">
           <div>
-            <span className="text-xs text-slate-400 uppercase tracking-wider block">Total Participants</span>
+            <span className="text-xs text-slate-400 uppercase tracking-wider block">Total Roster</span>
             <span className="text-2xl font-bold font-sans text-white">{unifiedContenders.length}</span>
           </div>
-          <Award className="w-8 h-8 text-fest-cyan/40" />
+          <Award className="w-7 h-7 text-fest-cyan/40" />
+        </div>
+
+        <div className="p-4 rounded-xl bg-dark-900 border border-fest-cyan/30 flex items-center justify-between">
+          <div>
+            <span className="text-xs text-fest-cyan uppercase tracking-wider block">Submitted</span>
+            <span className="text-2xl font-bold font-sans text-fest-cyan">{submittedCount}</span>
+          </div>
+          <Sparkles className="w-7 h-7 text-fest-cyan/40" />
         </div>
 
         <div className="p-4 rounded-xl bg-dark-900 border border-emerald-500/30 flex items-center justify-between">
           <div>
-            <span className="text-xs text-emerald-400 uppercase tracking-wider block">Evaluated by You</span>
+            <span className="text-xs text-emerald-400 uppercase tracking-wider block">Graded by You</span>
             <span className="text-2xl font-bold font-sans text-emerald-300">{evaluatedCount}</span>
           </div>
-          <CheckCircle2 className="w-8 h-8 text-emerald-500/40" />
+          <CheckCircle2 className="w-7 h-7 text-emerald-500/40" />
         </div>
 
         <div className="p-4 rounded-xl bg-dark-900 border border-fest-amber/30 flex items-center justify-between">
           <div>
-            <span className="text-xs text-fest-amber uppercase tracking-wider block">Pending Your Grade</span>
+            <span className="text-xs text-fest-amber uppercase tracking-wider block">Awaiting Grade</span>
             <span className="text-2xl font-bold font-sans text-fest-amber">{pendingCount}</span>
           </div>
-          <Clock className="w-8 h-8 text-fest-amber/40" />
+          <Clock className="w-7 h-7 text-fest-amber/40" />
         </div>
       </div>
 
@@ -592,12 +717,12 @@ export default function JudgeView() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by Participant Name, ID, Desk, or Email..."
+            placeholder="Search by Participant Name, ID (e.g. 242-33-218), Desk, or Email..."
             className="w-full pl-9 pr-4 py-2 rounded-lg bg-dark-950 border border-white/15 text-white text-xs focus:border-fest-amber placeholder-slate-500"
           />
         </div>
 
-        <div className="flex items-center space-x-1 p-1 bg-dark-950 rounded-lg border border-white/10 text-xs">
+        <div className="flex items-center space-x-1 p-1 bg-dark-950 rounded-lg border border-white/10 text-xs flex-wrap">
           <button
             onClick={() => setFilterMode('all')}
             className={`px-3 py-1 rounded transition-colors ${
@@ -607,12 +732,20 @@ export default function JudgeView() {
             All ({unifiedContenders.length})
           </button>
           <button
+            onClick={() => setFilterMode('submitted')}
+            className={`px-3 py-1 rounded transition-colors ${
+              filterMode === 'submitted' ? 'bg-fest-amber text-dark-950 font-bold' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Submitted ({submittedCount})
+          </button>
+          <button
             onClick={() => setFilterMode('pending')}
             className={`px-3 py-1 rounded transition-colors ${
               filterMode === 'pending' ? 'bg-fest-amber text-dark-950 font-bold' : 'text-slate-400 hover:text-white'
             }`}
           >
-            Pending ({pendingCount})
+            Pending Grade ({pendingCount})
           </button>
           <button
             onClick={() => setFilterMode('evaluated')}
@@ -622,6 +755,16 @@ export default function JudgeView() {
           >
             Evaluated ({evaluatedCount})
           </button>
+          {expelledCount > 0 && (
+            <button
+              onClick={() => setFilterMode('expelled')}
+              className={`px-3 py-1 rounded transition-colors ${
+                filterMode === 'expelled' ? 'bg-rose-500 text-white font-bold' : 'text-rose-400 hover:text-rose-200'
+              }`}
+            >
+              Expelled / Late ({expelledCount})
+            </button>
+          )}
         </div>
       </div>
 
@@ -630,26 +773,52 @@ export default function JudgeView() {
         {filteredContenders.length === 0 ? (
           <div className="p-12 text-center rounded-2xl bg-dark-900 border border-white/10 space-y-2">
             <Scale className="w-10 h-10 text-slate-600 mx-auto" />
-            <h3 className="text-base font-bold text-slate-300">No Participants Match Filters</h3>
+            <h3 className="text-base font-bold text-slate-300">No Participants Found</h3>
             <p className="text-xs text-slate-500">
-              Ensure participants have registered or check your active search term.
+              Ensure participants have submitted or check your active search filter.
             </p>
           </div>
         ) : (
           filteredContenders.map((contender) => {
-            const isExpanded = expandedContenderId === contender.participantId;
-            const myEval = contender.judgeMarks?.[currentJudge.id];
-            const hasEvaluated = !!myEval;
+            const stationKey = contender.stationKey || contender.couponCode || contender.participantId;
+            const isExpanded = expandedContenderId === stationKey;
+            const myEval = currentJudge && contender.judgeMarks?.[currentJudge.id];
+            const primaryEval = contender.primaryEval;
+            const isMarkedByMe = Boolean(myEval);
+            const isMarkedByOther = Boolean(primaryEval && currentJudge && primaryEval.judgeId !== currentJudge.id);
+            const duration = timer?.duration || 1200;
+            const autoTimeResult = calculateAutomatedTimeScore(contender.finishSeconds, duration, contender.hasSubmitted);
+
+            // Live sum calculation for expanded card
+            const liveProjectTotal = 
+              (Number(scores.projectAccuracy) || 0) +
+              (Number(scores.projectSimulation) || 0) +
+              (Number(scores.projectMonitoring) || 0) +
+              (Number(scores.projectUsability) || 0) +
+              (Number(scores.projectComponents) || 0);
+
+            const liveTotal = 
+              (Number(scores.promptScore) || 0) +
+              liveProjectTotal +
+              (autoTimeResult.isDisqualified ? 0 : autoTimeResult.score) +
+              (Number(scores.presentationScore) || 0) +
+              (Number(scores.tokenScore) || 0);
 
             return (
               <div 
-                key={contender.participantId}
+                key={stationKey}
                 className={`rounded-2xl border transition-all overflow-hidden ${
-                  isExpanded
+                  contender.isExpelled
+                    ? 'bg-rose-950/20 border-rose-500/40'
+                    : isExpanded
                     ? 'bg-dark-900 border-fest-amber/50 shadow-[0_0_30px_rgba(255,183,0,0.15)]'
-                    : hasEvaluated
+                    : isMarkedByMe
                     ? 'bg-dark-900/80 border-emerald-500/30 hover:border-emerald-500/60'
-                    : 'bg-dark-900/60 border-white/10 hover:border-white/20'
+                    : isMarkedByOther
+                    ? 'bg-dark-900/80 border-blue-500/30 hover:border-blue-500/60'
+                    : contender.hasSubmitted
+                    ? 'bg-dark-900/70 border-fest-cyan/30 hover:border-fest-cyan/60'
+                    : 'bg-dark-900/50 border-white/10 opacity-75'
                 }`}
               >
                 {/* Header Row */}
@@ -672,30 +841,66 @@ export default function JudgeView() {
                         <span className="px-2 py-0.5 rounded bg-fest-cyan/15 text-fest-cyan border border-fest-cyan/30 text-[11px] font-bold">
                           {contender.participantId}
                         </span>
+                        {contender.isExpelled && (
+                          <span className="px-2 py-0.5 rounded bg-rose-500 text-white font-black text-[10px] uppercase tracking-wider animate-pulse">
+                            EXPELLED
+                          </span>
+                        )}
+                        {!contender.isExpelled && contender.isDisqualified && (
+                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold uppercase">
+                            TIME EXPIRED
+                          </span>
+                        )}
                       </div>
                       <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
                         <span className="text-fest-pink">{contender.teamName || 'Solo'}</span>
                         {contender.email && <span>• {contender.email}</span>}
+                        {contender.hasSubmitted ? (
+                          <span className="text-emerald-400 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                            <span>Submitted ({contender.finishTimeFormatted})</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 italic">Not submitted yet</span>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   {/* Right Status Pill & Score */}
                   <div className="flex items-center space-x-3 shrink-0">
-                    {hasEvaluated ? (
+                    {contender.isExpelled ? (
+                      <span className="px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold">
+                        Score: 0 / 100 (Expelled)
+                      </span>
+                    ) : isMarkedByMe ? (
                       <div className="text-right">
-                        <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Your Grade: {myEval.totalScore}/100</span>
+                        <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Marked by You ({myEval.totalScore}/100)</span>
                         </span>
                         <span className="text-[10px] text-slate-400 block mt-0.5">
-                          Avg: {contender.totalScore} pts ({contender.evaluatedByJudgesCount || 1} judges)
+                          Single Faculty Evaluation Complete
                         </span>
                       </div>
+                    ) : isMarkedByOther ? (
+                      <div className="text-right">
+                        <span className="px-2.5 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                          <Lock className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Marked by {primaryEval.judgeName}</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                          Score: {primaryEval.totalScore}/100 pts (Double-mark locked)
+                        </span>
+                      </div>
+                    ) : contender.hasSubmitted ? (
+                      <span className="px-2.5 py-1 rounded-full bg-fest-amber/15 border border-fest-amber/30 text-fest-amber text-xs font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(255,183,0,0.2)]">
+                        <Clock className="w-3.5 h-3.5 text-fest-amber" />
+                        <span>Ready to Grade</span>
+                      </span>
                     ) : (
-                      <span className="px-2.5 py-1 rounded-full bg-fest-amber/15 border border-fest-amber/30 text-fest-amber text-xs font-bold flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>Pending Grade</span>
+                      <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-slate-500 text-xs">
+                        Awaiting Submission
                       </span>
                     )}
 
@@ -707,213 +912,633 @@ export default function JudgeView() {
 
                 {/* Expanded Evaluation Body */}
                 {isExpanded && (
-                  <div className="p-5 border-t border-white/10 bg-dark-950/70 space-y-5 animate-in fade-in duration-200">
+                  <div className="p-5 border-t border-white/10 bg-dark-950/80 space-y-5 animate-in fade-in duration-200">
                     
-                    {/* Participant Submission Work Preview */}
-                    <div className="p-4 rounded-xl bg-dark-900 border border-white/10 space-y-2">
-                      <div className="flex items-center justify-between text-xs">
+                    {/* EXPELLED BANNER (If participant was caught cheating) */}
+                    {contender.isExpelled && (
+                      <div className="p-4 rounded-xl bg-rose-500/15 border border-rose-500/40 flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2.5 text-rose-300">
+                          <Ban className="w-5 h-5 text-rose-400 shrink-0" />
+                          <div>
+                            <span className="font-bold block uppercase tracking-wider text-rose-200">
+                              Participant Expelled for Cheating
+                            </span>
+                            <span className="text-[11px] text-rose-300/80">
+                              {contender.disqualificationReason || 'Academic dishonesty recorded by adjudication panel.'}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleReinstateClick(contender)}
+                          className="px-3 py-1.5 rounded-lg bg-dark-950 border border-white/20 text-slate-200 hover:text-white text-xs font-bold"
+                        >
+                          Reinstate Participant
+                        </button>
+                      </div>
+                    )}
+
+                    {/* SUBMISSION STATUS & WORK PREVIEW */}
+                    <div className="p-4 rounded-xl bg-dark-900 border border-white/10 space-y-2.5">
+                      <div className="flex items-center justify-between text-xs flex-wrap gap-2">
                         <span className="font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                           <Sparkles className="w-3.5 h-3.5 text-fest-pink" />
-                          <span>Participant Submitted Work & Verification</span>
+                          <span>Participant Submitted Project & Work Verification</span>
                         </span>
+
                         {contender.submittedUrl ? (
                           <a
                             href={contender.submittedUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-fest-cyan/15 text-fest-cyan hover:bg-fest-cyan/25 border border-fest-cyan/30 text-xs font-bold transition-all shadow-[0_0_12px_rgba(0,229,255,0.2)]"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-fest-cyan/15 text-fest-cyan hover:bg-fest-cyan/25 border border-fest-cyan/30 text-xs font-bold transition-all shadow-[0_0_12px_rgba(0,229,255,0.2)]"
                           >
-                            <span>Open Participant Project Link</span>
+                            <span>Open Project / Prompt URL</span>
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
+                        ) : contender.hasSubmitted ? (
+                          <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/30 font-bold flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Live Work Active at {contender.deskNumber || 'Desk'}</span>
+                          </span>
                         ) : (
-                          <span className="text-[11px] text-slate-500 italic">No link submitted yet</span>
+                          <span className="text-xs text-slate-400 bg-white/5 px-2.5 py-1 rounded border border-white/10">
+                            Awaiting Submission from Desk
+                          </span>
                         )}
                       </div>
 
                       {/* Work stats */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
                         <div className="p-2 rounded bg-dark-950 border border-white/5">
-                          <span className="text-[10px] text-slate-400 block">Antigravity Daily %:</span>
-                          <span className="font-bold text-fest-pink">{contender.dailyLimitPercentageUsed}%</span>
+                          <span className="text-[10px] text-slate-400 block">Desk Station:</span>
+                          <span className="font-bold text-fest-amber">{contender.deskNumber || 'Desk'}</span>
                         </div>
                         <div className="p-2 rounded bg-dark-950 border border-white/5">
                           <span className="text-[10px] text-slate-400 block">Submission Time:</span>
-                          <span className="font-bold text-fest-cyan">{contender.finishTimeFormatted}</span>
+                          <span className="font-bold text-fest-cyan">{contender.finishTimeFormatted || 'In progress'}</span>
                         </div>
                         <div className="p-2 rounded bg-dark-950 border border-white/5">
-                          <span className="text-[10px] text-slate-400 block">Auto Token Score:</span>
-                          <span className="font-bold text-fest-pes">{calculateTokenScore(contender.dailyLimitPercentageUsed, 100, 15).score}/15 pts</span>
+                          <span className="text-[10px] text-slate-400 block">Time Management (Auto):</span>
+                          <span className="font-bold text-fest-amber">
+                            {autoTimeResult.isDisqualified ? '0/10 (Late/Expired)' : `${autoTimeResult.score}/10 pts`}
+                          </span>
                         </div>
                         <div className="p-2 rounded bg-dark-950 border border-white/5">
-                          <span className="text-[10px] text-slate-400 block">Auto Time Score:</span>
-                          <span className="font-bold text-fest-amber">{calculateTimeScore(contender.finishSeconds, 1200, 10).score}/10 pts</span>
+                          <span className="text-[10px] text-slate-400 block">Timing Rule Status:</span>
+                          <span className="text-[11px] text-slate-300 truncate block font-sans" title={autoTimeResult.reason}>
+                            {autoTimeResult.reason}
+                          </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Official Judge Rubric Scoring Form */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between pb-1 border-b border-white/10">
-                        <span className="font-bold text-white text-xs uppercase tracking-wider flex items-center gap-2">
-                          <Scale className="w-4 h-4 text-fest-amber" />
-                          <span>Judge #{currentJudge.judgeNumber} Scoring Rubric (Total: 100 Points)</span>
+                    {/* DESK STATION SECRET INSPECTION PROMPT CONTROLLER */}
+                    {(() => {
+                      const isDirectiveUnlocked = Boolean(
+                        verificationPrompt?.globalUnlocked ||
+                        verificationPrompt?.unlockedParticipants?.[contender.participantId?.toUpperCase()] ||
+                        verificationPrompt?.unlockedParticipants?.[contender.participantId]
+                      );
+                      const isCopied = copiedPromptId === contender.participantId;
+
+                      return (
+                        <div className={`p-4 rounded-xl border transition-all ${
+                          isDirectiveUnlocked 
+                            ? 'bg-emerald-950/20 border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.15)]' 
+                            : 'bg-dark-900 border-white/10'
+                        } space-y-3`}>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                            <div className="flex items-start gap-2.5">
+                              <Sparkles className={`w-4 h-4 mt-0.5 ${isDirectiveUnlocked ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
+                              <div>
+                                <span className="font-bold text-white block uppercase tracking-wider">
+                                  Secret Inspection Directive Controller ({contender.deskNumber || 'Desk'})
+                                </span>
+                                <span className="text-[11px] text-slate-400 block mt-0.5">
+                                  {isDirectiveUnlocked
+                                    ? `● Directive Unlocked on Desk ${contender.deskNumber || ''} portal screen.`
+                                    : `Locked on Desk ${contender.deskNumber || ''}. Unlock it when you visit the desk.`}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {/* Toggle unlock for this desk */}
+                              <button
+                                type="button"
+                                onClick={() => toggleVerificationPromptForParticipant(contender.participantId)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                  isDirectiveUnlocked
+                                    ? 'bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25'
+                                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                                }`}
+                              >
+                                {isDirectiveUnlocked ? (
+                                  <>
+                                    <Lock className="w-3.5 h-3.5" />
+                                    <span>Lock Prompt for Desk</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    <span>Unlock on Desk Screen</span>
+                                  </>
+                                )}
+                              </button>
+
+                              {/* Judge copy prompt directly to paste into Antigravity */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (navigator.clipboard) {
+                                    navigator.clipboard.writeText(verificationPrompt?.directive || '');
+                                    setCopiedPromptId(contender.participantId);
+                                    setTimeout(() => setCopiedPromptId(null), 2500);
+                                  }
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-fest-cyan/15 hover:bg-fest-cyan/25 border border-fest-cyan/30 text-fest-cyan text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_10px_rgba(0,229,255,0.15)]"
+                              >
+                                {isCopied ? (
+                                  <>
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Copied Directive!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3.5 h-3.5" />
+                                    <span>Copy Directive for Antigravity</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* TOP ACTION HEADER WITH EXPEL BUTTON (ALWAYS ACCESSIBLE WHETHER SUBMITTED OR NOT) */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-dark-900 border border-white/10">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="px-2.5 py-0.5 rounded bg-fest-cyan/15 text-fest-cyan border border-fest-cyan/30 font-bold font-mono">
+                          {contender.deskNumber}
                         </span>
-                        <span className="text-base font-extrabold text-fest-amber font-mono">
-                          Total: {(Number(scores.objectiveScore) || 0) + 
-                                  (Number(scores.noveltyScore) || 0) + 
-                                  (Number(scores.presentationScore) || 0) + 
-                                  (Number(scores.tokenScore) || 0) + 
-                                  (Number(scores.timeScore) || 0)} / 100 Pts
-                        </span>
+                        <strong className="text-white">{contender.name}</strong>
+                        <span className="text-slate-400">({contender.participantId})</span>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        
-                        {/* 1. Objective Fulfillment (0 - 35) */}
-                        <div className="p-3.5 rounded-xl bg-dark-900 border border-white/10 space-y-2">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-white">1. Objective & Challenge Alignment</span>
-                            <span className="text-fest-cyan font-bold font-mono">{scores.objectiveScore} / 35 Pts</span>
-                          </div>
-                          <p className="text-[10px] text-slate-400">
-                            Accuracy of output, prompt constraint handling, and task fulfillment.
-                          </p>
-                          <input
-                            type="range"
-                            min="0"
-                            max="35"
-                            value={scores.objectiveScore}
-                            onChange={(e) => setScores({ ...scores, objectiveScore: Number(e.target.value) })}
-                            className="w-full accent-fest-cyan cursor-pointer"
-                          />
-                        </div>
-
-                        {/* 2. Novelty & Creativity (0 - 20) */}
-                        <div className="p-3.5 rounded-xl bg-dark-900 border border-white/10 space-y-2">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-white">2. Idea Novelty & Prompt Craft</span>
-                            <span className="text-fest-pink font-bold font-mono">{scores.noveltyScore} / 20 Pts</span>
-                          </div>
-                          <p className="text-[10px] text-slate-400">
-                            CoT techniques, persona anchoring, guardrail schemas, and creativity.
-                          </p>
-                          <input
-                            type="range"
-                            min="0"
-                            max="20"
-                            value={scores.noveltyScore}
-                            onChange={(e) => setScores({ ...scores, noveltyScore: Number(e.target.value) })}
-                            className="w-full accent-fest-pink cursor-pointer"
-                          />
-                        </div>
-
-                        {/* 3. Presentation & Defense (0 - 20) */}
-                        <div className="p-3.5 rounded-xl bg-dark-900 border border-white/10 space-y-2">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-white">3. Explainability & Station Defense</span>
-                            <span className="text-fest-amber font-bold font-mono">{scores.presentationScore} / 20 Pts</span>
-                          </div>
-                          <p className="text-[10px] text-slate-400">
-                            Participant explanation of model choices, token reasoning, and prompt defense.
-                          </p>
-                          <input
-                            type="range"
-                            min="0"
-                            max="20"
-                            value={scores.presentationScore}
-                            onChange={(e) => setScores({ ...scores, presentationScore: Number(e.target.value) })}
-                            className="w-full accent-fest-amber cursor-pointer"
-                          />
-                        </div>
-
-                        {/* 4. Token Efficiency (0 - 15) */}
-                        <div className="p-3.5 rounded-xl bg-dark-900 border border-white/10 space-y-2">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-white">4. Antigravity Token Efficiency</span>
-                            <span className="text-fest-pes font-bold font-mono">{scores.tokenScore} / 15 Pts</span>
-                          </div>
-                          <p className="text-[10px] text-slate-400">
-                            Based on daily limit % used in Antigravity (less used = higher score).
-                          </p>
-                          <input
-                            type="range"
-                            min="0"
-                            max="15"
-                            value={scores.tokenScore}
-                            onChange={(e) => setScores({ ...scores, tokenScore: Number(e.target.value) })}
-                            className="w-full accent-fest-pes cursor-pointer"
-                          />
-                        </div>
-
-                        {/* 5. Time Velocity (0 - 10) */}
-                        <div className="p-3.5 rounded-xl bg-dark-900 border border-white/10 space-y-2 md:col-span-2">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-white">5. Velocity / Submission Time Speed</span>
-                            <span className="text-fest-cyan font-bold font-mono">{scores.timeScore} / 10 Pts</span>
-                          </div>
-                          <p className="text-[10px] text-slate-400">
-                            Early finishes receive higher marks; late submissions receive lower velocity marks.
-                          </p>
-                          <input
-                            type="range"
-                            min="0"
-                            max="10"
-                            value={scores.timeScore}
-                            onChange={(e) => setScores({ ...scores, timeScore: Number(e.target.value) })}
-                            className="w-full accent-fest-cyan cursor-pointer"
-                          />
-                        </div>
-
-                      </div>
-
-                      {/* Judge Qualitative Feedback */}
-                      <div>
-                        <label className="block text-slate-300 font-bold mb-1.5 text-xs">
-                          Judge Notes & Qualitative Remarks (Optional):
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={scores.notes}
-                          onChange={(e) => setScores({ ...scores, notes: e.target.value })}
-                          placeholder="e.g. Excellent CoT breakdown; very efficient token utilization..."
-                          className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white text-xs focus:border-fest-amber placeholder-slate-500"
-                        />
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center justify-between pt-2">
-                        {saveSuccessId === contender.participantId ? (
-                          <span className="text-emerald-400 text-xs font-bold flex items-center gap-1.5">
-                            <Check className="w-4 h-4" />
-                            <span>Evaluation Saved Successfully!</span>
-                          </span>
+                      <div className="flex items-center gap-2">
+                        {!contender.isExpelled ? (
+                          <button
+                            type="button"
+                            onClick={() => handleExpelClick(contender)}
+                            className="px-3 py-1.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500 hover:text-white font-mono text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                            title="Expel this participant immediately for cheating / academic dishonesty"
+                          >
+                            <Ban className="w-3.5 h-3.5 text-rose-400" />
+                            <span>Expel for Cheating</span>
+                          </button>
                         ) : (
-                          <span className="text-xs text-slate-500">
-                            Ready to record score for Judge #{currentJudge.judgeNumber}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleReinstateClick(contender)}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Reinstate Contender</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* LOCK GATE: IF NOT SUBMITTED, DISABLE SCORING */}
+                    {!contender.hasSubmitted ? (
+                      <div className="p-6 rounded-2xl bg-dark-900 border border-amber-500/30 text-center space-y-4">
+                        <Clock className="w-8 h-8 text-fest-amber mx-auto animate-pulse" />
+                        <div className="space-y-1">
+                          <h4 className="font-bold text-white text-sm">
+                            Scoring Locked Until Participant Submits
+                          </h4>
+                          <p className="text-xs text-slate-400 max-w-md mx-auto">
+                            Judge grading is enabled only after the participant finishes and submits their project URL from their desk. If the participant fails to submit before the battle timer expires, they will be disqualified automatically.
+                          </p>
+                        </div>
+
+                        {/* Pre-Submission Expel Control for In-Progress Cheating */}
+                        {!contender.isExpelled && (
+                          <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row items-center justify-center gap-3">
+                            <span className="text-xs text-rose-300 flex items-center gap-1.5 font-bold">
+                              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                              <span>Caught cheating before submission?</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleExpelClick(contender)}
+                              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(244,63,94,0.4)] transition-all cursor-pointer"
+                              title="Expel this participant immediately for cheating"
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                              <span>Expel for Cheating</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* OFFICIAL REDESIGNED JUDGE RUBRIC (NUMERICAL INPUT BOXES + AUTO-SAVING) */
+                      <div className="space-y-5">
+                        
+                        {/* Header & Live Total Score Display */}
+                        <div className="flex flex-wrap items-center justify-between pb-2 border-b border-white/10 gap-2">
+                          <div className="flex items-center gap-2">
+                            <Scale className="w-4 h-4 text-fest-amber" />
+                            <span className="font-bold text-white text-xs uppercase tracking-wider">
+                              Official Evaluation Rubric (Total: 100 Marks)
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            {/* Auto-Save Status Indicator */}
+                            {autoSaveStatus === 'saving' && !isMarkedByOther && (
+                              <span className="text-[11px] text-amber-400 flex items-center gap-1.5 animate-pulse font-mono">
+                                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                                <span>Saving marks...</span>
+                              </span>
+                            )}
+                            {autoSaveStatus === 'saved' && !isMarkedByOther && (
+                              <span className="text-[11px] text-emerald-400 flex items-center gap-1.5 font-mono">
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Auto-saved at {lastSavedTime} ✓</span>
+                              </span>
+                            )}
+                            {!autoSaveStatus && lastSavedTime && (
+                              <span className="text-[11px] text-slate-400 font-mono">
+                                Last saved: {lastSavedTime}
+                              </span>
+                            )}
+
+                            {/* Live Composite Total Badge */}
+                            <div className="px-3 py-1 rounded-xl bg-fest-amber/20 border border-fest-amber/40 text-fest-amber font-extrabold text-sm font-mono shadow-[0_0_15px_rgba(255,183,0,0.25)]">
+                              Total: {liveTotal} / 100 Marks
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* NOTICE IF ALREADY MARKED BY ANOTHER FACULTY JUDGE (SINGLE JUDGE POLICY) */}
+                        {isMarkedByOther && (
+                          <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-500/40 space-y-2 text-xs font-mono">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 text-blue-300 font-bold text-sm">
+                                <Lock className="w-4 h-4 text-blue-400" />
+                                <span>Evaluation Finalized by {primaryEval.judgeName}</span>
+                              </div>
+                              <span className="px-3 py-1 rounded-lg bg-blue-500/20 text-blue-200 border border-blue-500/40 font-bold font-mono text-xs shadow-[0_0_10px_rgba(59,130,246,0.3)]">
+                                Official Mark: {primaryEval.totalScore} / 100 Pts
+                              </span>
+                            </div>
+                            <p className="text-slate-300 text-[11px] leading-relaxed">
+                              IEEE PES DIU SBC policy enforces <strong>strictly one faculty adjudicator per student</strong>. 
+                              This contestant has already been evaluated by <strong>{primaryEval.judgeName}</strong> ({primaryEval.judgeEmail}) at {new Date(primaryEval.evaluatedAt).toLocaleTimeString()}.
+                              The rubric values below are displayed in read-only mode to prevent duplicate marking.
+                            </p>
+                          </div>
                         )}
 
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setExpandedContenderId(null)}
-                            className="px-3 py-2 rounded-lg bg-dark-950 border border-white/10 text-slate-400 hover:text-white text-xs transition-colors"
-                          >
-                            Close
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSaveEvaluation(contender)}
-                            className="px-5 py-2 rounded-lg bg-gradient-to-r from-fest-amber to-fest-pes text-dark-950 font-bold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(255,183,0,0.4)] flex items-center gap-2 hover:opacity-95 transition-all"
-                          >
-                            <Save className="w-4 h-4" />
-                            <span>Save Evaluation</span>
-                          </button>
-                        </div>
-                      </div>
+                        {/* NOTICE IF CURRENT JUDGE ALREADY MARKED */}
+                        {isMarkedByMe && (
+                          <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-xs font-mono text-emerald-300 flex items-center justify-between">
+                            <span className="flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <span>You evaluated this contender ({myEval.totalScore}/100 pts) at {new Date(myEval.evaluatedAt).toLocaleTimeString()}. You may adjust marks if needed.</span>
+                            </span>
+                          </div>
+                        )}
 
-                    </div>
+                        {/* SECTION 1: PROMPT EFFICIENCY (50 MARKS) */}
+                        <div className="p-4 rounded-xl bg-dark-900 border border-fest-cyan/30 space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <span className="font-bold text-white text-xs block">
+                                1. Prompt Efficiency & Chain-of-Thought (CoT)
+                              </span>
+                              <span className="text-[11px] text-slate-400">
+                                Check prompt deconstruction, zero hallucination guardrails, schema anchoring, and reasoning depth.
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-slate-400 text-xs">Score:</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="50"
+                                step="1"
+                                disabled={isMarkedByOther}
+                                value={scores.promptScore}
+                                onChange={(e) => handleScoreChange('promptScore', e.target.value, contender)}
+                                className={`w-20 px-3 py-1.5 rounded-lg border text-white font-mono text-center font-bold text-sm focus:outline-none ${
+                                  isMarkedByOther 
+                                    ? 'bg-dark-900/60 border-white/10 opacity-70 cursor-not-allowed' 
+                                    : 'bg-dark-950 border-fest-cyan/40 focus:border-fest-cyan'
+                                }`}
+                              />
+                              <span className="text-fest-cyan font-bold text-xs">/ 50 Pts</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* SECTION 2: PROJECT WORKING (25 MARKS - 5 SUB-SECTIONS x 5 MARKS) */}
+                        <div className="p-4 rounded-xl bg-dark-900 border border-fest-pink/30 space-y-3">
+                          <div className="flex items-center justify-between pb-1 border-b border-white/10">
+                            <div>
+                              <span className="font-bold text-white text-xs block">
+                                2. Project Working & Task Execution (25 Marks)
+                              </span>
+                              <span className="text-[11px] text-slate-400">
+                                Evaluates whether the generated project functions properly across 5 specific components (5 marks each).
+                              </span>
+                            </div>
+                            <span className="px-2.5 py-0.5 rounded bg-fest-pink/20 text-fest-pink border border-fest-pink/30 font-bold text-xs font-mono">
+                              Subtotal: {liveProjectTotal} / 25 Pts
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
+                            {/* 2a. Accuracy */}
+                            <div className="p-3 rounded-lg bg-dark-950 border border-white/10 space-y-1.5">
+                              <span className="text-[11px] font-bold text-slate-200 block">Accuracy of Project</span>
+                              <span className="text-[10px] text-slate-400 block">Model output accuracy & constraints</span>
+                              <div className="flex items-center justify-between pt-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="5"
+                                  step="1"
+                                  disabled={isMarkedByOther}
+                                  value={scores.projectAccuracy}
+                                  onChange={(e) => handleScoreChange('projectAccuracy', e.target.value, contender)}
+                                  className={`w-16 px-2 py-1 rounded border text-white font-mono text-center font-bold text-xs focus:outline-none ${
+                                    isMarkedByOther 
+                                      ? 'bg-dark-900/60 border-white/10 opacity-70 cursor-not-allowed' 
+                                      : 'bg-dark-900 border border-white/20 focus:border-fest-pink'
+                                  }`}
+                                />
+                                <span className="text-slate-400 text-xs">/ 5</span>
+                              </div>
+                            </div>
+
+                            {/* 2b. Simulation Interactivity */}
+                            <div className="p-3 rounded-lg bg-dark-950 border border-white/10 space-y-1.5">
+                              <span className="text-[11px] font-bold text-slate-200 block">Simulation Interactivity</span>
+                              <span className="text-[10px] text-slate-400 block">Real-time response & user controls</span>
+                              <div className="flex items-center justify-between pt-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="5"
+                                  step="1"
+                                  disabled={isMarkedByOther}
+                                  value={scores.projectSimulation}
+                                  onChange={(e) => handleScoreChange('projectSimulation', e.target.value, contender)}
+                                  className={`w-16 px-2 py-1 rounded border text-white font-mono text-center font-bold text-xs focus:outline-none ${
+                                    isMarkedByOther 
+                                      ? 'bg-dark-900/60 border-white/10 opacity-70 cursor-not-allowed' 
+                                      : 'bg-dark-900 border border-white/20 focus:border-fest-pink'
+                                  }`}
+                                />
+                                <span className="text-slate-400 text-xs">/ 5</span>
+                              </div>
+                            </div>
+
+                            {/* 2c. Live Data Monitoring */}
+                            <div className="p-3 rounded-lg bg-dark-950 border border-white/10 space-y-1.5">
+                              <span className="text-[11px] font-bold text-slate-200 block">Live Data Monitoring</span>
+                              <span className="text-[10px] text-slate-400 block">Telemetry, gauges & visual charts</span>
+                              <div className="flex items-center justify-between pt-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="5"
+                                  step="1"
+                                  disabled={isMarkedByOther}
+                                  value={scores.projectMonitoring}
+                                  onChange={(e) => handleScoreChange('projectMonitoring', e.target.value, contender)}
+                                  className={`w-16 px-2 py-1 rounded border text-white font-mono text-center font-bold text-xs focus:outline-none ${
+                                    isMarkedByOther 
+                                      ? 'bg-dark-900/60 border-white/10 opacity-70 cursor-not-allowed' 
+                                      : 'bg-dark-900 border border-white/20 focus:border-fest-pink'
+                                  }`}
+                                />
+                                <span className="text-slate-400 text-xs">/ 5</span>
+                              </div>
+                            </div>
+
+                            {/* 2d. UI Usability */}
+                            <div className="p-3 rounded-lg bg-dark-950 border border-white/10 space-y-1.5">
+                              <span className="text-[11px] font-bold text-slate-200 block">UI Usability & Polish</span>
+                              <span className="text-[10px] text-slate-400 block">Clean layout, ergonomics & UX</span>
+                              <div className="flex items-center justify-between pt-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="5"
+                                  step="1"
+                                  disabled={isMarkedByOther}
+                                  value={scores.projectUsability}
+                                  onChange={(e) => handleScoreChange('projectUsability', e.target.value, contender)}
+                                  className={`w-16 px-2 py-1 rounded border text-white font-mono text-center font-bold text-xs focus:outline-none ${
+                                    isMarkedByOther 
+                                      ? 'bg-dark-900/60 border-white/10 opacity-70 cursor-not-allowed' 
+                                      : 'bg-dark-900 border border-white/20 focus:border-fest-pink'
+                                  }`}
+                                />
+                                <span className="text-slate-400 text-xs">/ 5</span>
+                              </div>
+                            </div>
+
+                            {/* 2e. Component Count & Depth */}
+                            <div className="p-3 rounded-lg bg-dark-950 border border-white/10 space-y-1.5">
+                              <span className="text-[11px] font-bold text-slate-200 block">Component Architecture</span>
+                              <span className="text-[10px] text-slate-400 block">Depth of sub-modules & completeness</span>
+                              <div className="flex items-center justify-between pt-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="5"
+                                  step="1"
+                                  disabled={isMarkedByOther}
+                                  value={scores.projectComponents}
+                                  onChange={(e) => handleScoreChange('projectComponents', e.target.value, contender)}
+                                  className={`w-16 px-2 py-1 rounded border text-white font-mono text-center font-bold text-xs focus:outline-none ${
+                                    isMarkedByOther 
+                                      ? 'bg-dark-900/60 border-white/10 opacity-70 cursor-not-allowed' 
+                                      : 'bg-dark-900 border border-white/20 focus:border-fest-pink'
+                                  }`}
+                                />
+                                <span className="text-slate-400 text-xs">/ 5</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* SECTION 3: TIME MANAGEMENT (10 MARKS - AUTOMATED) */}
+                        <div className="p-4 rounded-xl bg-dark-900 border border-fest-amber/30 space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-white text-xs block">
+                                  3. Time Management (10 Marks - Automated)
+                                </span>
+                                <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold uppercase">
+                                  System Automated
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-slate-400">
+                                Full 10 marks if submitted within half-time (≤ 10 min). Linearly scales down afterwards. Disqualified if time expires.
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="px-3 py-1.5 rounded-lg bg-dark-950 border border-fest-amber/40 text-fest-amber font-mono font-bold text-sm">
+                                {autoTimeResult.isDisqualified ? '0' : autoTimeResult.score} / 10 Pts
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-[11px] text-slate-300 bg-dark-950 p-2 rounded border border-white/5 flex items-center gap-2">
+                            <Clock className="w-3.5 h-3.5 text-fest-amber" />
+                            <span>{autoTimeResult.reason}</span>
+                          </div>
+                        </div>
+
+                        {/* SECTION 4 & 5: PRESENTATION (10) & TOKEN CONSUMPTION (5) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          
+                          {/* 4. Presentation & Defense */}
+                          <div className="p-4 rounded-xl bg-dark-900 border border-fest-pes/30 space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-white text-xs">
+                                4. Student Presentation & Defense
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="10"
+                                  step="1"
+                                  disabled={isMarkedByOther}
+                                  value={scores.presentationScore}
+                                  onChange={(e) => handleScoreChange('presentationScore', e.target.value, contender)}
+                                  className={`w-16 px-2 py-1 rounded border text-white font-mono text-center font-bold text-xs focus:outline-none ${
+                                    isMarkedByOther 
+                                      ? 'bg-dark-900/60 border-white/10 opacity-70 cursor-not-allowed' 
+                                      : 'bg-dark-950 border border-fest-pes/40 focus:border-fest-pes'
+                                  }`}
+                                />
+                                <span className="text-fest-pes font-bold text-xs">/ 10 Pts</span>
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-slate-400">
+                              Student explains how their project works and defends prompt engineering choices to the judge.
+                            </p>
+                          </div>
+
+                          {/* 5. Token Consumption */}
+                          <div className="p-4 rounded-xl bg-dark-900 border border-purple-500/30 space-y-2">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <span className="font-bold text-white text-xs block">
+                                  5. Token Consumption Efficiency
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  Reported daily limit: <strong className="text-fest-pink">{contender.dailyLimitPercentageUsed}%</strong>
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="5"
+                                  step="1"
+                                  disabled={isMarkedByOther}
+                                  value={scores.tokenScore}
+                                  onChange={(e) => handleScoreChange('tokenScore', e.target.value, contender)}
+                                  className={`w-16 px-2 py-1 rounded border text-white font-mono text-center font-bold text-xs focus:outline-none ${
+                                    isMarkedByOther 
+                                      ? 'bg-dark-900/60 border-white/10 opacity-70 cursor-not-allowed' 
+                                      : 'bg-dark-950 border border-purple-500/40 focus:border-purple-400'
+                                  }`}
+                                />
+                                <span className="text-purple-300 font-bold text-xs">/ 5 Pts</span>
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-slate-400">
+                              Awarded by judge based on participant's token frugality and daily quota usage in Antigravity.
+                            </p>
+                          </div>
+
+                        </div>
+
+                        {/* SECTION 6: JUDGE NOTES & COMMENTS (AUTO-SAVED) */}
+                        <div className="space-y-1.5">
+                          <label className="block text-slate-300 font-bold text-xs flex items-center justify-between">
+                            <span>Judge Qualitative Notes & Station Feedback (Auto-saved):</span>
+                            <span className="text-slate-500 text-[10px] font-normal">Only visible to Judges & Admin</span>
+                          </label>
+                          <textarea
+                            rows={3}
+                            disabled={isMarkedByOther}
+                            value={scores.notes}
+                            onChange={(e) => handleScoreChange('notes', e.target.value, contender)}
+                            placeholder="e.g. Excellent CoT chain reasoning; clean interactive telemetry charts; very clear explanation..."
+                            className={`w-full px-3 py-2.5 rounded-lg border text-white text-xs focus:border-fest-amber placeholder-slate-500 ${
+                              isMarkedByOther 
+                                ? 'bg-dark-900/60 border-white/10 opacity-70 cursor-not-allowed' 
+                                : 'bg-dark-950 border border-white/15'
+                            }`}
+                          />
+                        </div>
+
+                        {/* ACTIONS & EXPEL CHEATING BUTTON */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/10">
+                          {/* Expel Cheating Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleExpelClick(contender)}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20 text-xs font-bold transition-all cursor-pointer"
+                            title="Expel this participant for cheating or academic dishonesty"
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                            <span>Expel for Cheating</span>
+                          </button>
+
+                          {/* Save & Close Actions */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedContenderId(null)}
+                              className="px-3 py-2 rounded-lg bg-dark-950 border border-white/10 text-slate-400 hover:text-white text-xs transition-colors cursor-pointer"
+                            >
+                              Close
+                            </button>
+                            {isMarkedByOther ? (
+                              <div className="px-4 py-2 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 font-bold text-xs flex items-center gap-2">
+                                <Lock className="w-3.5 h-3.5 text-blue-400" />
+                                <span>Already Graded by {primaryEval.judgeName} ({primaryEval.totalScore}/100)</span>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleManualSave(contender)}
+                                className="px-5 py-2 rounded-lg bg-gradient-to-r from-fest-amber to-fest-pes text-dark-950 font-bold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(255,183,0,0.35)] flex items-center gap-2 hover:opacity-95 transition-all cursor-pointer"
+                              >
+                                <Save className="w-4 h-4" />
+                                <span>Save Marks ({liveTotal}/100)</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
 
                   </div>
                 )}

@@ -1,18 +1,123 @@
 /**
- * Prompt Battle 2026 Scoring & Penalty Calculator
- * IEEE PES DIU SBC • EEE FEST 2026
+ * Official EEE FEST 2026 Prompt Battle Scoring Rubric (Total: 100 Marks):
+ * 1. Prompt Efficiency (50 Marks) - Evaluated by Judge (0 - 50)
+ * 2. Project Working (25 Marks) - Evaluated by Judge across 5 sub-sections (5 marks each = 25 marks):
+ *    - Accuracy of their project (0 - 5)
+ *    - Simulation interactivity (0 - 5)
+ *    - Live data monitoring (0 - 5)
+ *    - UI usability (0 - 5)
+ *    - Component count & depth (0 - 5)
+ * 3. Time Management (10 Marks) - Automated fill based on submission:
+ *    - Submit on or before half time -> Full 10 marks
+ *    - Submit after half time -> Linearly scaled down from 10 to 0
+ *    - Fail to submit before time expires -> Automatic disqualification (0 marks)
+ * 4. Presentation & Defense (10 Marks) - Evaluated by Judge (0 - 10)
+ * 5. Token Consumption (5 Marks) - Evaluated by Judge based on token consumption (0 - 5)
  * 
- * Rubric Breakdown (Total: 100 Points):
- * 1. Token Efficiency (15 pts): Decreases proportionally as more tokens are consumed.
- * 2. Time Efficiency (15 pts): Decreases proportionally as more competition time is elapsed.
- * 3. Objective Fulfillment (25 pts): Output prompt alignment with contest challenge.
- * 4. Finish Status (15 pts): Fully (15), Substantial (12), Partial (8), Minimal (4).
- * 5. Presentation Skill (15 pts): Contender explanation and architecture defense.
- * 6. Idea Novelty & Prompt Craft (15 pts): Advanced prompt frameworks & zero-shot craft.
+ * Sum: 50 + 25 + 10 + 10 + 5 = 100 Marks.
  */
 
 export const DEFAULT_TOKEN_BUDGET = 100; // 100% of Antigravity Daily Limit
-export const DEFAULT_BATTLE_DURATION = 1200; // 20 minutes
+export const DEFAULT_BATTLE_DURATION = 1200; // 20 minutes default
+
+/**
+ * Calculates Automated Time Management Score (0 - 10 pts).
+ * - If submission occurs on or before half-time (finishSeconds <= totalDurationSec / 2), participant receives full 10/10 marks.
+ * - If submission occurs after half-time but before total time, score scales linearly from 10 down to 0.
+ * - If participant failed to submit in time, timeScore is 0 and isDisqualified is true.
+ */
+export function calculateAutomatedTimeScore(finishSeconds = 0, totalDurationSec = DEFAULT_BATTLE_DURATION, hasSubmitted = true) {
+  if (!hasSubmitted) {
+    return {
+      score: 0,
+      isDisqualified: false,
+      reason: 'Awaiting submission',
+      elapsedFormatted: 'Not submitted',
+    };
+  }
+
+  const elapsed = Math.max(0, Number(finishSeconds) || 0);
+  const total = Math.max(1, Number(totalDurationSec) || DEFAULT_BATTLE_DURATION);
+  const halfTime = total / 2;
+
+  const min = Math.floor(elapsed / 60);
+  const sec = elapsed % 60;
+  const elapsedFormatted = `${min}m ${sec < 10 ? '0' : ''}${sec}s`;
+
+  if (elapsed > total) {
+    return {
+      score: 0,
+      isDisqualified: true,
+      reason: `Submitted late (${elapsedFormatted} > ${Math.floor(total / 60)}m)`,
+      elapsedFormatted,
+    };
+  }
+
+  if (elapsed <= halfTime) {
+    return {
+      score: 10,
+      isDisqualified: false,
+      reason: `Submitted early at ${elapsedFormatted} (≤ ${Math.floor(halfTime / 60)}m half-time) → Full 10 Marks`,
+      elapsedFormatted,
+    };
+  }
+
+  // Second half window: linear degradation from 10 down to 0
+  const secondHalfWindow = total - halfTime;
+  const overtime = elapsed - halfTime;
+  const ratio = Math.max(0, Math.min(1, 1 - (overtime / secondHalfWindow)));
+  const score = Math.max(0, Math.min(10, Math.round(ratio * 10)));
+
+  return {
+    score,
+    isDisqualified: false,
+    reason: `Submitted at ${elapsedFormatted} → ${score}/10 Marks`,
+    elapsedFormatted,
+  };
+}
+
+/**
+ * Computes official 100-mark evaluation for a judge.
+ */
+export function calculateOfficialJudgeTotal({
+  promptScore = 0,
+  projectAccuracy = 0,
+  projectSimulation = 0,
+  projectMonitoring = 0,
+  projectUsability = 0,
+  projectComponents = 0,
+  timeScore = 0,
+  presentationScore = 0,
+  tokenScore = 0,
+}) {
+  const prompt = Math.min(50, Math.max(0, Number(promptScore) || 0));
+  const acc = Math.min(5, Math.max(0, Number(projectAccuracy) || 0));
+  const sim = Math.min(5, Math.max(0, Number(projectSimulation) || 0));
+  const mon = Math.min(5, Math.max(0, Number(projectMonitoring) || 0));
+  const usa = Math.min(5, Math.max(0, Number(projectUsability) || 0));
+  const comp = Math.min(5, Math.max(0, Number(projectComponents) || 0));
+
+  const projectWorkingTotal = acc + sim + mon + usa + comp; // Max 25
+  const time = Math.min(10, Math.max(0, Number(timeScore) || 0));
+  const pres = Math.min(10, Math.max(0, Number(presentationScore) || 0));
+  const tok = Math.min(5, Math.max(0, Number(tokenScore) || 0));
+
+  const totalScore = Math.min(100, prompt + projectWorkingTotal + time + pres + tok);
+
+  return {
+    promptScore: prompt,
+    projectAccuracy: acc,
+    projectSimulation: sim,
+    projectMonitoring: mon,
+    projectUsability: usa,
+    projectComponents: comp,
+    projectWorkingTotal,
+    timeScore: time,
+    presentationScore: pres,
+    tokenScore: tok,
+    totalScore,
+  };
+}
 
 /**
  * Calculates Token Efficiency Score.

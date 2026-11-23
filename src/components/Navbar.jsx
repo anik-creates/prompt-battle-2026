@@ -10,7 +10,8 @@ import {
   Tv,
   LogOut,
   Lock,
-  Scale
+  Scale,
+  LogIn
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -81,78 +82,48 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Right Section: Seamless Navigation & Quick View Switcher */}
+          {/* Right Section: Clean Navigation (Projector & Login) + Fullscreen */}
           <div className="flex items-center space-x-2 sm:space-x-3">
             
-            {/* View Switcher Navigation Pill Group */}
+            {/* View Switcher Navigation Pill Group: Exactly 2 options */}
             <div className="flex items-center bg-dark-900/90 p-1 rounded-xl border border-white/10 space-x-1">
               {/* 1. Presentation / Projector View */}
               <button
                 onClick={() => switchView('presentation')}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-mono text-xs transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs transition-all ${
                   activeView === 'presentation'
                     ? 'bg-fest-cyan/15 text-fest-cyan border border-fest-cyan/40 shadow-[0_0_12px_rgba(0,229,255,0.2)] font-semibold'
                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`}
-                title="Projector / Audience View (/presentation)"
+                title="Auditorium Projector View (/presentation)"
               >
                 <Tv className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Projector</span>
+                <span>Projector</span>
               </button>
 
-              {/* 2. Participant Portal View */}
+              {/* 2. Login Portal View (All Logins: Participant, Judge, Admin) */}
               <button
                 onClick={() => switchView('submit')}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-mono text-xs transition-all ${
-                  activeView === 'submit'
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-mono text-xs transition-all ${
+                  activeView !== 'presentation'
                     ? 'bg-fest-pink/15 text-fest-pink border border-fest-pink/40 shadow-[0_0_12px_rgba(255,0,128,0.2)] font-semibold'
                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`}
-                title="Participant Portal (/submit)"
+                title="Login Portal (Participant, Judge, Admin)"
               >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Participant</span>
-              </button>
-
-              {/* 3. Judge Adjudication Portal */}
-              <button
-                onClick={() => switchView('judge')}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-mono text-xs transition-all ${
-                  activeView === 'judge'
-                    ? 'bg-fest-amber/20 text-fest-amber border border-fest-amber/40 shadow-[0_0_12px_rgba(255,183,0,0.25)] font-semibold'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-                title="Judge Adjudication Portal (/judge • 4 Judges)"
-              >
-                <Scale className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Judge</span>
-              </button>
-
-              {/* 4. Admin Command Arena Button */}
-              <button
-                onClick={() => switchView('admin')}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg font-mono text-xs font-semibold transition-all ${
-                  activeView === 'admin'
-                    ? 'bg-fest-pes text-dark-950 font-bold border border-fest-pes shadow-[0_0_16px_rgba(108,179,63,0.4)]'
-                    : 'bg-fest-pes/10 border border-fest-pes/40 text-fest-pes hover:bg-fest-pes/20'
-                }`}
-                title="Admin Command Arena (/admin • pes.ieee@diu.edu.bd)"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>Admin</span>
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Login</span>
               </button>
             </div>
 
-            {/* Extra Controls per Active View */}
-            {activeView === 'presentation' && (
-              <button
-                onClick={toggleFullscreen}
-                className="p-2 sm:p-2.5 rounded-lg bg-dark-900 border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
-                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen (Auditorium Projector Mode)'}
-              >
-                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-              </button>
-            )}
+            {/* Fullscreen Mode Button */}
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 sm:p-2.5 rounded-xl bg-dark-900/90 border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-colors shadow-sm"
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen Mode'}
+            >
+              {isFullscreen ? <Minimize className="w-4 h-4 text-fest-cyan" /> : <Maximize className="w-4 h-4" />}
+            </button>
 
             {activeView === 'admin' && (
               <div className="hidden lg:flex items-center space-x-2">

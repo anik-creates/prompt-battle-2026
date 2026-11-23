@@ -60,3 +60,12 @@ body {
   border-color: rgba(0, 229, 255, 0.25);
   box-shadow: 0 0 15px rgba(0, 229, 255, 0.07);
 }
+
+/* Anti-Print Security: Completely blocks printing or PDF-saving of problem statement and canvas */
+@media print {
+  .secure-problem-canvas-container,
+  canvas {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}

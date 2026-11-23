@@ -4,7 +4,7 @@ import { useBattle } from '../context/BattleContext';
 import TimerDisplay from './TimerDisplay';
 import LeaderboardView from './LeaderboardView';
 import PollArenaView from './PollArenaView';
-import QuizArenaView from './QuizArenaView';
+import SecureProblemCanvas from './SecureProblemCanvas';
 import { 
   QrCode, 
   Clock, 
@@ -17,7 +17,8 @@ import {
   Flame,
   Vote,
   HelpCircle,
-  MapPin
+  MapPin,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function PresentationView() {
@@ -30,13 +31,9 @@ export default function PresentationView() {
     problemStatement = {}
   } = useBattle();
 
-  // If active arena is Live Poll or Kahoot Quiz, render those arenas
+  // If active arena is Live Poll, render Poll Arena
   if (activeArena === 'poll') {
     return <PollArenaView />;
-  }
-
-  if (activeArena === 'quiz') {
-    return <QuizArenaView />;
   }
 
   // If Admin has published the Leaderboard in Battle mode, show Leaderboard View
@@ -132,53 +129,26 @@ export default function PresentationView() {
 
       {/* Official Challenge Spotlight (when released by Admin) */}
       {problemStatement.status === 'released' && (
-        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-dark-900 via-dark-950 to-dark-900 border-2 border-fest-cyan/40 shadow-[0_0_50px_rgba(0,229,255,0.2)] space-y-4 font-mono">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-3xl bg-dark-900 border-2 border-fest-cyan/40 shadow-[0_0_50px_rgba(0,229,255,0.2)] overflow-hidden font-mono">
+          <div className="p-4 sm:p-5 bg-dark-950 border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
               <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30">
-                Official Challenge Broadcast Active
+                Auditorium Spotlight Broadcast Active
               </span>
             </div>
-            {problemStatement.track && (
-              <span className="text-xs text-fest-cyan font-bold px-3 py-1 rounded-full bg-fest-cyan/15 border border-fest-cyan/30">
-                {problemStatement.track}
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-lg bg-dark-900 border border-fest-pink/30 text-fest-pink text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-fest-pink" />
+                <span>Protected Canvas View • Inspection & Capture Locked</span>
               </span>
-            )}
+            </div>
           </div>
-
-          <div className="space-y-1">
-            <h2 className="text-2xl sm:text-3xl font-extrabold font-sans text-white">
-              {problemStatement.title}
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans max-w-4xl">
-              {problemStatement.scenario}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 text-xs">
-            <div className="p-4 rounded-xl bg-dark-950 border border-white/10 space-y-1.5">
-              <span className="text-[11px] font-bold uppercase text-fest-cyan tracking-wider block">
-                Core Objective
-              </span>
-              <p className="text-slate-300 whitespace-pre-line leading-relaxed">
-                {problemStatement.objective}
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-dark-950 border border-fest-pink/30 space-y-1.5">
-              <span className="text-[11px] font-bold uppercase text-fest-pink tracking-wider block">
-                Key Constraint Highlights
-              </span>
-              <ul className="space-y-1 text-slate-300">
-                {(problemStatement.constraints || []).slice(0, 3).map((c, i) => (
-                  <li key={i} className="flex items-start gap-1.5">
-                    <span className="text-fest-pink">•</span>
-                    <span>{c}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <div className="p-3 sm:p-5">
+            <SecureProblemCanvas 
+              problemStatement={problemStatement}
+              mode="presentation"
+            />
           </div>
         </div>
       )}
@@ -238,7 +208,17 @@ export default function PresentationView() {
                       <span className="font-bold text-base text-white font-sans tracking-tight">
                         {p.name}
                       </span>
-                      <CheckCircle className="w-4 h-4 text-emerald-400" />
+                      {p.isExpelled ? (
+                        <span className="px-2 py-0.5 rounded bg-rose-500 text-white font-mono text-[10px] font-black uppercase tracking-wider animate-pulse">
+                          EXPELLED
+                        </span>
+                      ) : p.isDisqualified ? (
+                        <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold border border-amber-500/40">
+                          TIME EXPIRED
+                        </span>
+                      ) : (
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                      )}
                       {p.tabSwitches > 0 && (
                         <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-mono text-[10px] font-bold border border-rose-500/40">
                           ⚠️ {p.tabSwitches} switches
@@ -279,9 +259,19 @@ export default function PresentationView() {
                     </span>
                   </div>
 
-                  <span className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[11px] font-medium">
-                    Received
-                  </span>
+                  {p.isExpelled ? (
+                    <span className="px-2.5 py-1 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[11px] font-bold">
+                      Expelled (0 pts)
+                    </span>
+                  ) : p.isDisqualified ? (
+                    <span className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[11px] font-bold">
+                      Disqualified
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[11px] font-medium">
+                      Received
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

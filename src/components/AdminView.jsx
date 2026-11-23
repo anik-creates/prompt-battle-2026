@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useBattle } from '../context/BattleContext';
 import TimerDisplay from './TimerDisplay';
 import FirebaseModal from './FirebaseModal';
-import ParticipantSubmitView from './ParticipantSubmitView';
 import ContenderRosterManager from './ContenderRosterManager';
 import LockedProblemStatementWindow from './LockedProblemStatementWindow';
 import { 
@@ -47,7 +46,8 @@ import {
   FileText,
   MapPin,
   Scale,
-  Mail
+  Mail,
+  UserCheck
 } from 'lucide-react';
 
 export default function AdminView() {
@@ -59,7 +59,6 @@ export default function AdminView() {
     participants, 
     published, 
     poll,
-    quiz,
     totalJoinedCount,
     setPollDisplayMode,
     joinedParticipants,
@@ -84,13 +83,6 @@ export default function AdminView() {
     setPollStatus,
     publishPollResults,
     resetPoll,
-    launchQuizQuestion,
-    endQuizQuestion,
-    publishQuizLeaderboard,
-    resetQuiz,
-    addQuizQuestion,
-    updateQuizQuestion,
-    deleteQuizQuestion,
     updatePoll,
     deletePoll,
     tokenBudget,
@@ -99,13 +91,17 @@ export default function AdminView() {
     judges = [],
     deleteJudge,
     registeredContenders = [],
-    promptCheckerActive = false,
-    togglePromptChecker
+    verificationPrompt,
+    updateVerificationPromptDirective,
+    toggleGlobalVerificationPrompt,
+    unlockVerificationPromptForParticipant,
+    lockVerificationPromptForParticipant,
+    toggleVerificationPromptForParticipant,
+    resetVerificationPrompt
   } = useBattle();
 
-  // Admin Section Tab: 'battle' | 'problem' | 'roster' | 'judges' | 'poll' | 'quiz'
+  // Admin Section Tab: 'battle' | 'problem' | 'roster' | 'judges' | 'poll' | 'inspection'
   const [adminTab, setAdminTab] = useState('battle');
-  const [showMobileSimulator, setShowMobileSimulator] = useState(false);
   const [evaluationViewMode, setEvaluationViewMode] = useState('table'); // 'table' | 'cards'
 
   // Problem Statement Editor State
@@ -115,8 +111,6 @@ export default function AdminView() {
     scenario: problemStatement.scenario || '',
     objective: problemStatement.objective || '',
     constraintsText: Array.isArray(problemStatement.constraints) ? problemStatement.constraints.join('\n') : '',
-    outputSchemaExample: problemStatement.outputSchemaExample || '',
-    submissionRequirements: problemStatement.submissionRequirements || '',
   }));
   const [problemSavedMsg, setProblemSavedMsg] = useState(false);
 
@@ -129,8 +123,6 @@ export default function AdminView() {
         scenario: problemStatement.scenario || '',
         objective: problemStatement.objective || '',
         constraintsText: Array.isArray(problemStatement.constraints) ? problemStatement.constraints.join('\n') : '',
-        outputSchemaExample: problemStatement.outputSchemaExample || '',
-        submissionRequirements: problemStatement.submissionRequirements || '',
       });
     }
   }, [problemStatement.id, problemStatement.releasedAt]);
@@ -148,19 +140,35 @@ export default function AdminView() {
       scenario: editingProblem.scenario.trim(),
       objective: editingProblem.objective.trim(),
       constraints: cleanConstraints,
-      outputSchemaExample: editingProblem.outputSchemaExample.trim(),
-      submissionRequirements: editingProblem.submissionRequirements.trim(),
     });
 
     setProblemSavedMsg(true);
     setTimeout(() => setProblemSavedMsg(false), 2500);
   };
 
-  // Edit Quiz Question Modal State
-  const [editingQuizQ, setEditingQuizQ] = useState(null);
-
   // Edit Poll Modal State
   const [editingPollModal, setEditingPollModal] = useState(null);
+
+  // Judge Secret Verification Directive State
+  const [directiveEditorTitle, setDirectiveEditorTitle] = useState(verificationPrompt?.title || 'IEEE PES DIU SBC • Judge Secret Verification Directive');
+  const [directiveEditorDesc, setDirectiveEditorDesc] = useState(verificationPrompt?.description || 'Confidential AI Prompt Efficiency & Token Economy Audit Directive');
+  const [directiveEditorText, setDirectiveEditorText] = useState(verificationPrompt?.directive || '');
+  const [directiveSavedMsg, setDirectiveSavedMsg] = useState(false);
+  const [copiedDirective, setCopiedDirective] = useState(false);
+
+  useEffect(() => {
+    if (verificationPrompt) {
+      setDirectiveEditorTitle(verificationPrompt.title || 'IEEE PES DIU SBC • Judge Secret Verification Directive');
+      setDirectiveEditorDesc(verificationPrompt.description || 'Confidential AI Prompt Efficiency & Token Economy Audit Directive');
+      setDirectiveEditorText(verificationPrompt.directive || '');
+    }
+  }, [verificationPrompt?.directive, verificationPrompt?.title, verificationPrompt?.description]);
+
+  useEffect(() => {
+    if (verificationPrompt?.directive) {
+      setDirectiveEditorText(verificationPrompt.directive);
+    }
+  }, [verificationPrompt?.directive]);
 
   // Login form state
   const [adminEmailInput, setAdminEmailInput] = useState('');
@@ -207,12 +215,6 @@ export default function AdminView() {
     { text: '', isCorrect: false },
     { text: '', isCorrect: false },
   ]);
-
-  // Quiz Form State
-  const [newQText, setNewQText] = useState('');
-  const [newQOpts, setNewQOpts] = useState(['', '', '', '']);
-  const [newQCorrect, setNewQCorrect] = useState(0);
-  const [newQTime, setNewQTime] = useState(20);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -274,19 +276,6 @@ export default function AdminView() {
     });
 
     setNewPollQuestion('');
-  };
-
-  const handleAddQuestion = (e) => {
-    e.preventDefault();
-    if (!newQText.trim()) return;
-    addQuizQuestion({
-      question: newQText.trim(),
-      options: newQOpts.map(o => o.trim() || 'Option'),
-      correctIndex: newQCorrect,
-      timeLimit: newQTime,
-    });
-    setNewQText('');
-    setNewQOpts(['', '', '', '']);
   };
 
   const exportToCSV = () => {
@@ -461,41 +450,6 @@ export default function AdminView() {
     );
   }
 
-  // Smartphone frame simulator renderer
-  const renderPhoneSimulator = () => (
-    <div className="w-full max-w-[340px] 2xl:max-w-[360px] mx-auto rounded-[44px] p-3.5 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 shadow-[0_0_50px_rgba(0,0,0,0.95)] border-4 border-slate-600">
-      <div className="rounded-[34px] bg-dark-950 overflow-hidden border border-white/15 relative h-[620px] 2xl:h-[660px] flex flex-col shadow-inner">
-        {/* Smartphone Top Notch / Speaker */}
-        <div className="pt-2.5 pb-1 bg-dark-950 flex items-center justify-between px-5 border-b border-white/5 select-none shrink-0">
-          <span className="text-[10px] font-mono text-slate-400">9:41</span>
-          <div className="w-20 h-3.5 rounded-full bg-black border border-white/15 flex items-center justify-center">
-            <div className="w-2 h-2 rounded-full bg-slate-900 border border-white/10 mr-1.5"></div>
-          </div>
-          <span className="text-[10px] font-mono text-emerald-400 font-bold">5G</span>
-        </div>
-
-        {/* Live Broadcast Pill Inside Phone */}
-        <div className="px-3 py-1 bg-dark-900/90 border-b border-white/5 flex items-center justify-between text-[10px] font-mono shrink-0">
-          <span className="flex items-center gap-1.5 text-slate-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-fest-cyan animate-pulse"></span>
-            <span>Mirrored Phone Screen</span>
-          </span>
-          <span className="text-fest-cyan font-bold uppercase">{activeArena}</span>
-        </div>
-
-        {/* Mobile Screen Content (Live View with isSimulator={true}) */}
-        <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
-          <ParticipantSubmitView isSimulator={true} />
-        </div>
-
-        {/* Smartphone Home Indicator Bar */}
-        <div className="py-2 bg-dark-950 flex justify-center border-t border-white/5 shrink-0">
-          <div className="w-28 h-1 rounded-full bg-white/30"></div>
-        </div>
-      </div>
-    </div>
-  );
-
   // --- AUTHENTICATED ADMIN PANEL ---
   return (
     <div className="w-full max-w-[1750px] mx-auto py-4 sm:py-6 space-y-6">
@@ -553,16 +507,6 @@ export default function AdminView() {
             <span className="sm:hidden">Upload JSON</span>
           </button>
 
-          {/* Mobile phone toggle button for screens < xl */}
-          <button
-            onClick={() => setShowMobileSimulator(!showMobileSimulator)}
-            className="xl:hidden flex items-center gap-1.5 px-3 py-2 rounded bg-fest-cyan/15 border border-fest-cyan/40 text-fest-cyan font-bold transition-all"
-            title="Toggle Live Participant Screen"
-          >
-            <Smartphone className="w-3.5 h-3.5 animate-pulse" />
-            <span>{showMobileSimulator ? 'Hide Phone' : 'Live Phone View'}</span>
-          </button>
-
           <button
             onClick={() => setIsFirebaseOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded bg-fest-cyan/10 border border-fest-cyan/40 text-fest-cyan"
@@ -582,7 +526,7 @@ export default function AdminView() {
 
           <button
             onClick={() => {
-              if (window.confirm('Reset all battle timers and participants? This cannot be undone.')) {
+              if (window.confirm('Reset all battle timers and participant submissions? The 64 official registered contenders and their desks will remain permanently preserved.')) {
                 resetAllData();
               }
             }}
@@ -610,7 +554,7 @@ export default function AdminView() {
             Auditorium Projector & Phones Live Broadcast Mode:
           </span>
           <span className="text-fest-cyan font-bold uppercase px-2.5 py-0.5 rounded bg-dark-950 border border-fest-cyan/40">
-            {activeArena === 'battle' ? 'Prompt Battle Arena' : activeArena === 'poll' ? 'Live Poll Display' : 'Kahoot Quiz Screen'}
+            {activeArena === 'battle' ? 'Prompt Battle Arena' : 'Live Poll Display'}
           </span>
         </div>
 
@@ -638,121 +582,11 @@ export default function AdminView() {
             <Vote className="w-3.5 h-3.5" />
             <span>Poll Screen</span>
           </button>
-
-          <button
-            onClick={() => switchArena('quiz')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all ${
-              activeArena === 'quiz'
-                ? 'bg-fest-amber text-dark-950 font-bold shadow-[0_0_15px_rgba(255,183,0,0.4)]'
-                : 'bg-dark-950 border border-white/10 text-slate-300 hover:text-white'
-            }`}
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span>Kahoot Quiz Screen</span>
-          </button>
         </div>
       </div>
 
-      {/* MOBILE EXPANDED SIMULATOR (< xl) */}
-      {showMobileSimulator && (
-        <div className="xl:hidden p-4 rounded-2xl bg-dark-900 border border-fest-cyan/30 space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-white/10 font-mono text-xs">
-            <div className="flex items-center gap-2">
-              <Smartphone className="w-4 h-4 text-fest-cyan animate-pulse" />
-              <span className="font-bold text-white">Live Participant Screen Mirror</span>
-            </div>
-            <button
-              onClick={() => setShowMobileSimulator(false)}
-              className="px-2.5 py-1 rounded bg-dark-950 text-slate-400 hover:text-white text-[11px]"
-            >
-              Close
-            </button>
-          </div>
-          <div className="flex justify-center">
-            {renderPhoneSimulator()}
-          </div>
-        </div>
-      )}
-
-      {/* TWO-COLUMN COMMAND CENTER LAYOUT (Desktop xl: Side-by-side with Pinned Phone) */}
-      <div className="flex flex-col xl:flex-row items-start gap-8">
-        
-        {/* LEFT COLUMN: Pinned Live Participant Phone Simulator (PINNED FOR ALL TIMES ON DESKTOP) */}
-        <aside className="hidden xl:block w-[360px] 2xl:w-[380px] shrink-0 sticky top-24 self-start space-y-3">
-          <div className="p-4 rounded-2xl bg-dark-900/90 border border-white/15 space-y-3 shadow-[0_0_40px_rgba(0,0,0,0.7)] backdrop-blur-md">
-            
-            {/* Simulator Header / Status */}
-            <div className="flex items-center justify-between font-mono text-xs pb-2 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <Smartphone className="w-4 h-4 text-fest-cyan animate-pulse" />
-                <span className="font-bold text-white uppercase tracking-wider text-[11px]">
-                  Participant Screen
-                </span>
-              </div>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-dark-950 text-fest-cyan border border-fest-cyan/30 font-bold uppercase">
-                {activeArena} Live
-              </span>
-            </div>
-
-            {/* Render Smartphone Frame */}
-            {renderPhoneSimulator()}
-
-            {/* Quick Testing Controls & Meta */}
-            <div className="pt-2 border-t border-white/10 space-y-2 font-mono text-xs">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-400 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                  <span>Mirrored to All Phones</span>
-                </span>
-                <a
-                  href="./#submit"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-fest-cyan hover:text-fest-pink transition-colors inline-flex items-center gap-1"
-                  title="Open real phone view in new window"
-                >
-                  <span>Open #submit</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-
-              {/* Stage switch test buttons right under phone */}
-              <div className="grid grid-cols-3 gap-1.5 pt-1 text-[10px]">
-                <button
-                  type="button"
-                  onClick={() => switchArena('battle')}
-                  className={`py-1 rounded text-center transition-all ${
-                    activeArena === 'battle' ? 'bg-fest-cyan text-dark-950 font-bold' : 'bg-dark-950 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Battle
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchArena('poll')}
-                  className={`py-1 rounded text-center transition-all ${
-                    activeArena === 'poll' ? 'bg-fest-pink text-white font-bold' : 'bg-dark-950 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Poll
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchArena('quiz')}
-                  className={`py-1 rounded text-center transition-all ${
-                    activeArena === 'quiz' ? 'bg-fest-amber text-dark-950 font-bold' : 'bg-dark-950 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Kahoot
-                </button>
-              </div>
-            </div>
-
-          </div>
-        </aside>
-
-        {/* RIGHT COLUMN: Master Controls & Tabs */}
-        <main className="flex-1 min-w-0 space-y-6 w-full">
+      {/* MAIN MASTER CONTROLS & TABS (FULL WIDTH) */}
+      <main className="w-full space-y-6">
           
           {/* ADMIN CONTROL SECTION TABS */}
           <div className="flex border-b border-white/10 font-mono text-xs sm:text-sm space-x-4 sm:space-x-6 overflow-x-auto pb-0.5">
@@ -820,15 +654,15 @@ export default function AdminView() {
             </button>
 
             <button
-              onClick={() => setAdminTab('quiz')}
+              onClick={() => setAdminTab('inspection')}
               className={`pb-3 flex items-center gap-2 font-bold transition-colors border-b-2 flex-shrink-0 ${
-                adminTab === 'quiz'
-                  ? 'border-fest-amber text-fest-amber'
+                adminTab === 'inspection'
+                  ? 'border-emerald-400 text-emerald-400'
                   : 'border-transparent text-slate-400 hover:text-white'
               }`}
             >
-              <HelpCircle className="w-4 h-4" />
-              <span>Kahoot Quiz Manager</span>
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span>Judge Inspection Directive ({verificationPrompt?.globalUnlocked ? 'Global Unlocked' : `${Object.values(verificationPrompt?.unlockedParticipants || {}).filter(Boolean).length} Unlocked`})</span>
             </button>
           </div>
 
@@ -894,7 +728,7 @@ export default function AdminView() {
                       ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
                       : 'bg-fest-amber/20 text-fest-amber border-fest-amber/40'
                   }`}>
-                    {problemStatement.status === 'released' ? '● RELEASED (LIVE ON 65 SCREENS)' : 'LOCKED (HIDDEN FROM PARTICIPANTS)'}
+                    {problemStatement.status === 'released' ? `● RELEASED (LIVE ON ${registeredContenders.length || 64} SCREENS)` : 'LOCKED (HIDDEN FROM PARTICIPANTS)'}
                   </span>
                 </div>
                 <p className="text-xs font-mono text-slate-300">
@@ -937,47 +771,30 @@ export default function AdminView() {
             </div>
           </div>
 
-          {/* POST-BATTLE AI PROMPT & TOKEN EFFICIENCY CHECKER TRIGGER CARD */}
-          <div className={`p-6 rounded-2xl border transition-all ${
-            promptCheckerActive
-              ? 'bg-gradient-to-r from-purple-950/40 via-dark-900 to-dark-950 border-purple-500/50 shadow-[0_0_30px_rgba(168,85,247,0.25)]'
-              : 'bg-dark-900/80 border-white/15'
-          }`}>
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Zap className={`w-5 h-5 ${promptCheckerActive ? 'text-purple-400 animate-pulse' : 'text-slate-400'}`} />
-                  <h2 className="text-xl font-bold font-sans text-white uppercase tracking-tight">
-                    Post-Battle AI Prompt & Token Economy Checker
-                  </h2>
-                  <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full border ${
-                    promptCheckerActive
-                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                      : 'bg-slate-800 text-slate-400 border-white/10'
-                  }`}>
-                    {promptCheckerActive ? '● UNLOCKED FOR PARTICIPANTS' : 'LOCKED (HIDDEN DURING BATTLE)'}
-                  </span>
-                </div>
-                <p className="text-xs font-mono text-slate-300">
-                  {promptCheckerActive
-                    ? 'Active: Participants can now audit their prompt engineering efficiency, Chain-of-Thought (CoT) reasoning depth, schema adherence, and Antigravity daily limit token consumption.'
-                    : 'Keep this locked during the battle. Trigger/activate this after the competition ends so participants can inspect their AI efficiency score out of 100.'}
+          {/* JUDGE SECRET INSPECTION DIRECTIVE QUICK-STATUS CARD */}
+          <div className="p-5 rounded-2xl border border-white/10 bg-dark-900/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 font-mono text-xs">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-white text-sm">
+                  Judge Secret Verification Directive ({verificationPrompt?.globalUnlocked ? 'Global Unlocked' : `${Object.values(verificationPrompt?.unlockedParticipants || {}).filter(Boolean).length} Desks Unlocked`})
+                </h4>
+                <p className="text-slate-400 text-[11px] mt-0.5">
+                  Customizable prompt directive for faculty judges to audit contestant desks. Unlocked per desk by the judge. All grading is manual by faculty (only Time is automated).
                 </p>
               </div>
-
-              <button
-                type="button"
-                onClick={() => togglePromptChecker(!promptCheckerActive)}
-                className={`px-6 py-3.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${
-                  promptCheckerActive
-                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-[0_0_20px_rgba(225,29,72,0.4)]'
-                    : 'bg-gradient-to-r from-purple-600 to-fest-pink text-white hover:opacity-95 shadow-[0_0_25px_rgba(168,85,247,0.4)]'
-                }`}
-              >
-                <Zap className="w-4 h-4 fill-current" />
-                <span>{promptCheckerActive ? 'Deactivate Prompt Checker' : 'Trigger Prompt Checker for Participants'}</span>
-              </button>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setAdminTab('inspection')}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)] shrink-0 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Edit Directive Prompt & Desks</span>
+            </button>
           </div>
 
           {/* Battle Timer Controls */}
@@ -1473,7 +1290,7 @@ export default function AdminView() {
                       ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
                       : 'bg-fest-amber/20 text-fest-amber border-fest-amber/40'
                   }`}>
-                    {problemStatement.status === 'released' ? '● RELEASED (LIVE ON 65 SCREENS)' : 'LOCKED (HIDDEN FROM CONTENDERS)'}
+                    {problemStatement.status === 'released' ? `● RELEASED (LIVE ON ${registeredContenders.length || 64} SCREENS)` : 'LOCKED (HIDDEN FROM PARTICIPANTS)'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300">
@@ -1598,28 +1415,6 @@ export default function AdminView() {
                 />
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">4. Expected Output JSON Schema Example</label>
-                <textarea
-                  rows={4}
-                  value={editingProblem.outputSchemaExample}
-                  onChange={(e) => setEditingProblem({ ...editingProblem, outputSchemaExample: e.target.value })}
-                  placeholder={`{\n  "status": "OPTIMAL",\n  "dispatch": [...]\n}`}
-                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-emerald-300 text-xs focus:border-fest-cyan resize-none font-mono leading-relaxed"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">5. Submission Guidelines</label>
-                <textarea
-                  rows={3}
-                  value={editingProblem.submissionRequirements}
-                  onChange={(e) => setEditingProblem({ ...editingProblem, submissionRequirements: e.target.value })}
-                  placeholder="Submit your Antigravity project link and record daily token limit %..."
-                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 text-white text-xs focus:border-fest-cyan resize-none leading-relaxed"
-                />
-              </div>
-
               <div className="flex justify-end pt-2">
                 <button
                   type="submit"
@@ -1684,10 +1479,10 @@ export default function AdminView() {
               </div>
               <div>
                 <h3 className="text-lg font-bold font-sans text-white">
-                  4 Judges Adjudication Management
+                  Faculty Judges Adjudication Management
                 </h3>
                 <p className="text-slate-400 mt-0.5">
-                  Adjudicators register using their Gmail and password. All 4 judges can grade all contenders.
+                  Official faculty adjudicators for IEEE PES DIU SBC Prompt Battle 2026. Strict single-judge policy: only one faculty member evaluates each student (double-marking is locked).
                 </p>
               </div>
             </div>
@@ -1767,91 +1562,151 @@ export default function AdminView() {
 
           {/* Contenders vs Judges Marking Matrix */}
           <div className="p-6 rounded-2xl bg-dark-900 border border-white/15 space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-white/10">
-              <span className="font-bold text-white uppercase tracking-wider text-xs flex items-center gap-2">
-                <Scale className="w-4 h-4 text-fest-amber" />
-                <span>Contender Multi-Judge Evaluation Matrix</span>
-              </span>
-              <span className="text-[11px] text-slate-400">
-                {registeredContenders.length} Roster Contenders • {participants.length} Submissions
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-white/10 gap-2 font-mono">
+              <div>
+                <span className="font-bold text-white uppercase tracking-wider text-xs flex items-center gap-2">
+                  <Scale className="w-4 h-4 text-fest-amber" />
+                  <span>Contender Single-Judge Adjudication & Evaluation Audit</span>
+                </span>
+                <span className="text-[11px] text-slate-400 block mt-0.5">
+                  Single Teacher Evaluation Policy: One faculty judge per contestant. Once finalized, marks are locked.
+                </span>
+              </div>
+              <span className="text-[11px] px-2.5 py-1 rounded bg-dark-950 border border-white/10 text-slate-300">
+                {registeredContenders.length} Roster Contenders • {participants.length} Active Records
               </span>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs font-mono">
                 <thead>
                   <tr className="border-b border-white/10 text-slate-400 uppercase text-[10px] tracking-wider">
                     <th className="py-2.5 px-3">Desk / ID</th>
                     <th className="py-2.5 px-3">Contender Name</th>
-                    <th className="py-2.5 px-3 text-center">Judge 1</th>
-                    <th className="py-2.5 px-3 text-center">Judge 2</th>
-                    <th className="py-2.5 px-3 text-center">Judge 3</th>
-                    <th className="py-2.5 px-3 text-center">Judge 4</th>
-                    <th className="py-2.5 px-3 text-center">Average Score</th>
-                    <th className="py-2.5 px-3 text-right">Status</th>
+                    <th className="py-2.5 px-3">Evaluating Faculty (Marked By)</th>
+                    <th className="py-2.5 px-3 text-center">Score Breakdown (Prompt / Proj / Time / Pres / Token)</th>
+                    <th className="py-2.5 px-3 text-center">Total Score</th>
+                    <th className="py-2.5 px-3 text-right">Adjudication Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {(registeredContenders.length > 0 ? registeredContenders : participants).map((contender, idx) => {
-                    const cleanId = (contender.participantId || contender.id || '').toUpperCase();
-                    const participantData = participants.find((p) => (p.participantId?.toUpperCase() === cleanId || p.id === cleanId)) || contender;
-                    const judgeMarks = participantData.judgeMarks || {};
+                  {[...(registeredContenders.length > 0 ? registeredContenders : participants)]
+                    .sort((a, b) => {
+                      const deskA = parseInt(String(a.deskNumber || '').replace(/\D/g, ''), 10) || 0;
+                      const deskB = parseInt(String(b.deskNumber || '').replace(/\D/g, ''), 10) || 0;
+                      return deskA - deskB;
+                    })
+                    .map((contender, idx) => {
+                      const cleanId = (contender.participantId || contender.studentId || contender.id || '').toUpperCase();
+                      const pCoupon = (contender.couponCode || '').toUpperCase();
+                      const pDesk = (contender.deskNumber || '').toLowerCase();
 
-                    // Get scores for judges 1 to 4
-                    const j1 = judges.find(j => j.judgeNumber === 1);
-                    const j2 = judges.find(j => j.judgeNumber === 2);
-                    const j3 = judges.find(j => j.judgeNumber === 3);
-                    const j4 = judges.find(j => j.judgeNumber === 4);
+                      const participantData = (participants || []).find((p) => {
+                        const cCoupon = (p.couponCode || '').toUpperCase();
+                        const cDesk = (p.deskNumber || '').toLowerCase();
+                        const cId = (p.participantId || p.id || '').toUpperCase();
+                        if (pCoupon && cCoupon && pCoupon === cCoupon) return true;
+                        if (pDesk && cDesk && pDesk === cDesk) return true;
+                        if (cleanId && cId && cleanId === cId) return true;
+                        return false;
+                      }) || contender;
 
-                    const s1 = j1 && judgeMarks[j1.id]?.totalScore;
-                    const s2 = j2 && judgeMarks[j2.id]?.totalScore;
-                    const s3 = j3 && judgeMarks[j3.id]?.totalScore;
-                    const s4 = j4 && judgeMarks[j4.id]?.totalScore;
+                      const judgeMarks = participantData.judgeMarks || {};
+                      const evalList = Object.values(judgeMarks);
+                      const primaryEval = evalList[0] || null;
+                      const markedByJudge = participantData.markedByJudgeName || primaryEval?.judgeName || null;
+                      const isExpelled = Boolean(participantData.isExpelled);
+                      const isDisqualified = Boolean(participantData.isDisqualified);
+                      const hasSubmitted = Boolean(
+                        participantData.hasSubmitted || 
+                        participantData.submittedUrl || 
+                        participantData.workUrl || 
+                        (participantData.finishSeconds && participantData.finishSeconds > 0)
+                      );
+                      const totalScore = (isExpelled || isDisqualified) ? 0 : (participantData.totalScore || primaryEval?.totalScore || 0);
 
-                    const gradedCount = [s1, s2, s3, s4].filter(s => s !== undefined).length;
-                    const avgScore = participantData.totalScore || 0;
-
-                    return (
-                      <tr key={cleanId || idx} className="hover:bg-white/5 transition-colors">
-                        <td className="py-3 px-3">
-                          <span className="font-bold text-fest-amber mr-2">{contender.deskNumber || 'Desk 01'}</span>
-                          <span className="text-[10px] text-slate-400">{cleanId}</span>
-                        </td>
-                        <td className="py-3 px-3 font-bold text-white">
-                          <div>{contender.name}</div>
-                          <div className="text-[10px] text-fest-pink font-normal">{contender.teamName || 'Solo'}</div>
-                        </td>
-                        <td className="py-3 px-3 text-center font-mono">
-                          {s1 !== undefined ? <span className="text-fest-cyan font-bold">{s1} pts</span> : <span className="text-slate-600">-</span>}
-                        </td>
-                        <td className="py-3 px-3 text-center font-mono">
-                          {s2 !== undefined ? <span className="text-fest-pink font-bold">{s2} pts</span> : <span className="text-slate-600">-</span>}
-                        </td>
-                        <td className="py-3 px-3 text-center font-mono">
-                          {s3 !== undefined ? <span className="text-fest-amber font-bold">{s3} pts</span> : <span className="text-slate-600">-</span>}
-                        </td>
-                        <td className="py-3 px-3 text-center font-mono">
-                          {s4 !== undefined ? <span className="text-fest-pes font-bold">{s4} pts</span> : <span className="text-slate-600">-</span>}
-                        </td>
-                        <td className="py-3 px-3 text-center font-mono">
-                          <span className="px-2 py-0.5 rounded bg-fest-pes/20 text-fest-pes font-extrabold text-xs">
-                            {avgScore} / 100
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            gradedCount >= 4
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                              : gradedCount > 0
-                              ? 'bg-fest-amber/20 text-fest-amber border border-fest-amber/30'
-                              : 'bg-white/5 text-slate-500 border border-white/5'
-                          }`}>
-                            {gradedCount}/4 Judges Graded
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                      return (
+                        <tr key={contender.couponCode || cleanId || idx} className="hover:bg-white/5 transition-colors">
+                          <td className="py-3 px-3">
+                            <span className="font-bold text-fest-amber mr-2">{contender.deskNumber || 'Desk 01'}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{contender.couponCode || cleanId}</span>
+                          </td>
+                          <td className="py-3 px-3 font-bold text-white">
+                            <div className="font-sans">{contender.name}</div>
+                            <div className="text-[10px] text-fest-pink font-normal">{contender.teamName || 'Solo'} • {cleanId}</div>
+                          </td>
+                          <td className="py-3 px-3">
+                            {markedByJudge ? (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold flex items-center gap-1.5 w-fit">
+                                  <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>{markedByJudge}</span>
+                                </span>
+                                <span className="text-[9px] text-slate-400">Single Evaluator Policy Enforced</span>
+                              </div>
+                            ) : hasSubmitted ? (
+                              <span className="px-2.5 py-1 rounded-full bg-fest-amber/15 border border-fest-amber/30 text-fest-amber text-[11px] font-bold flex items-center gap-1.5 w-fit">
+                                <Clock className="w-3 h-3 text-fest-amber" />
+                                <span>Ready for Faculty Evaluation</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 italic text-[11px]">Awaiting Submission</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono">
+                            {primaryEval ? (
+                              <div className="text-center font-mono text-[11px]">
+                                <span className="text-fest-cyan font-bold" title="Prompt (Max 50)">P: {primaryEval.promptScore ?? 0}</span>
+                                <span className="text-slate-600 mx-1">/</span>
+                                <span className="text-fest-pink font-bold" title="Project Working (Max 25)">Proj: {primaryEval.projectWorkingTotal ?? 0}</span>
+                                <span className="text-slate-600 mx-1">/</span>
+                                <span className="text-fest-amber font-bold" title="Time Score (Max 10, Auto)">T: {primaryEval.timeScore ?? 0}</span>
+                                <span className="text-slate-600 mx-1">/</span>
+                                <span className="text-purple-300 font-bold" title="Presentation (Max 10)">Pr: {primaryEval.presentationScore ?? 0}</span>
+                                <span className="text-slate-600 mx-1">/</span>
+                                <span className="text-emerald-400 font-bold" title="Token Economy (Max 5)">Tk: {primaryEval.tokenScore ?? 0}</span>
+                              </div>
+                            ) : hasSubmitted ? (
+                              <div className="text-center font-mono text-[10px] text-fest-cyan">
+                                <span>Time: {participantData.timeScore || 0}/10 (Auto) • Awaiting Rubric</span>
+                              </div>
+                            ) : (
+                              <div className="text-center font-mono text-[10px] text-slate-600">—</div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono">
+                            <span className="px-2 py-0.5 rounded bg-fest-pes/20 text-fest-pes font-extrabold text-xs">
+                              {totalScore} / 100
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            {isExpelled ? (
+                              <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold uppercase animate-pulse">
+                                EXPELLED
+                              </span>
+                            ) : isDisqualified ? (
+                              <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold uppercase">
+                                TIME EXPIRED
+                              </span>
+                            ) : markedByJudge ? (
+                              <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1 justify-end ml-auto w-fit">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                <span>Finalized</span>
+                              </span>
+                            ) : hasSubmitted ? (
+                              <span className="px-2 py-0.5 rounded bg-fest-amber/20 text-fest-amber border border-fest-amber/30 text-[10px] font-bold flex items-center gap-1 justify-end ml-auto w-fit">
+                                <Clock className="w-3 h-3 text-fest-amber" />
+                                <span>Pending Adjudication</span>
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded bg-white/5 text-slate-500 border border-white/5 text-[10px]">
+                                In Arena
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
@@ -2148,324 +2003,261 @@ export default function AdminView() {
         </div>
       )}
 
-      {/* TAB 3: KAHOOT QUIZ MANAGER */}
-      {adminTab === 'quiz' && (
+      {/* TAB 6: JUDGE SECRET VERIFICATION / INSPECTION DIRECTIVE MANAGER */}
+      {adminTab === 'inspection' && (
         <div className="space-y-8">
           
-          <div className="p-6 rounded-xl bg-dark-900 border border-white/15 space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <span className="text-xs font-mono text-fest-amber uppercase tracking-widest font-bold block mb-1">
-                  Kahoot Live Question Controller
-                </span>
-                <h3 className="text-xl font-bold font-sans text-white">
-                  Question {(quiz?.currentQuestionIndex || 0) + 1} of {quiz?.questions?.length || 0}
-                </h3>
-                <p className="text-xs font-mono text-slate-300 mt-1 max-w-xl">
-                  {quiz?.questions?.[quiz?.currentQuestionIndex || 0]?.question}
-                </p>
-                <div className="text-xs font-mono text-slate-400 mt-2 flex items-center gap-3">
-                  <span>Status: <strong className="text-fest-cyan uppercase">{quiz?.status}</strong></span>
-                  <span>•</span>
-                  <span>Responses: <strong className="text-white">{Object.keys(quiz?.submissions || {}).length}</strong> / <strong className="text-emerald-400">{totalJoinedCount}</strong> Joined</span>
+          {/* Top Overview & Master Controls */}
+          <div className="p-6 rounded-2xl bg-dark-900 border border-white/15 space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-emerald-400" />
+                  <h3 className="text-xl font-bold font-sans text-white uppercase tracking-tight">
+                    Judge Secret Verification Directive Editor
+                  </h3>
+                  <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold font-mono uppercase ${
+                    verificationPrompt?.globalUnlocked 
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                      : 'bg-dark-950 text-slate-400 border border-white/10'
+                  }`}>
+                    {verificationPrompt?.globalUnlocked ? 'Global Broadcast Unlocked' : 'Desk-Restricted Mode (Default)'}
+                  </span>
                 </div>
+                <p className="text-xs font-mono text-slate-300 max-w-2xl leading-relaxed">
+                  This directive prompt works identically to the Problem Statement window, but remains locked until a faculty judge arrives at an individual contestant station and triggers the unlock. The judge copies this prompt into the student's Antigravity chat, inspects the telemetry and reasoning, and then manually inputs all rubric marks into their evaluation form. No automated scoring is performed by this directive.
+                </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              {/* Master Global Unlock / Lock Toggle */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
-                  onClick={() => launchQuizQuestion(quiz?.currentQuestionIndex || 0)}
-                  className="px-4 py-2.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-                >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Launch Question to Phones</span>
-                </button>
-
-                <button
-                  onClick={endQuizQuestion}
-                  className="px-4 py-2.5 rounded bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-bold uppercase tracking-wider"
-                >
-                  End Question
-                </button>
-
-                <button
-                  onClick={() => {
-                    const nextIdx = Math.min((quiz?.questions?.length || 1) - 1, (quiz?.currentQuestionIndex || 0) + 1);
-                    launchQuizQuestion(nextIdx);
-                  }}
-                  className="px-4 py-2.5 rounded bg-fest-cyan text-dark-950 font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
-                >
-                  <span>Next Question</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-
-                <button
-                  onClick={() => publishQuizLeaderboard(!quiz?.published)}
-                  className={`px-4 py-2.5 rounded font-mono text-xs font-bold uppercase tracking-wider ${
-                    quiz?.published
-                      ? 'bg-amber-600 text-white'
-                      : 'bg-fest-amber text-dark-950 shadow-[0_0_20px_rgba(255,183,0,0.4)]'
+                  type="button"
+                  onClick={toggleGlobalVerificationPrompt}
+                  className={`px-4 py-2.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
+                    verificationPrompt?.globalUnlocked
+                      ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-[0_0_20px_rgba(225,29,72,0.4)]'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]'
                   }`}
                 >
-                  {quiz?.published ? 'Hide Podium' : 'Publish Grand Quiz Podium'}
-                </button>
-
-                <button
-                  onClick={resetQuiz}
-                  className="px-3 py-2.5 rounded bg-dark-950 border border-white/10 text-slate-400 hover:text-white"
-                  title="Reset Quiz"
-                >
-                  <RotateCcw className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4" />
+                  <span>{verificationPrompt?.globalUnlocked ? 'Lock Global Unlock (Revert to Desk-Only)' : 'Unlock For All 64 Desks Globally'}</span>
                 </button>
               </div>
             </div>
 
-            {/* Live Quiz Responses Roster */}
-            {Object.keys(quiz?.submissions || {}).length > 0 && (
-              <div className="pt-3 border-t border-white/10 space-y-2">
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-slate-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-fest-amber" />
-                    <span>Live Contender Submissions ({Object.keys(quiz?.submissions || {}).length} Answered / {totalJoinedCount} Joined)</span>
-                  </span>
-                </div>
-                <div className="overflow-x-auto max-h-56 scrollbar-thin border border-white/10 rounded-lg">
-                  <table className="w-full text-left font-mono text-xs">
-                    <thead className="bg-dark-950 text-slate-400 text-[11px] uppercase tracking-wider sticky top-0">
-                      <tr>
-                        <th className="py-2 px-3">Contender</th>
-                        <th className="py-2 px-3">Team</th>
-                        <th className="py-2 px-3 text-center">Selected Option</th>
-                        <th className="py-2 px-3 text-center">Status</th>
-                        <th className="py-2 px-3 text-center">Speed</th>
-                        <th className="py-2 px-3 text-right">Points</th>
-                        <th className="py-2 px-3 text-center">Tab Switches</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5 bg-dark-950/60">
-                      {Object.values(quiz?.submissions || {}).map((sub) => {
-                        const optLabels = ['A', 'B', 'C', 'D'];
-                        const optText = quiz?.questions?.[quiz?.currentQuestionIndex || 0]?.options?.[sub.selectedIndex];
-                        return (
-                          <tr key={sub.participantId} className="hover:bg-white/[0.02]">
-                            <td className="py-2 px-3 font-sans font-bold text-white">{sub.name}</td>
-                            <td className="py-2 px-3 text-fest-amber">{sub.teamName || 'Solo'}</td>
-                            <td className="py-2 px-3 text-center font-bold text-slate-200">
-                              Option {optLabels[sub.selectedIndex] || '—'} {optText ? `(${optText})` : ''}
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              {sub.isCorrect ? (
-                                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">CORRECT</span>
-                              ) : (
-                                <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold text-[10px]">WRONG</span>
-                              )}
-                            </td>
-                            <td className="py-2 px-3 text-center text-fest-cyan font-bold">{sub.timeTakenSec ? `${sub.timeTakenSec}s` : '—'}</td>
-                            <td className="py-2 px-3 text-right text-fest-amber font-bold">+{sub.score || 0}</td>
-                            <td className="py-2 px-3 text-center">
-                              {sub.tabSwitches > 0 ? (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold">
-                                  <AlertCircle className="w-3 h-3 text-rose-400" />
-                                  <span>{sub.tabSwitches}</span>
-                                </span>
-                              ) : (
-                                <span className="text-emerald-400 text-[10px]">0</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+            {/* Directive Prompt Text Editor */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <label className="text-slate-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-fest-cyan" />
+                  <span>Judge Secret Verification Directive Configuration</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  {directiveSavedMsg && (
+                    <span className="text-emerald-400 font-bold text-[11px] flex items-center gap-1 animate-in fade-in">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Saved & Synced to Cloud!</span>
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(directiveEditorText);
+                        setCopiedDirective(true);
+                        setTimeout(() => setCopiedDirective(false), 2000);
+                      }
+                    }}
+                    className="px-3 py-1 rounded bg-dark-950 border border-white/10 text-slate-300 hover:text-white text-[11px] flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedDirective ? (
+                      <>
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        <span className="text-emerald-400">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Copy Directive</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
-            )}
+
+              {/* Directive Title & Subtitle / Purpose Inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+                <div>
+                  <label className="block text-slate-400 text-[11px] font-bold mb-1">Directive Header Title</label>
+                  <input
+                    type="text"
+                    value={directiveEditorTitle}
+                    onChange={(e) => setDirectiveEditorTitle(e.target.value)}
+                    placeholder="e.g. IEEE PES DIU SBC • Judge Secret Verification Directive"
+                    className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 focus:border-fest-cyan text-white text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-[11px] font-bold mb-1">Directive Subtitle / Category</label>
+                  <input
+                    type="text"
+                    value={directiveEditorDesc}
+                    onChange={(e) => setDirectiveEditorDesc(e.target.value)}
+                    placeholder="e.g. Confidential AI Prompt Efficiency & Token Economy Audit Directive"
+                    className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/15 focus:border-fest-cyan text-white text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-[11px] font-bold mb-1">
+                  Confidential Verification Prompt Text (Copied by Judge into Contender AI Session)
+                </label>
+                <textarea
+                  rows={6}
+                  value={directiveEditorText}
+                  onChange={(e) => setDirectiveEditorText(e.target.value)}
+                  className="w-full p-4 rounded-xl bg-dark-950 border border-white/15 focus:border-emerald-400 text-emerald-300 font-mono text-xs custom-scrollbar resize-y leading-relaxed"
+                  placeholder="Enter standardized judge verification directive..."
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Reset directive to default IEEE PES DIU SBC inspection template?')) {
+                      resetVerificationPrompt();
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-dark-950 border border-white/10 text-slate-400 hover:text-white font-mono text-xs flex items-center gap-1.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset to PES Default</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateVerificationPromptDirective({
+                      title: directiveEditorTitle.trim(),
+                      description: directiveEditorDesc.trim(),
+                      directive: directiveEditorText.trim()
+                    });
+                    setDirectiveSavedMsg(true);
+                    setTimeout(() => setDirectiveSavedMsg(false), 2500);
+                  }}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Directive Prompt</span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* ALL QUIZ QUESTIONS BANK (EDITABLE & DELETABLE) */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-white/10 font-mono text-xs">
-              <div className="flex items-center gap-2">
-                <HelpCircle className="w-4 h-4 text-fest-amber" />
-                <h3 className="font-sans font-bold text-base text-white uppercase tracking-tight">
-                  Kahoot Question Bank ({quiz?.questions?.length || 0} Questions)
-                </h3>
+          {/* Desk-by-Desk Unlock Controller Roster (All 64 Participants) */}
+          <div className="p-6 rounded-2xl bg-dark-900 border border-white/15 space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-white/10 font-mono">
+              <div>
+                <span className="text-xs text-fest-cyan uppercase tracking-widest font-bold block mb-0.5">
+                  Participant Station Unlock Controller
+                </span>
+                <h4 className="text-base font-bold text-white">
+                  Individual Desk Unlock Status ({registeredContenders.length} Fixed Participants)
+                </h4>
               </div>
-              <span className="text-slate-400">
-                Active Question: #{(quiz?.currentQuestionIndex || 0) + 1}
+              <span className="text-xs text-slate-400">
+                Unlocked Desks: <strong className="text-emerald-400">
+                  {verificationPrompt?.globalUnlocked 
+                    ? `${registeredContenders.length} / ${registeredContenders.length} (Global)` 
+                    : `${Object.values(verificationPrompt?.unlockedParticipants || {}).filter(Boolean).length} / ${registeredContenders.length}`}
+                </strong>
               </span>
             </div>
 
-            <div className="space-y-3">
-              {(quiz?.questions || []).map((q, idx) => (
-                <div 
-                  key={q.id || idx}
-                  className={`p-4 rounded-xl border transition-all ${
-                    idx === (quiz?.currentQuestionIndex || 0)
-                      ? 'bg-dark-900 border-fest-amber/50 shadow-[0_0_20px_rgba(255,183,0,0.15)]'
-                      : 'bg-dark-950/70 border-white/10'
-                  }`}
-                >
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2.5 border-b border-white/10">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`px-2 py-0.5 rounded font-mono font-bold text-xs ${
-                        idx === (quiz?.currentQuestionIndex || 0)
-                          ? 'bg-fest-amber text-dark-950'
-                          : 'bg-dark-900 border border-white/10 text-slate-300'
-                      }`}>
-                        Q{idx + 1}
-                      </span>
-                      <span className="font-sans font-bold text-white text-sm">
-                        {q.question}
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-dark-900 text-fest-cyan text-[10px] font-mono border border-fest-cyan/30">
-                        {q.timeLimit || 20}s
-                      </span>
-                    </div>
+            <div className="overflow-x-auto max-h-[600px] scrollbar-thin border border-white/10 rounded-xl">
+              <table className="w-full text-left font-mono text-xs">
+                <thead className="bg-dark-950 text-slate-400 text-[11px] uppercase tracking-wider sticky top-0">
+                  <tr>
+                    <th className="py-2.5 px-3">Station</th>
+                    <th className="py-2.5 px-3">Participant ID</th>
+                    <th className="py-2.5 px-3">Contender Name</th>
+                    <th className="py-2.5 px-3">Team</th>
+                    <th className="py-2.5 px-3">Submission</th>
+                    <th className="py-2.5 px-3">Directive Status</th>
+                    <th className="py-2.5 px-3 text-right">Desk Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {registeredContenders.map((c) => {
+                    const id = (c.participantId || c.studentId || '').toUpperCase();
+                    const isUnlocked = Boolean(
+                      verificationPrompt?.globalUnlocked ||
+                      verificationPrompt?.unlockedParticipants?.[id] ||
+                      verificationPrompt?.unlockedParticipants?.[c.participantId]
+                    );
+                    const sub = participants.find((p) => (p.participantId || p.studentId || '').toUpperCase() === id);
 
-                    <div className="flex items-center gap-1.5 shrink-0 font-mono text-xs">
-                      <button
-                        onClick={() => launchQuizQuestion(idx)}
-                        className="px-3 py-1 rounded bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-all text-[11px] flex items-center gap-1"
-                        title="Broadcast this question to phones"
-                      >
-                        <Play className="w-3 h-3 fill-current" />
-                        <span>Launch</span>
-                      </button>
-
-                      <button
-                        onClick={() => setEditingQuizQ({ ...q, index: idx, options: [...(q.options || [])] })}
-                        className="p-1.5 rounded bg-dark-900 border border-white/10 text-slate-300 hover:text-white"
-                        title="Edit question text, options, and answer"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Delete question Q${idx + 1}: "${q.question}"?`)) {
-                            deleteQuizQuestion(q.id);
-                          }
-                        }}
-                        className="p-1.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/30"
-                        title="Delete question"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Options List */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2.5 font-mono text-xs">
-                    {(q.options || []).map((opt, optIdx) => {
-                      const isCorrect = q.correctIndex === optIdx;
-                      return (
-                        <div 
-                          key={optIdx}
-                          className={`p-2 rounded flex items-center justify-between border ${
-                            isCorrect 
-                              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' 
-                              : 'bg-dark-900/60 border-white/5 text-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-fest-cyan">
-                              {String.fromCharCode(65 + optIdx)}:
+                    return (
+                      <tr key={id} className={`hover:bg-white/5 transition-colors ${isUnlocked ? 'bg-emerald-950/10' : ''}`}>
+                        <td className="py-2.5 px-3 font-bold text-fest-amber">
+                          {c.deskNumber || 'Desk'}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-fest-cyan">
+                          {c.participantId}
+                        </td>
+                        <td className="py-2.5 px-3 font-medium text-white">
+                          {c.name}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-400">
+                          {c.teamName || 'Solo'}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {sub ? (
+                            <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                              Submitted ({sub.finishTimeFormatted})
                             </span>
-                            <span>{opt}</span>
-                          </div>
-                          {isCorrect && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-300">
-                              CORRECT
-                            </span>
+                          ) : (
+                            <span className="text-slate-500 italic text-[11px]">Pending</span>
                           )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase inline-flex items-center gap-1 ${
+                            isUnlocked 
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                              : 'bg-dark-950 text-slate-400 border border-white/10'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isUnlocked ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`}></span>
+                            <span>{isUnlocked ? 'Unlocked on Desk' : 'Locked'}</span>
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => toggleVerificationPromptForParticipant(c.participantId)}
+                            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                              isUnlocked
+                                ? 'bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25'
+                                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                            }`}
+                          >
+                            {isUnlocked ? 'Lock Desk' : 'Unlock Desk'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
-
-          <form onSubmit={handleAddQuestion} className="p-6 rounded-xl bg-dark-900/60 border border-white/15 space-y-4">
-            <h4 className="font-sans font-bold text-white text-base flex items-center gap-2">
-              <Plus className="w-4 h-4 text-fest-amber" />
-              <span>Add Custom Kahoot Question</span>
-            </h4>
-
-            <div>
-              <label className="block text-xs font-mono text-slate-300 mb-1">Question Prompt *</label>
-              <input
-                type="text"
-                required
-                value={newQText}
-                onChange={(e) => setNewQText(e.target.value)}
-                placeholder="e.g. Which prompt injection defense enforces output syntax verification?"
-                className="w-full px-3 py-2 rounded bg-dark-950 border border-white/15 text-white font-sans text-sm focus:border-fest-amber"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {['A (Red ▲)', 'B (Blue ◆)', 'C (Yellow ●)', 'D (Green ■)'].map((label, idx) => (
-                <div key={idx}>
-                  <label className="block text-[11px] font-mono text-slate-400 mb-1 flex items-center justify-between">
-                    <span>Option {label}</span>
-                    <span className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="correctIdx"
-                        checked={newQCorrect === idx}
-                        onChange={() => setNewQCorrect(idx)}
-                        className="accent-emerald-400"
-                      />
-                      <span className={newQCorrect === idx ? 'text-emerald-400 font-bold' : ''}>Correct</span>
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newQOpts[idx]}
-                    onChange={(e) => {
-                      const updated = [...newQOpts];
-                      updated[idx] = e.target.value;
-                      setNewQOpts(updated);
-                    }}
-                    placeholder={`Answer text for ${label}...`}
-                    className="w-full px-3 py-1.5 rounded bg-dark-950 border border-white/10 text-white font-mono text-xs focus:border-fest-amber"
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-4 text-xs font-mono pt-2">
-              <span className="text-slate-300">Time Limit:</span>
-              {[15, 20, 30, 45].map((s) => (
-                <button
-                  type="button"
-                  key={s}
-                  onClick={() => setNewQTime(s)}
-                  className={`px-3 py-1 rounded border ${
-                    newQTime === s ? 'bg-fest-amber text-dark-950 font-bold border-fest-amber' : 'bg-dark-950 text-slate-300 border-white/10'
-                  }`}
-                >
-                  {s}s
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="submit"
-              className="py-2.5 px-6 rounded bg-fest-amber text-dark-950 font-mono text-xs font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(255,183,0,0.3)]"
-            >
-              Add Question to Quiz
-            </button>
-          </form>
 
         </div>
       )}
 
         </main>
-      </div>
 
       {/* Manual Contender Add Modal */}
       {showAddModal && (
@@ -2523,105 +2315,6 @@ export default function AdminView() {
                   className="px-4 py-2 rounded bg-fest-cyan text-dark-950 font-bold"
                 >
                   Add Contender
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* EDIT QUIZ QUESTION MODAL */}
-      {editingQuizQ && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="w-full max-w-xl bg-dark-900 border border-white/20 rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto scrollbar-thin font-mono text-xs shadow-2xl">
-            <div className="flex items-center justify-between pb-2 border-b border-white/10">
-              <h3 className="font-sans font-bold text-white text-base">
-                Edit Kahoot Question #{editingQuizQ.index + 1}
-              </h3>
-              <button
-                onClick={() => setEditingQuizQ(null)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                updateQuizQuestion(editingQuizQ.id, {
-                  question: editingQuizQ.question,
-                  options: editingQuizQ.options,
-                  correctIndex: editingQuizQ.correctIndex,
-                  timeLimit: editingQuizQ.timeLimit,
-                });
-                setEditingQuizQ(null);
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">Question Prompt *</label>
-                <input
-                  type="text"
-                  required
-                  value={editingQuizQ.question}
-                  onChange={(e) => setEditingQuizQ({ ...editingQuizQ, question: e.target.value })}
-                  className="w-full px-3 py-2 rounded bg-dark-950 border border-white/15 text-white font-sans text-sm focus:border-fest-amber"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-slate-300 font-bold">Answer Options (Select radio for correct answer):</label>
-                {(editingQuizQ.options || []).map((opt, oIdx) => (
-                  <div key={oIdx} className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="editCorrectIdx"
-                      checked={editingQuizQ.correctIndex === oIdx}
-                      onChange={() => setEditingQuizQ({ ...editingQuizQ, correctIndex: oIdx })}
-                      className="accent-emerald-400 w-4 h-4 cursor-pointer shrink-0"
-                    />
-                    <span className="text-slate-400 w-6 shrink-0">{String.fromCharCode(65 + oIdx)}:</span>
-                    <input
-                      type="text"
-                      required
-                      value={opt}
-                      onChange={(e) => {
-                        const updated = [...editingQuizQ.options];
-                        updated[oIdx] = e.target.value;
-                        setEditingQuizQ({ ...editingQuizQ, options: updated });
-                      }}
-                      className="flex-1 px-3 py-1.5 rounded bg-dark-950 border border-white/10 text-white"
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <div>
-                <label className="block text-slate-300 mb-1">Time Limit (Seconds)</label>
-                <input
-                  type="number"
-                  min="5"
-                  max="120"
-                  value={editingQuizQ.timeLimit || 20}
-                  onChange={(e) => setEditingQuizQ({ ...editingQuizQ, timeLimit: Number(e.target.value) })}
-                  className="w-24 px-3 py-1.5 rounded bg-dark-950 border border-white/15 text-white"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setEditingQuizQ(null)}
-                  className="px-4 py-2 rounded text-slate-400 hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded bg-fest-amber text-dark-950 font-bold uppercase tracking-wider"
-                >
-                  Save Question
                 </button>
               </div>
             </form>
