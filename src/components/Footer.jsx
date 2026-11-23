@@ -95,7 +95,7 @@ export default function Footer() {
           <p>© 2026 IEEE PES DIU SBC • EEE FEST 2026. All rights reserved.</p>
           <p className="mt-2 sm:mt-0 flex items-center gap-2 text-slate-400">
             <span>Powered by</span>
-            <span className="text-fest-pink font-semibold">AI Prompt Battle Engine</span>
+            <span className="text-fest-pink font-semibold">PES Web Development team</span>
             <span>•</span>
             <button 
               onClick={() => switchView('judge')}
